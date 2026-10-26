@@ -321,7 +321,7 @@ components:
 
     IdentityContext:
       type: object
-      required: [tenant_uuid]
+      required: [tenant_uuid, is_root]
       properties:
         tenant_uuid:
           type: string
@@ -332,6 +332,9 @@ components:
         member_uuid:
           type: string
           format: uuid
+        is_root:
+          type: boolean
+          description: Root assertion from the startup-selected authenticated identity adapter; never inferred from client claims or role names.
         roles:
           type: array
           items:

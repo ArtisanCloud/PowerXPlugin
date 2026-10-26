@@ -18,10 +18,21 @@ import (
 )
 
 var db *gorm.DB
+var readOnlyDatabase bool
+
+// IsReadOnly reports the database-enforced startup mode, not a caller override.
+func IsReadOnly() bool { return readOnlyDatabase }
+
+// BackgroundWorkersDisabled also honors the host's explicit local rehearsal
+// policy. It only suppresses outbound/background work and never grants writes.
+func BackgroundWorkersDisabled() bool {
+	return IsReadOnly() || strings.EqualFold(strings.TrimSpace(os.Getenv("POWERX_DISABLE_BACKGROUND_WORKERS")), "true")
+}
 
 func GetGlobalDB() *gorm.DB { return db }
 
 func Connect(cfg *config.DatabaseConfig) (*gorm.DB, error) {
+	readOnlyDatabase = false
 	// 默认值/校验
 	cfg.ApplyDefaults()
 	if err := cfg.Validate(); err != nil {
@@ -115,8 +126,8 @@ func Connect(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 
 	// schema 准备
 	if strings.ToLower(cfg.Driver) == "postgres" {
-		if err := createSchema(cfg.Schema); err != nil {
-			return nil, fmt.Errorf("failed to create schema: %w", err)
+		if err := prepareSchema(cfg.Schema); err != nil {
+			return nil, err
 		}
 		if err := setDefaultSchema(cfg.Schema); err != nil {
 			return nil, fmt.Errorf("failed to set default schema: %w", err)

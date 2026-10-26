@@ -362,13 +362,46 @@ func (s *LocalAI) chat(ctx context.Context, in dto.LLMInvokeInput, vision bool) 
 func (s *LocalAI) LLMInvoke(ctx context.Context, in dto.LLMInvokeInput) (*dto.LLMInvokeOutput, error) {
 	return s.chat(ctx, in, false)
 }
-func (s *LocalAI) VLMInvoke(ctx context.Context, in dto.ModalInvokeInput) (*dto.ModalInvokeOutput, error) {
-	out, e := s.chat(ctx, dto.LLMInvokeInput{ModelKey: in.ModelKey, Inputs: in.Inputs, Params: in.Params}, true)
-	if e != nil {
-		return nil, e
+
+// InvokeLLMWithProfile tests an unsaved local profile without mutating the
+// startup model registry or selecting a delegated adapter.
+func (s *LocalAI) InvokeLLMWithProfile(ctx context.Context, profile config.LocalAIModel, in dto.LLMInvokeInput) (*dto.LLMInvokeOutput, error) {
+	m, err := normalizeLocalAIModel(profile)
+	if err != nil {
+		return nil, err
 	}
-	raw, e := json.Marshal(out)
-	return &dto.ModalInvokeOutput{Data: raw}, e
+	isolated := &LocalAI{models: map[string]config.LocalAIModel{m.Key: m}, http: s.http}
+	in.ModelKey = m.Key
+	return isolated.LLMInvoke(ctx, in)
+}
+func (s *LocalAI) VLMInvoke(ctx context.Context, in dto.MediaInvokeInput) (*dto.AnalysisResult, error) {
+	out, err := s.chat(ctx, dto.LLMInvokeInput{ModelKey: in.ModelKey, Inputs: in.Inputs, Params: in.Params}, true)
+	if err != nil {
+		return nil, err
+	}
+	model, err := s.model(ctx, in.ModelKey, "vlm")
+	if err != nil {
+		return nil, err
+	}
+	return &dto.AnalysisResult{ContractVersion: 2, Type: "analysis", Text: out.Text, Usage: out.Usage, TraceID: uuid.NewString(), Provider: model.Provider, Model: model.Model}, nil
+}
+
+// Local media generation/task storage is not implemented by the Ollama adapter.
+// These methods fail explicitly; they never call Core or create synthetic jobs.
+func (s *LocalAI) ListMediaModels(context.Context, dto.MediaCatalogFilter) (*dto.MediaModelCatalog, error) {
+	return nil, aiError(422, "MODALITY_UNSUPPORTED")
+}
+func (s *LocalAI) ListMediaProviders(context.Context, string) (*dto.MediaProviderCatalog, error) {
+	return nil, aiError(422, "MODALITY_UNSUPPORTED")
+}
+func (s *LocalAI) GetMediaTask(context.Context, string) (*dto.MediaTask, error) {
+	return nil, aiError(422, "MODALITY_UNSUPPORTED")
+}
+func (s *LocalAI) CancelMediaTask(context.Context, string) (*dto.MediaTask, error) {
+	return nil, aiError(422, "MODALITY_UNSUPPORTED")
+}
+func (s *LocalAI) SubscribeMediaTask(context.Context, string, dto.MediaTaskSubscriptionOptions, func(dto.MediaTaskEvent) error) error {
+	return aiError(422, "MODALITY_UNSUPPORTED")
 }
 
 func (s *LocalAI) LLMStream(ctx context.Context, in dto.LLMStreamInput, emit func(dto.LLMStreamEvent) error) error {
@@ -456,15 +489,15 @@ func (s *LocalAI) EmbeddingInvoke(ctx context.Context, in dto.EmbeddingInvokeInp
 	return &dto.EmbeddingInvokeOutput{Vectors: out.Vectors}, nil
 }
 
-func (s *LocalAI) ImageInvoke(ctx context.Context, in dto.ModalInvokeInput) (*dto.ModalInvokeOutput, error) {
+func (s *LocalAI) ImageInvoke(ctx context.Context, in dto.MediaInvokeInput) (*dto.MediaTask, error) {
 	_, err := s.model(ctx, in.ModelKey, "image")
 	return nil, err
 }
-func (s *LocalAI) VideoInvoke(ctx context.Context, in dto.ModalInvokeInput) (*dto.ModalInvokeOutput, error) {
+func (s *LocalAI) VideoInvoke(ctx context.Context, in dto.MediaInvokeInput) (*dto.MediaTask, error) {
 	_, err := s.model(ctx, in.ModelKey, "video")
 	return nil, err
 }
-func (s *LocalAI) TTSInvoke(ctx context.Context, in dto.ModalInvokeInput) (*dto.ModalInvokeOutput, error) {
+func (s *LocalAI) TTSInvoke(ctx context.Context, in dto.MediaInvokeInput) (*dto.MediaTask, error) {
 	_, err := s.model(ctx, in.ModelKey, "tts")
 	return nil, err
 }

@@ -1,6 +1,12 @@
 exposure:
   channels:
     - auth: jwt
+      capability: {{ .PluginID }}.parcel.volume
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/internal/tools/parcel-volumes
+      method: POST
+      rbac: parcel.volumes:compute
+      type: rest
+    - auth: jwt
       capability: {{ .PluginID }}.auth.me_context
       entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/admin/user/auth/me/context
       method: GET

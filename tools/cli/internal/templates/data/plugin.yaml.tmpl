@@ -1,8 +1,10 @@
 id: {{ .PluginID }}
 name: {{ .PluginName }}
 version: {{ .Version }}
+{{ .NotificationPresentationsYAML }}
 description: "PowerX 基础模板插件，提供模板 CRUD、能力注册与多协议暴露示例。"
 runtime:
+  pin_executable: true
   kind: process
   entry: backend/bin/plugin
   env:
@@ -122,6 +124,16 @@ frontend:
                 order: 3
                 required_policies:
                   - menu.console.templates.framework_lab:view
+          - id: regression
+            title_i18n:
+              namespace: menus
+              key: menu.{{ .PluginID }}.regression
+            icon: i-heroicons-beaker
+            path: /admin/regression
+            route: admin/regression
+            order: 3
+            required_policies:
+              - regression:read
           - id: powerx
             title: PowerX底座能力
             title_i18n:

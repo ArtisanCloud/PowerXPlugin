@@ -17,13 +17,14 @@ BACKEND_DIR         ?= .
 BUILD_DIR           ?= $(BACKEND_DIR)/bin
 ABS_BACKEND_DIR     := $(abspath $(BACKEND_DIR))
 ABS_BUILD_DIR       := $(abspath $(BUILD_DIR))
-GO_BUILD_CACHE     ?= $(abspath $(BACKEND_DIR)/.cache/go-build)
+# 默认沿用 Go 的缓存配置；显式变量仍可用于需要隔离的构建。
+GO_BUILD_CACHE     ?= $(shell go env GOCACHE)
 
 FRONTEND_DIR        ?= web-admin
 FRONTEND_OUTPUT     ?= $(FRONTEND_DIR)/.output
 
 CLI_ROOT_DIR        ?= ..
-CLI_BUILD_CACHE     ?= $(abspath $(CLI_ROOT_DIR)/.cache/go-build)
+CLI_BUILD_CACHE     ?= $(GO_BUILD_CACHE)
 PX_PLUGIN_CLI_VERSION ?=
 GO_BIN_DIR          ?= $(shell sh -c 'if [ -n "$$GOBIN" ]; then printf "%s" "$$GOBIN"; else GOPATH="$$(go env GOPATH 2>/dev/null)"; printf "%s/bin" "$$GOPATH"; fi')
 
@@ -74,12 +75,12 @@ build: ## 构建后端（本机平台）
 	  echo "跳过 Go 构建（python backend）"; \
 	else \
 	  mkdir -p $(ABS_BUILD_DIR); \
-	  mkdir -p $(GO_BUILD_CACHE); \
+	  mkdir -p "$(GO_BUILD_CACHE)"; \
 	  rm -f $(ABS_BUILD_DIR)/plugin $(ABS_BUILD_DIR)/migrate; \
-	  GOCACHE=$(GO_BUILD_CACHE) go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/plugin ./cmd/plugin; \
+	  GOCACHE="$(GO_BUILD_CACHE)" go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/plugin ./cmd/plugin; \
 	  if [ -d "$(ABS_BACKEND_DIR)/cmd/database" ]; then \
 	    echo "   构建 migrate（如存在）..."; \
-	    GOCACHE=$(GO_BUILD_CACHE) go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/migrate ./cmd/database; \
+	    GOCACHE="$(GO_BUILD_CACHE)" go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/migrate ./cmd/database; \
 	  else \
 	    echo "   跳过 migrate（未找到 cmd/database）"; \
 	  fi; \
@@ -89,12 +90,12 @@ build: ## 构建后端（本机平台）
 build-px-plugin: ## 在仓库根目录构建 bin/px-plugin
 	@echo "==> 构建 px-plugin CLI -> $(CLI_ROOT_DIR)/bin/px-plugin"
 	@mkdir -p $(CLI_ROOT_DIR)/bin
-	@mkdir -p $(CLI_BUILD_CACHE)
+	@mkdir -p "$(CLI_BUILD_CACHE)"
 	@if [ -n "$(PX_PLUGIN_CLI_VERSION)" ]; then \
 	  echo "   使用版本号: $(PX_PLUGIN_CLI_VERSION)"; \
-	  GOCACHE=$(CLI_BUILD_CACHE) go build -C $(CLI_ROOT_DIR) -ldflags "-X main.version=$(PX_PLUGIN_CLI_VERSION)" -o ./bin/px-plugin ./tools/cli/cmd/px-plugin; \
+	  GOCACHE="$(CLI_BUILD_CACHE)" go build -C $(CLI_ROOT_DIR) -ldflags "-X main.version=$(PX_PLUGIN_CLI_VERSION)" -o ./bin/px-plugin ./tools/cli/cmd/px-plugin; \
 	else \
-	  GOCACHE=$(CLI_BUILD_CACHE) go build -C $(CLI_ROOT_DIR) -o ./bin/px-plugin ./tools/cli/cmd/px-plugin; \
+	  GOCACHE="$(CLI_BUILD_CACHE)" go build -C $(CLI_ROOT_DIR) -o ./bin/px-plugin ./tools/cli/cmd/px-plugin; \
 	fi
 	@$(CLI_ROOT_DIR)/bin/px-plugin --version
 
@@ -116,12 +117,12 @@ build-linux: ## 构建后端（Linux amd64）
 	  echo "跳过 Go 构建（python backend）"; \
 	else \
 	  mkdir -p $(ABS_BUILD_DIR); \
-	  mkdir -p $(GO_BUILD_CACHE); \
+	  mkdir -p "$(GO_BUILD_CACHE)"; \
 	  rm -f $(ABS_BUILD_DIR)/plugin $(ABS_BUILD_DIR)/migrate; \
-	  GOOS=linux GOARCH=$(TARGET_ARCH) GOCACHE=$(GO_BUILD_CACHE) go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/plugin ./cmd/plugin; \
+	  GOOS=linux GOARCH=$(TARGET_ARCH) GOCACHE="$(GO_BUILD_CACHE)" go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/plugin ./cmd/plugin; \
 	  if [ -d "$(ABS_BACKEND_DIR)/cmd/database" ]; then \
 	    echo "   构建 migrate（Linux/$(TARGET_ARCH)）..."; \
-	    GOOS=linux GOARCH=$(TARGET_ARCH) GOCACHE=$(GO_BUILD_CACHE) go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/migrate ./cmd/database; \
+	    GOOS=linux GOARCH=$(TARGET_ARCH) GOCACHE="$(GO_BUILD_CACHE)" go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/migrate ./cmd/database; \
 	  else \
 	    echo "   跳过 migrate（未找到 cmd/database）"; \
 	  fi; \

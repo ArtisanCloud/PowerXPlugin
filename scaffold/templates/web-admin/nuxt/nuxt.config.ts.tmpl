@@ -317,6 +317,7 @@ export default defineNuxtConfig({
       powerxPluginId: pluginId,
       powerxPluginVersion: pluginVersion,
       insidePowerX: INSIDE_POWERX,
+      regressionEnabled: process.env.NUXT_PUBLIC_REGRESSION_ENABLED === "true",
       providerMode: PROVIDER_MODE,
       powerxProxy: POWERX_PROXY_PUBLIC,
       gatewayAuthScheme: String(process.env.PX_GATEWAY_AUTH_SCHEME || '').trim().toLowerCase(),

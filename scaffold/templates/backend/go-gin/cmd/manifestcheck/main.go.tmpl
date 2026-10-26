@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	fwmanifest "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -34,6 +35,13 @@ func main() {
 }
 
 func run(pluginPath, manifestPath, schemaPath, eventFabricPath string, capabilitiesOnly, pluginOnly, syncCatalogs, syncOnly bool) error {
+	initial, err := loadYAMLFile(pluginPath)
+	if err != nil {
+		return fmt.Errorf("load plugin: %w", err)
+	}
+	if _, err := fwmanifest.DecodeNotificationPresentations(initial["notification_presentations"]); err != nil {
+		return fmt.Errorf("invalid_manifest: %w", err)
+	}
 	if syncCatalogs {
 		if err := syncPluginCatalogs(pluginPath); err != nil {
 			return err

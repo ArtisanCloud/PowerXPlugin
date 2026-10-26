@@ -21,6 +21,7 @@ backend:
   entry: backend/cmd/plugin
 `)
 
+	appendNotificationBindingFixture(t, tmp)
 	contracts := filepath.Join(tmp, "docs", "contracts")
 	mkDir(t, contracts)
 	writeFile(t, filepath.Join(contracts, "manifest.json"), `{"name":"Demo","version":"0.1.0"}`)
@@ -68,6 +69,7 @@ backend:
 	if result == nil {
 		t.Fatalf("Build() result is nil")
 	}
+	assertPackagedNotificationBindings(t, result.PackagePath)
 	if _, err := os.Stat(result.PackagePath); err != nil {
 		t.Fatalf("package.tar.gz missing: %v", err)
 	}

@@ -87,6 +87,12 @@ knowledge:
       ivfflat_lists: 100
 
 runtime:
+  media:
+    # core_host 显式选择 API Key Core 媒体；留空使用当前 provider。
+    channel: ""
+  notifications:
+    # 留空使用选定 provider；core_host 显式使用 API Key Core 通知。
+    channel: ""
   run_migrate: false
   event_bridge:
     enabled: true
@@ -268,3 +274,17 @@ operations:
 #   driver: "postgres"
 #   dsn: "postgres://powerx:powerx@localhost:5432/{{ .PluginDBName }}?sslmode=disable"
 #   schema: "public"
+
+regression:
+  enabled: false
+  environment: development
+  profiles:
+    - uuid: "44444444-4444-4444-8444-444444444444"
+      key: controlled
+      kind: controlled
+      title_key: regression.profiles.controlled
+      fixture_namespace: regression
+
+# Versioned provider catalog packaged with this plugin build.
+ai_catalog:
+  directory: ai/providers.d

@@ -1,0 +1,26 @@
+{
+  "checked_at": "2026-10-25T14:07:23.967277+00:00",
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/tenant/invocations",
+    "capability_id": "com.corex.ai.catalog.providers.read",
+    "preferred_protocol": "core_internal",
+    "body": {
+      "operation": "list_settings_providers",
+      "modality": "llm"
+    }
+  },
+  "result": {
+    "live_check": "performed",
+    "operation": "list_settings_providers",
+    "http_status": 400,
+    "error_code": "AI_OPERATION_INVALID",
+    "reason_code": "AI_OPERATION_INVALID",
+    "trace_id": null
+  },
+  "status": "CORE_SETTINGS_CATALOG_OPERATION_UNAVAILABLE",
+  "core_patch_applied": false,
+  "runtime_restarted": false,
+  "grant_changed": false,
+  "provider_generation_submitted": false
+}

@@ -12,11 +12,11 @@ const (
 	BackendGoChi      = "go-chi"   // Future support
 
 	// Frontend template types
-	FrontendNuxt      = "nuxt"     // Current support
-	FrontendNext      = "next"     // Future support
-	FrontendVue       = "vue"      // Future support
-	FrontendReact     = "react"    // Future support
-	FrontendSvelte    = "svelte"   // Future support
+	FrontendNuxt   = "nuxt"   // Current support
+	FrontendNext   = "next"   // Future support
+	FrontendVue    = "vue"    // Future support
+	FrontendReact  = "react"  // Future support
+	FrontendSvelte = "svelte" // Future support
 )
 
 // SupportedBackends returns a list of all supported backend template types.

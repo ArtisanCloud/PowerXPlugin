@@ -1,5 +1,6 @@
 capabilities:
   imports:
+    - contracts/capabilities/{{ .PluginID }}.parcel.volume.yaml
     - contracts/capabilities/{{ .PluginID }}.auth.me_context.yaml
     - contracts/capabilities/{{ .PluginID }}.template.audit.yaml
     - contracts/capabilities/{{ .PluginID }}.template.batch_clone.yaml
@@ -15,6 +16,12 @@ capabilities:
     - contracts/capabilities/{{ .PluginID }}.template.update.yaml
     - contracts/capabilities/{{ .PluginID }}.template.validate.yaml
   provides:
+    - descriptor: contracts/capabilities/{{ .PluginID }}.parcel.volume.yaml
+      id: {{ .PluginID }}.parcel.volume
+      schemas:
+        input: contracts/tools/parcel-volume.v1.json
+        output: contracts/tools/parcel-volume.v1.json
+      version: 1.0.0
     - descriptor: contracts/capabilities/{{ .PluginID }}.auth.me_context.yaml
       id: {{ .PluginID }}.auth.me_context
       schemas:
@@ -104,6 +111,12 @@ capabilities:
     - com.corex.agent.session.manage
     - com.corex.ai.catalog.models.read
     - com.corex.ai.catalog.providers.read
+    - com.corex.ai.vlm.invoke
+    - com.corex.ai.image.invoke
+    - com.corex.ai.video.invoke
+    - com.corex.ai.tts.invoke
+    - com.corex.ai.media.tasks.read
+    - com.corex.ai.media.tasks.cancel
     - com.corex.capabilities.catalog.read
     - com.corex.capabilities.grant_status.read
     - com.corex.customer.memberships.delegated_read
@@ -120,6 +133,8 @@ capabilities:
     - com.corex.media.assets.manage
     - com.corex.media.assets.read
     - com.corex.notifications.create
+    - com.corex.notifications.invalidate_card
+    - com.corex.notifications.read_receipts
     - com.corex.runtime.cache.manage
     - com.corex.runtime.cache.read
     - com.corex.runtime.taskcenter.manage

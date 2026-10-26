@@ -1,0 +1,287 @@
+{
+  "validated_at": "2026-10-22T02:27:53.699256+00:00",
+  "scope": "Framework source and controlled consumer validation for standard-image-v2, thumbnail_64 and business_notification_card.v2",
+  "framework": {
+    "branch": "025-framework-business-regression",
+    "base_commit": "f123a2310568bd0e3625e825b4fa419b9cfb4f6c",
+    "implementation_commit": null,
+    "uncommitted": true,
+    "includes_prior_ai_media_and_card_v1_worktree": true
+  },
+  "contracts": {
+    "source_repository": "ArtisanCloud/PowerX",
+    "source_commit": "0be9945cf7544bf18d0ed58be1043a313bba9de8",
+    "source_worktree_uncommitted": true,
+    "snapshot_date": "2026-10-22",
+    "source_paths": {
+      "business-notification-card.md": "docs/contracts/business-notification-card.md",
+      "business-notification-card.openapi.yaml": "docs/contracts/business-notification-card.openapi.yaml",
+      "notification-member-delivery.openapi.yaml": "docs/contracts/notification-member-delivery.openapi.yaml",
+      "media-thumbnail64-framework-handoff.md": "docs/contracts/media-thumbnail64-framework-handoff.md",
+      "media-image-derivatives.md": "docs/contracts/media-image-derivatives.md",
+      "fixtures/business-notification-card.v1.json": "docs/contracts/fixtures/business-notification-card.v1.json",
+      "fixtures/business-notification-card.v2.json": "docs/contracts/fixtures/business-notification-card.v2.json",
+      "fixtures/media-image-derivatives.v2.json": "docs/contracts/fixtures/media-image-derivatives.v2.json",
+      "media-host.openapi.yaml": "specs/001-media-storage/contracts/http-openapi.yaml",
+      "image-derivatives.openapi.yaml": "specs/001-media-storage/contracts/image-derivatives.openapi.yaml"
+    },
+    "sha256": {
+      "business-notification-card.md": "7b2f3d63b4ec9c7f122c44b1d7a0be814e03840bada4ee17012a2838cf503df1",
+      "business-notification-card.openapi.yaml": "009562b46eb0f257cbbc427e0bbc6fdf3c32f33bc7337d614af870f095537718",
+      "notification-member-delivery.openapi.yaml": "0ea2f9cdd6c7f6c19156a0cbf6718b533af7d5c197380a08891f41c5f3083bfa",
+      "media-thumbnail64-framework-handoff.md": "14947aa6ed68cf589aeaaae2d631856de83eb3cdd81044a1190316b0c2672cf4",
+      "media-image-derivatives.md": "f00f2933bfae2bc721826e7724ed1a637bb858cd31a2f47fd711034a1046c4b6",
+      "fixtures/business-notification-card.v1.json": "b2368121349f94d1cf31788a183ccdbe27fa26f40dcd6cb9474fdede101273d8",
+      "fixtures/business-notification-card.v2.json": "7b1c37d54756b2dbe14b196ed01b57efedff27ecc8750f11647f36b08d3b6a1e",
+      "fixtures/media-image-derivatives.v2.json": "1add45ec2aa034890f33967c9fe8aabeb53b7e9b94133f603c5e6603f803e2db",
+      "media-host.openapi.yaml": "13f92b62fcd386e61cbc7a54222fd53485ed43f11e943daab75324b2e07a8063",
+      "image-derivatives.openapi.yaml": "9dc83e216393ecffb9ff703bf8d9b6032c57e2e04303ab296fecc53683bf08ca"
+    }
+  },
+  "matrix": {
+    "go": "implemented_and_controlled_verified",
+    "nuxt": "implemented_types_and_snapshot_client_controlled_verified",
+    "manifest_cli_skeleton_templates": "implemented_package_and_actual_generator_consumer_verified",
+    "dotnet": "v2_extensions_not_implemented_deferred",
+    "publication": "local_snapshots_only_not_published",
+    "installed_acceptance": "not_performed"
+  },
+  "checks": {
+    "go": {
+      "status": "passed",
+      "packages": 53,
+      "test_cases_including_subtests": 1066,
+      "package_names": [
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/ai",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/agent",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/aisettings",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/cache",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/capability",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/middleware",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/contactfw",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/integration",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/hostapi",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/knowledge",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/media",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/metadata",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/notifications",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/pluginrelease",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/pluginruntime",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/agent",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/ai",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/capability",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/hostcontract",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/integration",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/knowledge",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/notifications",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/pluginrelease",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/pluginruntime",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/runtimeidentity",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/skills",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/sts",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/regression",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/regression/storegorm",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/scheduler",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/skills",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/ssebus",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/taskbus",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/taskcenter",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/taskqueue",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest",
+        "github.com/powerx-plugin/cli/cmd",
+        "github.com/powerx-plugin/cli/internal/manifest",
+        "github.com/powerx-plugin/cli/internal/package",
+        "github.com/powerx-plugin/cli/internal/templates",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/module",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/media",
+        "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/notifications",
+        "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/cmd/plugin",
+        "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config",
+        "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/cmd/manifestcheck",
+        "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/host_contract",
+        "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/runtimeexample"
+      ],
+      "optional_generated_gates_skipped_in_broad_suite": [
+        "TestLiveHostRuntimeIdentity",
+        "TestIAMBaselineGeneratedPlugin",
+        "TestGeneratedBackendBuild",
+        "TestRegressionGeneratedPlugins"
+      ],
+      "generated_consumer_verified_separately": true
+    },
+    "race": {
+      "status": "passed",
+      "packages": 8
+    },
+    "vet": {
+      "status": "passed",
+      "diagnostics": 0
+    },
+    "nuxt": {
+      "status": "passed",
+      "files": 3,
+      "tests": 16,
+      "new_thumbnail64_and_card_v2_cases": 8,
+      "browser_or_ui_acceptance": false
+    },
+    "typescript": {
+      "status": "passed",
+      "source_modules": [
+        "notifications.ts",
+        "image-derivatives.ts"
+      ],
+      "packed_snapshot_checked": true
+    },
+    "source_contract_pin": {
+      "status": "passed",
+      "core_files": 10,
+      "upstream_snapshot_hashes_matched": true
+    },
+    "root_contracts": {
+      "status": "passed",
+      "command": "npm test"
+    },
+    "template_sync": {
+      "status": "passed",
+      "command": "node scripts/sync-templates.mjs --check"
+    },
+    "final_tarball": {
+      "status": "passed",
+      "test": "TestBuilderBuildSuccess",
+      "assertion": "unpack tar.gz; preserve exact four sample_track/bulk_order v1/v2 declarations"
+    },
+    "actual_generator_consumer": {
+      "path": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-thumbnail64-20261022-43252ceb268a47d2/generated-consumer",
+      "go_work": "off",
+      "local_replace": false,
+      "four_bindings": "passed",
+      "manifest_validation": "passed",
+      "backend_build": "passed",
+      "shared_fixtures": "passed",
+      "packed_typescript": "passed"
+    },
+    "auth_channels": {
+      "api_key": "controlled ApiKey transport and explicit Core Host adapter",
+      "sts": "controlled Bearer TokenProvider transport; existing real installation bootstrap provider retained",
+      "real_core_api_key_tested": false,
+      "real_installed_sts_exchange_tested": false,
+      "real_live_grants_tested": false
+    },
+    "behaviors": [
+      "per_variant_error_and_retryable_passthrough",
+      "named_lookup_with_reordered_and_extra_items",
+      "ready_preview_consumed_when_thumbnail64_failed",
+      "ready_requires_variant_uuid_and_actual_metadata",
+      "v2_missing_required_specs_rejected",
+      "no_preview_or_origin_substitution",
+      "parent_asset_and_variant_uuid_ticket_scope",
+      "core_generated_variant_mime_size_preserved",
+      "thumbnail64_checksum_mime_byte_limit",
+      "local_explicit_variant_actual_png_dimensions_64_vs_65",
+      "fixed_body_only_core_internal_status_and_ensure_binding",
+      "configured_api_prefix",
+      "upstream_status_machine_code_reason_details_trace_request",
+      "sse_snapshot_renewal_without_cursor_or_idle_get",
+      "sse_invalidation_stops_without_new_status_fetch",
+      "cancel_and_late_lease_callbacks",
+      "startup_adapter_channel_is_fixed",
+      "local_derivatives_extension_unavailable",
+      "card_v1_v2_separate_shapes_and_independent_renditions",
+      "presentation_changed_passthrough",
+      "v1_upgrade_reference_original_uuid_and_409_no_recreate",
+      "versioned_receipts_remain_supported",
+      "notification_revision_dedupe_preserves_supplied_read_state",
+      "manifest_composite_uniqueness_and_unsafe_path_rejection",
+      "packaged_and_generated_bindings_and_shared_schemas_preserved"
+    ]
+  },
+  "sdk_and_generator": {
+    "bundle": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-thumbnail64-20261022-43252ceb268a47d2",
+    "published": false,
+    "changes_committed": false,
+    "base_commit": "f123a2310568bd0e3625e825b4fa419b9cfb4f6c",
+    "source_sha256": {
+      "go": "2d0a80a518254549f2791eb95ca09031f2574b40f3d622b7895ce7b878a46776",
+      "nuxt": "1f47c36788746a870e0f2afaefeaf6ac1061fa7181df99061bb5578b95dd8f3c",
+      "generator": "b5544696989a9112d95e61eff89b16f52f3e3c39ab151975d48275cd8c9209dd",
+      "contracts": "159e30d15d62a053a1b4cfb9257b816b18e0bee11fa72fa49d5a7b1604b000e1"
+    },
+    "go_module": "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go",
+    "go_sdk_version": "v0.0.27-dev.thumbnail64.2d0a80a518254549",
+    "go_proxy": "file:///private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-thumbnail64-20261022-43252ceb268a47d2/go-proxy",
+    "nuxt_client_version": "0.0.14-dev.thumbnail64.1f47c36788746a87",
+    "nuxt_client_ref": "file:/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-thumbnail64-20261022-43252ceb268a47d2/artisan-cloud-plugin-framework-client-0.0.14-dev.thumbnail64.1f47c36788746a87.tgz",
+    "nuxt_client_tarball": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-thumbnail64-20261022-43252ceb268a47d2/artisan-cloud-plugin-framework-client-0.0.14-dev.thumbnail64.1f47c36788746a87.tgz",
+    "generator_version": "v0.0.0-thumbnail64.b5544696989a9112",
+    "generator_binary": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-thumbnail64-20261022-43252ceb268a47d2/px-plugin",
+    "consumer": {
+      "path": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-thumbnail64-20261022-43252ceb268a47d2/generated-consumer",
+      "go_work": "off",
+      "local_replace": false,
+      "four_bindings": "passed",
+      "manifest_validation": "passed",
+      "backend_build": "passed",
+      "shared_fixtures": "passed",
+      "packed_typescript": "passed"
+    },
+    "artifact_sha256": {
+      "px-plugin": "02435c54f0fd0a77e32e8ef3f86c39a9dc3912bc0c542836f6438fac4299e216",
+      "artisan-cloud-plugin-framework-client-0.0.14-dev.thumbnail64.1f47c36788746a87.tgz": "b009b5049df6d591db9447dfe165309fffc9f6b04b84727d0324cb9ad6543302",
+      "go-proxy/github.com/!artisan!cloud/!power!x!plugin/framework/backend/go/@v/v0.0.27-dev.thumbnail64.2d0a80a518254549.zip": "9392b2765a742d12106bcf13be0cd5d531e83582eb61663f3725d1c937dc2590"
+    }
+  },
+  "logs": {
+    "go-tests.jsonl": {
+      "path": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-thumbnail64-20261022-43252ceb268a47d2/go-tests.jsonl",
+      "sha256": "86c6da1ed38cd9b3e62bdf3c0bbb1f1fd723f151e1574796b3aa3cfa75105b92"
+    },
+    "race.log": {
+      "path": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-thumbnail64-20261022-43252ceb268a47d2/race.log",
+      "sha256": "e755f267268c138d2b0a0829bcae930829ab2d81d5d73d3f0a5cd975e259c287"
+    },
+    "vet.log": {
+      "path": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-thumbnail64-20261022-43252ceb268a47d2/vet.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "root-checks.log": {
+      "path": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-thumbnail64-20261022-43252ceb268a47d2/root-checks.log",
+      "sha256": "a88cfc9b3bf44d1e7234c0bb0d47e2ae01a3071654bd3654e333cff2a11535f1"
+    },
+    "nuxt-tests.log": {
+      "path": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-thumbnail64-20261022-43252ceb268a47d2/nuxt-tests.log",
+      "sha256": "bea54037df0eb32d39fd23b85ba32b387a5c049f8e00565e8f57c87e1a23441f"
+    }
+  },
+  "not_claimed": [
+    "published_SDK_or_CLI",
+    "fix_commit_SHA",
+    "dotnet_v2_completion",
+    "Core_worker_or_backfill_implementation_changes",
+    "real_Core_credentials_or_grant_acceptance",
+    "AI_Craft_business_adoption",
+    "real_member_cost_cropping_and_image_permissions",
+    "real_table_network_bandwidth_or_Core_card_browser_acceptance"
+  ],
+  "remaining_joint_acceptance": [
+    "lock Core build containing the implementation and official SDK CLI versions",
+    "actual API Key and installation STS exchange, publication, tenant registration and live grants",
+    "AI Craft Local encoder and authorized media-to-delivery presentation_changed mapping",
+    "current-user and cost visibility, revocation and cross-tenant checks",
+    "20/50-row real thumbnail byte sizes and no preview/origin before click",
+    "deployment-owned Redis namespace verification and explicit reviewed backfill"
+  ],
+  "workspace_actions": {
+    "Core_modified": false,
+    "AI_Craft_modified": false,
+    "migration_or_seed_run": false,
+    "backfill_run": false,
+    "user_services_restarted": false,
+    "persistent_services_started": false,
+    "http_fixtures": "test-owned httptest servers closed by test cleanup"
+  }
+}

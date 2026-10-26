@@ -1,0 +1,48 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"net"
+	"net/http"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
+	"time"
+
+	handler "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/parceltool"
+	"github.com/gin-gonic/gin"
+)
+
+// 独立、无 DB 的同一插件工具入口，供固定镜像部署与隔离验收；不加载业务配置或迁移。
+func main() {
+	if os.Getenv("POWERX_INTERNAL_TOKEN") == "" {
+		panic("parcel.transport_unavailable")
+	}
+	prefix := strings.TrimRight(os.Getenv("POWERX_PLUGIN_HTTP_BASE"), "/")
+	if prefix != "" && !strings.HasPrefix(prefix, "/") {
+		panic("parcel.http_base_invalid")
+	}
+	engine := gin.New()
+	engine.Use(gin.Recovery())
+	handler.Register(engine.Group(prefix))
+	engine.GET("/healthz", func(c *gin.Context) { c.Status(http.StatusOK) })
+	listener, err := net.Listen("tcp", os.Getenv("POWERX_HTTP_ADDR"))
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("parcel.tool.started pid=%d port=%s\n", os.Getpid(), listener.Addr().String())
+	server := &http.Server{Handler: engine, ReadHeaderTimeout: 3 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second, MaxHeaderBytes: 16 << 10}
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
+	go func() {
+		<-stop
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		_ = server.Shutdown(ctx)
+	}()
+	if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
+		panic(err)
+	}
+}

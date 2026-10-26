@@ -1,0 +1,34 @@
+package regression
+
+import (
+	Regression "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/regression"
+	StoreGorm "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/regression/storegorm"
+	Models "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
+	"gorm.io/gorm"
+)
+
+type RunRecord StoreGorm.RunRecord
+type CaseExecutionRecord StoreGorm.CaseExecutionRecord
+type EventRecord StoreGorm.RegressionEventRecord
+
+func (RunRecord) TableName() string           { return Models.S(Models.TableRegressionRuns) }
+func (CaseExecutionRecord) TableName() string { return Models.S(Models.TableRegressionCaseExecutions) }
+func (EventRecord) TableName() string         { return Models.S(Models.TableRegressionEvents) }
+func (r *RunRecord) BeforeCreate(*gorm.DB) error {
+	if !Regression.ValidUUID(r.UUID) || !Regression.ValidUUID(r.TenantUUID) || !Regression.ValidUUID(r.ActorUUID) || !Regression.ValidUUID(r.ProfileUUID) || !Regression.ValidUUID(r.ClientRequestUUID) {
+		return Regression.NewError(Regression.InvalidRequest)
+	}
+	return nil
+}
+func (r *CaseExecutionRecord) BeforeCreate(*gorm.DB) error {
+	if !Regression.ValidUUID(r.UUID) || !Regression.ValidUUID(r.TenantUUID) || !Regression.ValidUUID(r.RunUUID) || !Regression.ValidUUID(r.CaseUUID) {
+		return Regression.NewError(Regression.InvalidRequest)
+	}
+	return nil
+}
+func (r *EventRecord) BeforeCreate(*gorm.DB) error {
+	if !Regression.ValidUUID(r.UUID) || !Regression.ValidUUID(r.TenantUUID) || !Regression.ValidUUID(r.RunUUID) {
+		return Regression.NewError(Regression.InvalidRequest)
+	}
+	return Regression.ValidateMeta(r.Meta, r.TenantUUID, r.Meta.SourcePlugin)
+}

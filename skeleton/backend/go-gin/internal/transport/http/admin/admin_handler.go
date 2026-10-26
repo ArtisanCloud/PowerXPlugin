@@ -1,6 +1,7 @@
 package admin
 
 import (
+	fwmanifest "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
 	"os"
 	"strings"
 	"time"
@@ -37,17 +38,22 @@ func NewAdminHandler(deps *app.Deps) *AdminHandler {
 // GetManifest 获取插件清单
 func (h *AdminHandler) GetManifest(c *gin.Context) {
 	log := logger.HandlerLogger("admin").WithContext(c.Request.Context())
+	var notificationPresentations []fwmanifest.NotificationPresentation
+	if h.deps != nil {
+		notificationPresentations = h.deps.NotificationPresentations
+	}
 
 	manifest := &contracts.PluginManifest{
-		ID:          "com.powerx.plugins.base",
-		Name:        "PowerX Base Plugin",
-		Version:     runtimePluginVersion(),
-		Description: "A starter plugin that showcases template management capabilities for PowerX",
-		Author:      "PowerX Team",
-		Homepage:    "https://powerx.dev/plugins/base",
-		Repository:  "https://powerx.dev/plugins/base.git",
-		License:     "MIT",
-		Tags:        []string{"base", "template", "starter"},
+		NotificationPresentations: notificationPresentations,
+		ID:                        "com.powerx.plugins.base",
+		Name:                      "PowerX Base Plugin",
+		Version:                   runtimePluginVersion(),
+		Description:               "A starter plugin that showcases template management capabilities for PowerX",
+		Author:                    "PowerX Team",
+		Homepage:                  "https://powerx.dev/plugins/base",
+		Repository:                "https://powerx.dev/plugins/base.git",
+		License:                   "MIT",
+		Tags:                      []string{"base", "template", "starter"},
 
 		Backend: contracts.BackendConfig{
 			Entry:  "backend/bin/plugin",

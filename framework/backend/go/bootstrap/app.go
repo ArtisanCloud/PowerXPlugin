@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -37,8 +38,25 @@ type App struct {
 	iamRegistry       *iamadapters.Registry
 	capabilityInvoker CapabilityInvoker
 
-	mu       sync.RWMutex
-	manifest *manifest.Plugin
+	mu                sync.RWMutex
+	manifest          *manifest.Plugin
+	onHTTPReady       func(HTTPReadyInfo)
+	shutdownRequested bool
+}
+
+// HTTPReadyInfo describes a successfully bound HTTP listener. Dependencies and
+// routes must be registered before Run. This does not certify background workers.
+type HTTPReadyInfo struct {
+	ListenAddr string
+	ReadyAt    time.Time
+}
+
+// OnHTTPReady registers a synchronous notification before serving requests.
+// Configure it before Run; the handler must not wait for an HTTP response.
+func (a *App) OnHTTPReady(handler func(HTTPReadyInfo)) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.onHTTPReady = handler
 }
 
 // Config 描述服务的基础运行配置。
@@ -167,7 +185,32 @@ func (a *App) Run() error {
 			slog.Bool("standalone", a.Config.Standalone),
 		)
 	}
-	err := a.server.ListenAndServe()
+	a.mu.RLock()
+	stopped := a.shutdownRequested
+	a.mu.RUnlock()
+	if stopped {
+		return nil
+	}
+	addr := a.server.Addr
+	if addr == "" {
+		// Match net/http.Server.ListenAndServe's documented empty-address default.
+		addr = ":http"
+	}
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+	defer listener.Close()
+	a.mu.RLock()
+	stopped, ready := a.shutdownRequested, a.onHTTPReady
+	a.mu.RUnlock()
+	if stopped {
+		return nil
+	}
+	if ready != nil {
+		ready(HTTPReadyInfo{ListenAddr: listener.Addr().String(), ReadyAt: time.Now()})
+	}
+	err = a.server.Serve(listener)
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
@@ -176,6 +219,9 @@ func (a *App) Run() error {
 
 // Shutdown 优雅关闭已附加的服务。
 func (a *App) Shutdown() error {
+	a.mu.Lock()
+	a.shutdownRequested = true
+	a.mu.Unlock()
 	defer a.closeGateway()
 	if a.shutdown == nil {
 		return nil

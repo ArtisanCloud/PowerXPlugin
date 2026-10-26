@@ -25,12 +25,15 @@ func TestLocalPublisherUsesTrustedTenantAndPersistsNotification(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewLocalPublisher(): %v", err)
 	}
-	created, err := publisher.Create(context.Background(), powerxnotifications.CreateInput{Title: "Title", Content: "Content", MemberUUID: "member-1", Type: "notice", Metadata: map[string]any{"source": "test"}})
+	created, err := publisher.Create(context.Background(), powerxnotifications.CreateInput{Title: "Title", Content: "Content", MemberUUID: "member-1", Type: "notice", Metadata: map[string]any{"source": "test"}, Navigation: &powerxnotifications.Navigation{Label: "fixture.navigation", Path: "/fixture"}})
 	if err != nil {
 		t.Fatalf("Create(): %v", err)
 	}
 	if created.UUID == "" || created.MemberUUID != "member-1" {
 		t.Fatalf("unexpected response: %#v", created)
+	}
+	if len(created.Actions) != 1 || created.Actions[0].Params["path"] != "/fixture" {
+		t.Fatal("LOCAL_NAVIGATION_LOST")
 	}
 	var record marketplacemodel.Notification
 	if err := db.Where("id = ?", created.UUID).First(&record).Error; err != nil {
@@ -46,5 +49,13 @@ func TestLocalPublisherRejectsMissingTrustedTenant(t *testing.T) {
 	_, err := publisher.Create(context.Background(), powerxnotifications.CreateInput{Title: "Title", Content: "Content"})
 	if err == nil {
 		t.Fatal("Create() error = nil, want tenant rejection")
+	}
+}
+
+func TestLocalPublisherRejectsBusinessCardsWithoutCreatingRecords(t *testing.T) {
+	publisher := &LocalPublisher{}
+	out, err := publisher.Create(context.Background(), powerxnotifications.CreateInput{Metadata: map[string]any{"business_card": map[string]any{}}})
+	if err == nil || out != nil {
+		t.Fatal("LOCAL_CARD_SUCCESS_FABRICATED")
 	}
 }

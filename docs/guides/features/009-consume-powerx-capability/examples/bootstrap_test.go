@@ -28,7 +28,7 @@ func (p *localProbe) Create(context.Context, corenotifications.CreateInput) (*co
 func TestLocalSelectionAndMissingAdapter(t *testing.T) {
 	ctx := context.Background()
 	local := &localProbe{}
-	pub, err := BuildPublisher(ctx, provider.ModeLocal, local, "", nil, nil, nil)
+	pub, err := BuildPublisher(ctx, provider.ModeLocal, local, "", "", nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,12 +39,12 @@ func TestLocalSelectionAndMissingAdapter(t *testing.T) {
 		t.Fatalf("local_calls=%d", local.calls)
 	}
 	var missing *localProbe
-	_, err = BuildPublisher(ctx, provider.ModeLocal, missing, "", nil, nil, nil)
+	_, err = BuildPublisher(ctx, provider.ModeLocal, missing, "", "", nil, nil, nil)
 	var coded *module.Error
 	if !errors.As(err, &coded) || coded.Code != "FRAMEWORK_MODULE_ADAPTER_UNAVAILABLE" {
 		t.Fatalf("error=%v", err)
 	}
-	_, err = BuildPublisher(ctx, provider.ModeDelegated, local, "", nil, nil, nil)
+	_, err = BuildPublisher(ctx, provider.ModeDelegated, local, "", "", nil, nil, nil)
 	if err == nil {
 		t.Fatal("error=nil")
 	}
@@ -94,7 +94,7 @@ func TestDelegatedPreflightAndNoFallback(t *testing.T) {
 				}
 			}))
 			defer server.Close()
-			pub, err := BuildPublisher(ctx, provider.ModeDelegated, local, server.URL,
+			pub, err := BuildPublisher(ctx, provider.ModeDelegated, local, server.URL, "/api/v1",
 				func(context.Context) (string, error) { return "fixture-sts", nil },
 				[]string{"com.corex.capabilities.grant_status.read", "com.corex.notifications.create"}, server.Client())
 			if denied {

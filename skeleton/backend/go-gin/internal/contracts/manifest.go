@@ -1,18 +1,22 @@
 package contracts
 
-import "time"
+import (
+	fwmanifest "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
+	"time"
+)
 
 // PluginManifest 插件清单契约
 type PluginManifest struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	Version     string   `json:"version"`
-	Description string   `json:"description"`
-	Author      string   `json:"author,omitempty"`
-	Homepage    string   `json:"homepage,omitempty"`
-	Repository  string   `json:"repository,omitempty"`
-	License     string   `json:"license,omitempty"`
-	Tags        []string `json:"tags,omitempty"`
+	NotificationPresentations []fwmanifest.NotificationPresentation `json:"notification_presentations,omitempty"`
+	ID                        string                                `json:"id"`
+	Name                      string                                `json:"name"`
+	Version                   string                                `json:"version"`
+	Description               string                                `json:"description"`
+	Author                    string                                `json:"author,omitempty"`
+	Homepage                  string                                `json:"homepage,omitempty"`
+	Repository                string                                `json:"repository,omitempty"`
+	License                   string                                `json:"license,omitempty"`
+	Tags                      []string                              `json:"tags,omitempty"`
 
 	// 后端配置
 	Backend BackendConfig `json:"backend"`

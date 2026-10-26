@@ -22,6 +22,7 @@ func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
 	}
 	h := &Handler{mode: deps.ProviderMode, deps: deps}
 	group := admin.Group("/ai-settings")
+	registerMediaRoutes(group, h)
 	group.GET("/mode", h.Mode)
 	group.GET("/summary", h.Summary)
 	group.GET("/provider-profiles", h.ProviderProfiles)
@@ -39,16 +40,37 @@ func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
 func (h *Handler) CatalogProviders(c *gin.Context) {
 	modality := c.Query("modality")
 	if modality == "" {
-		contracts.ResponseError(c, http.StatusBadRequest, "INVALID_ARGUMENT", "modality is required")
+		mediaFailure(c, &powerxai.HTTPError{StatusCode: 400, ReasonCode: "AI_REQUEST_INVALID"})
 		return
 	}
-	if c.DefaultQuery("source", "local") == "powerx" {
-		if h == nil || h.deps == nil || h.deps.PowerXAISettings == nil {
-			admincommon.ProviderUnavailable(c, "AI_SETTINGS_CATALOG_UNAVAILABLE", "PowerX AI catalog is unavailable", h.diagnostics())
+	if source := c.Query("source"); source != "local" && source != "powerx" {
+		mediaFailure(c, &powerxai.HTTPError{StatusCode: 400, ReasonCode: "AI_REQUEST_INVALID"})
+		return
+	}
+	if c.Query("source") == "powerx" {
+		if modality == "llm" {
+			h.llmCatalog(c, true)
 			return
 		}
-		items, err := h.deps.PowerXAISettings.CatalogProviders(c.Request.Context(), modality, requestID(c))
-		respondDelegated(c, gin.H{"items": items}, err)
+		capability, ok := mediaCapability(modality)
+		if !ok {
+			mediaFailure(c, &powerxai.HTTPError{StatusCode: 422, ReasonCode: "AI_MODEL_CAPABILITY_UNSUPPORTED"})
+			return
+		}
+		if h.deps.PowerXAISettings == nil {
+			mediaFailure(c, &powerxai.HTTPError{StatusCode: 503, ReasonCode: "AI_CLIENT_UNAVAILABLE"})
+			return
+		}
+		out, err := h.deps.PowerXAISettings.CatalogProviders(c.Request.Context(), capability, requestID(c))
+		if err != nil {
+			mediaFailure(c, err)
+			return
+		}
+		items := make([]map[string]string, 0, len(out.Providers))
+		for _, p := range out.Providers {
+			items = append(items, map[string]string{"id": p.Provider, "name": p.Label})
+		}
+		contracts.ResponseSuccess(c, gin.H{"items": items})
 		return
 	}
 	svc, _, ok := h.localService(c)
@@ -60,20 +82,33 @@ func (h *Handler) CatalogProviders(c *gin.Context) {
 func (h *Handler) CatalogModels(c *gin.Context) {
 	modality, provider := c.Query("modality"), c.Query("provider")
 	if modality == "" || provider == "" {
-		contracts.ResponseError(c, http.StatusBadRequest, "INVALID_ARGUMENT", "modality and provider are required")
+		mediaFailure(c, &powerxai.HTTPError{StatusCode: 400, ReasonCode: "AI_REQUEST_INVALID"})
 		return
 	}
-	if c.DefaultQuery("source", "local") == "powerx" {
-		if h == nil || h.deps == nil || h.deps.PowerXAISettings == nil {
-			admincommon.ProviderUnavailable(c, "AI_SETTINGS_CATALOG_UNAVAILABLE", "PowerX AI catalog is unavailable", h.diagnostics())
+	if source := c.Query("source"); source != "local" && source != "powerx" {
+		mediaFailure(c, &powerxai.HTTPError{StatusCode: 400, ReasonCode: "AI_REQUEST_INVALID"})
+		return
+	}
+	if c.Query("source") == "powerx" {
+		if modality == "llm" {
+			h.llmCatalog(c, false)
 			return
 		}
-		items, err := h.deps.PowerXAISettings.CatalogModels(c.Request.Context(), modality, provider, c.Query("app"), requestID(c))
-		out := make([]map[string]string, 0, len(items))
-		for _, id := range items {
-			out = append(out, map[string]string{"id": id, "label": id})
+		capability, ok := mediaCapability(modality)
+		if !ok {
+			mediaFailure(c, &powerxai.HTTPError{StatusCode: 422, ReasonCode: "AI_MODEL_CAPABILITY_UNSUPPORTED"})
+			return
 		}
-		respondDelegated(c, gin.H{"items": out}, err)
+		if h.deps.PowerXAISettings == nil {
+			mediaFailure(c, &powerxai.HTTPError{StatusCode: 503, ReasonCode: "AI_CLIENT_UNAVAILABLE"})
+			return
+		}
+		out, err := h.deps.PowerXAISettings.CatalogModels(c.Request.Context(), capability, provider, c.Query("app"), requestID(c))
+		if err != nil {
+			mediaFailure(c, err)
+			return
+		}
+		contracts.ResponseSuccess(c, out)
 		return
 	}
 	svc, _, ok := h.localService(c)
@@ -82,11 +117,45 @@ func (h *Handler) CatalogModels(c *gin.Context) {
 	}
 	contracts.ResponseSuccess(c, gin.H{"items": svc.CatalogModels(modality, provider, c.Query("app"))})
 }
+func mediaCapability(modality string) (string, bool) {
+	switch modality {
+	case "vlm":
+		return powerxai.VisionUnderstanding, true
+	case "image":
+		return powerxai.ImageGeneration, true
+	case "video":
+		return powerxai.VideoGeneration, true
+	case "audio_tts":
+		return powerxai.SpeechSynthesis, true
+	}
+	return "", false
+}
+func (h *Handler) llmCatalog(c *gin.Context, providers bool) {
+	if h.deps.PowerXAISettings == nil {
+		mediaFailure(c, &powerxai.HTTPError{StatusCode: 503, ReasonCode: "AI_CLIENT_UNAVAILABLE"})
+		return
+	}
+	if providers {
+		out, err := h.deps.PowerXAISettings.SettingsCatalogProviders(c.Request.Context(), requestID(c))
+		if err != nil {
+			mediaFailure(c, err)
+			return
+		}
+		contracts.ResponseSuccess(c, out)
+		return
+	}
+	out, err := h.deps.PowerXAISettings.SettingsCatalogModels(c.Request.Context(), c.Query("provider"), c.Query("app"), requestID(c))
+	if err != nil {
+		mediaFailure(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, out)
+}
 
 type localSettingRequest struct {
 	Source        string         `json:"source" binding:"required,oneof=local powerx"`
 	Environment   string         `json:"environment" binding:"required,oneof=development production"`
-	Modality      string         `json:"modality" binding:"required,oneof=llm image embedding audio_tts audio_asr video model3d rerank"`
+	Modality      string         `json:"modality" binding:"required,oneof=llm vlm image embedding audio_tts audio_asr video model3d rerank"`
 	Provider      string         `json:"provider" binding:"required"`
 	App           string         `json:"app"`
 	ModelKey      string         `json:"model_key" binding:"required"`
@@ -136,84 +205,10 @@ func (h *Handler) SaveLocalSetting(c *gin.Context) {
 	respondDelegated(c, item, err)
 }
 
-func (h *Handler) TestConnection(c *gin.Context) {
-	var req localSettingRequest
-	if err := c.ShouldBindJSON(&req); err != nil || req.ModelKey == "" {
-		contracts.ResponseError(c, http.StatusBadRequest, "INVALID_ARGUMENT", "model key is required")
-		return
-	}
-	if h.isDelegated() {
-		if _, err := h.invokeDelegatedLLM(c, req, "ping"); err != nil {
-			respondDelegated(c, nil, err)
-			return
-		}
-		contracts.ResponseSuccess(c, gin.H{"status": "connected"})
-		return
-	}
-	svc, _, ok := h.localService(c)
-	if !ok {
-		return
-	}
-	if err := svc.TestConnection(c.Request.Context(), localaisettings.SaveInput{Environment: req.Environment, Modality: req.Modality, Provider: req.Provider, App: req.App, ModelKey: req.ModelKey, Endpoint: req.Endpoint, CredentialRef: req.CredentialRef, Parameters: req.Parameters}); err != nil {
-		respondDelegated(c, nil, err)
-		return
-	}
-	contracts.ResponseSuccess(c, gin.H{"status": "connected"})
-}
-
-func (h *Handler) QuickCall(c *gin.Context) {
-	var req localSettingRequest
-	if err := c.ShouldBindJSON(&req); err != nil || req.ModelKey == "" {
-		contracts.ResponseError(c, http.StatusBadRequest, "INVALID_ARGUMENT", "model key is required")
-		return
-	}
-	if h.isDelegated() {
-		text, err := h.invokeDelegatedLLM(c, req, "Reply with OK.")
-		if err != nil {
-			respondDelegated(c, nil, err)
-			return
-		}
-		contracts.ResponseSuccess(c, gin.H{"status": "success", "text": text})
-		return
-	}
-	svc, _, ok := h.localService(c)
-	if !ok {
-		return
-	}
-	text, err := svc.QuickCall(c.Request.Context(), localaisettings.SaveInput{Environment: req.Environment, Modality: req.Modality, Provider: req.Provider, App: req.App, ModelKey: req.ModelKey, Endpoint: req.Endpoint, CredentialRef: req.CredentialRef, Parameters: req.Parameters})
-	if err != nil {
-		respondDelegated(c, nil, err)
-		return
-	}
-	contracts.ResponseSuccess(c, gin.H{"status": "success", "text": text})
-}
-
-// invokeDelegatedLLM intentionally goes through the startup-bound Framework
-// runtime. The catalog source is a page preference only and must not select a
-// different business execution route.
-func (h *Handler) invokeDelegatedLLM(c *gin.Context, req localSettingRequest, prompt string) (string, error) {
-	if h == nil || h.deps == nil || h.deps.AIInvocation == nil {
-		return "", errors.New("delegated AI runtime is unavailable")
-	}
-	service, err := h.deps.AIInvocation.Generative()
-	if err != nil {
-		return "", err
-	}
-	out, err := service.LLMInvoke(c.Request.Context(), powerxai.LLMInvokeInput{
-		ModelKey: req.ModelKey,
-		Inputs: []powerxai.ContentItem{
-			{Role: "user", Type: "text", Content: prompt},
-		},
-		Params: req.Parameters,
-	})
-	if err != nil {
-		return "", err
-	}
-	if out == nil {
-		return "", errors.New("delegated AI runtime returned an empty response")
-	}
-	return out.Text, nil
-}
+// Both actions execute the selected capability. Media generation returns a task,
+// never a synthetic connectivity result. Credentials are selected at startup.
+func (h *Handler) TestConnection(c *gin.Context) { h.invokeSettingTest(c) }
+func (h *Handler) QuickCall(c *gin.Context)      { h.invokeSettingTest(c) }
 
 type Handler struct {
 	mode fwprovider.Mode
@@ -286,6 +281,11 @@ func (h *Handler) isDelegated() bool {
 
 func respondDelegated(c *gin.Context, data any, err error) {
 	if err != nil {
+		var aiErr *powerxai.HTTPError
+		if errors.As(err, &aiErr) {
+			mediaFailure(c, err)
+			return
+		}
 		var contractErr *hostapi.HTTPError
 		if errors.As(err, &contractErr) {
 			contracts.ResponseError(c, contractErr.StatusCode, contractErr.ReasonCode, contractErr.ReasonCode)

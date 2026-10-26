@@ -1,0 +1,88 @@
+package ai_settings
+
+import (
+	"net/http"
+
+	powerxai "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/ai"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
+	localsettings "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/ai_settings"
+	"github.com/gin-gonic/gin"
+)
+
+type settingTestRequest struct {
+	localSettingRequest
+	Inputs         []powerxai.ContentItem `json:"inputs" binding:"required,min=1"`
+	IdempotencyKey string                 `json:"idempotency_key"`
+}
+
+func (h *Handler) invokeSettingTest(c *gin.Context) {
+	var req settingTestRequest
+	if c.ShouldBindJSON(&req) != nil {
+		mediaFailure(c, &powerxai.HTTPError{StatusCode: 400, ReasonCode: "AI_REQUEST_INVALID"})
+		return
+	}
+	if req.Modality != "llm" {
+		if _, ok := mediaCapability(req.Modality); !ok {
+			mediaFailure(c, &powerxai.HTTPError{StatusCode: 422, ReasonCode: "AI_MODEL_CAPABILITY_UNSUPPORTED"})
+			return
+		}
+	}
+	// Local profile testing is limited to the adapter it actually implements.
+	// Non-LLM operations use the same immutable runtime as business execution.
+	if !h.isDelegated() && req.Modality == "llm" {
+		svc, _, ok := h.localService(c)
+		if !ok {
+			return
+		}
+		out, err := svc.InvokeLLM(c.Request.Context(), localsettings.SaveInput{Modality: req.Modality, Provider: req.Provider, ModelKey: req.ModelKey, Endpoint: req.Endpoint, Parameters: req.Parameters}, req.Inputs)
+		respondDelegated(c, out, err)
+		return
+	}
+	service, err := h.mediaService()
+	if err != nil {
+		mediaFailure(c, err)
+		return
+	}
+	input := powerxai.MediaInvokeInput{ModelKey: req.ModelKey, Inputs: req.Inputs, Params: req.Parameters, IdempotencyKey: req.IdempotencyKey}
+	var out any
+	switch req.Modality {
+	case "llm":
+		out, err = service.LLMInvoke(c.Request.Context(), powerxai.LLMInvokeInput{ModelKey: req.ModelKey, Inputs: req.Inputs, Params: req.Parameters})
+	case "vlm":
+		out, err = service.VLMInvoke(c.Request.Context(), input)
+	case "image":
+		out, err = service.ImageInvoke(c.Request.Context(), input)
+	case "video":
+		out, err = service.VideoInvoke(c.Request.Context(), input)
+	case "audio_tts":
+		out, err = service.TTSInvoke(c.Request.Context(), input)
+	}
+	if err != nil {
+		mediaFailure(c, err)
+		return
+	}
+	if out == nil {
+		mediaFailure(c, &powerxai.HTTPError{StatusCode: 502, ReasonCode: "AI_RESPONSE_INVALID"})
+		return
+	}
+	if task, ok := out.(*powerxai.MediaTask); ok {
+		capability, _ := mediaCapability(req.Modality)
+		if task == nil || task.Validate() != nil || task.ModelKey != req.ModelKey || task.Capability != capability {
+			mediaFailure(c, &powerxai.HTTPError{StatusCode: 502, ReasonCode: "AI_TASK_RESPONSE_INVALID"})
+			return
+		}
+		c.JSON(http.StatusAccepted, gin.H{"data": task})
+		return
+	}
+	if analysis, ok := out.(*powerxai.AnalysisResult); ok {
+		if analysis == nil || analysis.ContractVersion != 2 || analysis.Type != "analysis" || analysis.TraceID == "" || analysis.Provider == "" || analysis.Model == "" {
+			mediaFailure(c, &powerxai.HTTPError{StatusCode: 502, ReasonCode: "AI_ANALYSIS_RESPONSE_INVALID"})
+			return
+		}
+	}
+	if text, ok := out.(*powerxai.LLMInvokeOutput); ok && text == nil {
+		mediaFailure(c, &powerxai.HTTPError{StatusCode: 502, ReasonCode: "AI_RESPONSE_INVALID"})
+		return
+	}
+	contracts.ResponseSuccess(c, out)
+}

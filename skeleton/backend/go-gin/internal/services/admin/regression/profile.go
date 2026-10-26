@@ -1,0 +1,66 @@
+package regression
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	Regression "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/regression"
+	Config "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	Models "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
+	Scenarios "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/regression/scenarios"
+	Templates "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/templates"
+	App "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	"github.com/jackc/pgx/v5"
+)
+
+func registerProfile(registry *Regression.Registry, deps *App.Deps, p Config.RegressionProfileConfig) error {
+	// The digest includes the database target. It never persists the DSN or its credentials.
+	target := map[string]any{"profile_uuid": p.UUID, "namespace": p.FixtureNamespace, "driver": deps.DB.Dialector.Name(), "schema": Models.Schema(), "resource_type": p.MetadataResourceType, "resource_uuid": p.MetadataResourceUUID, "tenant_uuid": p.TenantUUID}
+	if deps.Config.Database != nil {
+		if deps.DB.Dialector.Name() == "postgres" {
+			connection, err := pgx.ParseConfig(deps.Config.Database.DSN)
+			if err != nil {
+				return Regression.NewError(Regression.InvalidRequest)
+			}
+			target["database_target"] = map[string]any{"host": connection.Host, "port": connection.Port, "database": connection.Database}
+		} else {
+			target["database_target"] = deps.Config.Database.DSN
+		}
+	}
+	if p.Kind == "live" && deps.Config.Gateway != nil {
+		target["core_target"] = deps.Config.Gateway.BaseURL
+	}
+	digest := sha256.Sum256(Regression.JSON(target))
+	def := Regression.ProfileDefinition{UUID: p.UUID, Key: p.Key, TitleKey: p.TitleKey, Kind: p.Kind, FixtureNamespace: p.FixtureNamespace, BindingRevision: hex.EncodeToString(digest[:]), DependencyDeclarations: []Regression.DependencyDeclaration{}}
+	if p.Kind == "controlled" {
+		def.DependencyDeclarations = []Regression.DependencyDeclaration{{DependencyKey: "plugin.database", Mode: "real", Boundary: "storage", RequiredCapabilities: []string{}}}
+		return registry.RegisterProfile(def, func(ctx context.Context, a Regression.Actor) (any, []Regression.DependencyEvidence, error) {
+			if err := Regression.ValidateActor(a); err != nil {
+				return nil, nil, err
+			}
+			return &Scenarios.Dependencies{Templates: Templates.NewTemplateService(deps.DB), TemplateHTTP: templateHTTP(deps.DB, a)}, []Regression.DependencyEvidence{{DependencyKey: "plugin.database", DeclaredMode: "real", ActualMode: "real", Boundary: "storage"}}, nil
+		})
+	}
+	def.DependencyDeclarations = []Regression.DependencyDeclaration{{DependencyKey: "core.metadata", Mode: "real", Boundary: "core.host", RequiredCapabilities: []string{"com.corex.metadata.tag.read", "com.corex.metadata.tag.manage"}}}
+	runtime := deps.MetadataDebugDelegatedRuntime
+	return registry.RegisterProfile(def, func(ctx context.Context, a Regression.Actor) (any, []Regression.DependencyEvidence, error) {
+		evidence := []Regression.DependencyEvidence{{DependencyKey: "core.metadata", DeclaredMode: "real", ActualMode: "real", Boundary: "core.host"}}
+		if err := Regression.ValidateActor(a); err != nil {
+			return nil, evidence, err
+		}
+		if a.TenantUUID != p.TenantUUID {
+			evidence[0].ReasonCode = Regression.DependencyBlocked
+			return nil, evidence, Regression.NewError(Regression.DependencyBlocked)
+		}
+		if runtime == nil {
+			evidence[0].ReasonCode = Regression.DependencyBlocked
+			return nil, evidence, Regression.NewError(Regression.DependencyBlocked)
+		}
+		service, err := runtime.Service()
+		if err != nil {
+			evidence[0].ReasonCode = Regression.DependencyBlocked
+			return nil, evidence, Regression.NewError(Regression.DependencyBlocked)
+		}
+		return &Scenarios.MetadataDependencies{Service: service, ResourceType: p.MetadataResourceType, ResourceUUID: p.MetadataResourceUUID}, evidence, nil
+	})
+}

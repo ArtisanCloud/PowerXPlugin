@@ -9,13 +9,15 @@ import (
 const ReadReceiptContract = "notification_read_receipt.v1"
 
 type ReadReceiptInput struct {
-	MemberUUID        string   `json:"member_uuid"`
-	NotificationUUIDs []string `json:"notification_uuids"`
+	Revisions         map[string]int64 `json:"revisions,omitempty"`
+	MemberUUID        string           `json:"member_uuid"`
+	NotificationUUIDs []string         `json:"notification_uuids"`
 }
 type ReadReceipt struct {
-	Contract          string   `json:"contract"`
-	MemberUUID        string   `json:"member_uuid"`
-	NotificationUUIDs []string `json:"notification_uuids"`
+	Revisions         map[string]int64 `json:"revisions,omitempty"`
+	Contract          string           `json:"contract"`
+	MemberUUID        string           `json:"member_uuid"`
+	NotificationUUIDs []string         `json:"notification_uuids"`
 }
 type ReadAcknowledger interface {
 	Acknowledge(context.Context, ReadReceiptInput) (*ReadReceipt, error)
@@ -45,6 +47,11 @@ func (c *Client) Acknowledge(ctx context.Context, input ReadReceiptInput) (*Read
 		}
 		expected[id] = true
 	}
+	for id, revision := range input.Revisions {
+		if !expected[id] || !validRevision(revision) {
+			return nil, invalid()
+		}
+	}
 	var out ReadReceipt
 	if err := c.doJSON(ctx, http.MethodPost, "/notifications/read-receipts", input, &out); err != nil {
 		return nil, err
@@ -57,6 +64,14 @@ func (c *Client) Acknowledge(ctx context.Context, input ReadReceiptInput) (*Read
 			return nil, invalidResponse()
 		}
 		delete(expected, id)
+	}
+	if len(out.Revisions) != len(input.Revisions) {
+		return nil, invalidResponse()
+	}
+	for id, revision := range out.Revisions {
+		if !validRevision(revision) || input.Revisions[id] != revision {
+			return nil, invalidResponse()
+		}
 	}
 	return &out, nil
 }

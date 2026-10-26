@@ -43,17 +43,12 @@ func TestClientUsesTypedAIEndpointsAndResponseEnvelope(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, float32(0.1), embedding.Vectors[0][0])
 
-	image, err := client.ImageInvoke(context.Background(), ModalInvokeInput{ModelKey: "image-test", Inputs: []ContentItem{{Type: "text", Content: "a tree"}}})
-	require.NoError(t, err)
-	require.JSONEq(t, `{"url":"https://media.example/tree.png"}`, string(image.Data))
-
 	require.Equal(t, []string{
 		"POST /api/v1/ai/llm/invoke",
 		"GET /api/v1/ai/llm/models?provider=openai",
 		"POST /api/v1/ai/llm/sessions",
 		"POST /api/v1/ai/llm/sessions/4e5b9a11-a9f4-4253-a0e8-f1eed119c5f4/messages",
 		"POST /api/v1/ai/embedding/invoke",
-		"POST /api/v1/ai/image/invoke",
 	}, transport.calls)
 	for _, authorization := range transport.authorizations {
 		require.Equal(t, "Bearer test-token", authorization)
@@ -64,7 +59,7 @@ func TestClientReturnsHTTPErrorWithoutFabricatingData(t *testing.T) {
 	client, err := NewClient(Config{BaseURL: "https://core.example", BearerToken: "test-token"}, &http.Client{Transport: failingTransport{}})
 	require.NoError(t, err)
 
-	_, err = client.VLMInvoke(context.Background(), ModalInvokeInput{ModelKey: "vlm-test"})
+	_, err = client.LLMInvoke(context.Background(), LLMInvokeInput{ModelKey: "llm-test"})
 	require.Error(t, err)
 	apiErr, ok := err.(*HTTPError)
 	require.True(t, ok)

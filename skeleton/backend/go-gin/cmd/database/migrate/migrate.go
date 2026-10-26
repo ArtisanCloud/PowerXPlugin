@@ -185,6 +185,9 @@ func MigratePluginModelsWithConfig(ctx context.Context, db *gorm.DB, cfg *config
 	if err := safeAutoMigrate(ctx, db, tables); err != nil {
 		return err
 	}
+	if err := MigrateRegression(ctx, db); err != nil {
+		return err
+	}
 	if err := ensureLocalKnowledgePGVector(ctx, db, cfg); err != nil {
 		return err
 	}

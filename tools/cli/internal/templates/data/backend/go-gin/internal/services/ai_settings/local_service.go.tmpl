@@ -6,6 +6,8 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/hostapi"
+	powerxai "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/ai"
 	"{{ .BackendModulePath }}/internal/config"
 	"{{ .BackendModulePath }}/internal/entity/models"
 	repository "{{ .BackendModulePath }}/internal/entity/repository/ai_settings"
@@ -96,10 +98,23 @@ func (s *LocalSettingsService) Save(ctx context.Context, tenantUUID, catalogSour
 	return s.Repository.Upsert(ctx, &models.LocalAISetting{TenantUUID: tenantUUID, Environment: in.Environment, Modality: in.Modality, Source: catalogSource, Provider: in.Provider, App: in.App, ModelKey: in.ModelKey, Endpoint: in.Endpoint, CredentialRef: in.CredentialRef, Parameters: datatypes.JSON(params)})
 }
 func (s *LocalSettingsService) TestConnection(ctx context.Context, in SaveInput) error {
+	if in.Modality != "llm" {
+		return &hostapi.HTTPError{StatusCode: 422, ReasonCode: "AI_MODEL_CAPABILITY_UNSUPPORTED"}
+	}
 	return s.ai.TestConnectionWithProfile(ctx, profileRuntimeModel(in))
 }
 func (s *LocalSettingsService) QuickCall(ctx context.Context, in SaveInput) (string, error) {
+	if in.Modality != "llm" {
+		return "", &hostapi.HTTPError{StatusCode: 422, ReasonCode: "AI_MODEL_CAPABILITY_UNSUPPORTED"}
+	}
 	return s.ai.QuickCallWithProfile(ctx, profileRuntimeModel(in))
+}
+
+func (s *LocalSettingsService) InvokeLLM(ctx context.Context, in SaveInput, inputs []powerxai.ContentItem) (*powerxai.LLMInvokeOutput, error) {
+	if in.Modality != "llm" {
+		return nil, &hostapi.HTTPError{StatusCode: 422, ReasonCode: "AI_MODEL_CAPABILITY_UNSUPPORTED"}
+	}
+	return s.ai.InvokeLLMWithProfile(ctx, profileRuntimeModel(in), powerxai.LLMInvokeInput{ModelKey: in.ModelKey, Inputs: inputs, Params: in.Parameters})
 }
 
 func profileRuntimeModel(in SaveInput) config.LocalAIModel {
@@ -114,7 +129,7 @@ func profileRuntimeModel(in SaveInput) config.LocalAIModel {
 }
 func supports(model config.LocalAIModel, modality string) bool {
 	for _, value := range model.Modalities {
-		if value == modality || (modality == "image" && value == "vlm") {
+		if value == modality {
 			return true
 		}
 	}

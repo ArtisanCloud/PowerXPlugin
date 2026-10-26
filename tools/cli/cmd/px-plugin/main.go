@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -16,7 +17,12 @@ func main() {
 		cmd.Version = version
 	}
 	if err := cmd.Execute(os.Args[1:]); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		code := 1
+		var coded interface{ ExitCode() int }
+		if errors.As(err, &coded) {
+			code = coded.ExitCode()
+		}
+		os.Exit(code)
 	}
 }

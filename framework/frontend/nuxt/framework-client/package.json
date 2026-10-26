@@ -1,12 +1,15 @@
 {
   "name": "@artisan-cloud/plugin-framework-client",
-  "version": "0.0.13",
+  "version": "0.0.14-dev.20261026.1",
   "type": "module",
   "exports": {
     ".": "./index.ts"
   },
   "files": [
+    "image-derivatives.ts",
+    "notifications.ts",
     "regression.ts",
+    "ai-media.ts",
     "index.ts",
     "api.ts",
     "api-errors.ts",

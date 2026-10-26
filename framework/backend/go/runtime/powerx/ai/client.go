@@ -12,8 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/hostcontract"
-
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/sts"
 )
 
@@ -156,30 +154,6 @@ func (c *Client) EmbeddingInvoke(ctx context.Context, input EmbeddingInvokeInput
 	return &out, nil
 }
 
-func (c *Client) VLMInvoke(ctx context.Context, input ModalInvokeInput) (*ModalInvokeOutput, error) {
-	return c.modalInvoke(ctx, "/api/v1/ai/vlm/invoke", input)
-}
-
-func (c *Client) ImageInvoke(ctx context.Context, input ModalInvokeInput) (*ModalInvokeOutput, error) {
-	return c.modalInvoke(ctx, "/api/v1/ai/image/invoke", input)
-}
-
-func (c *Client) VideoInvoke(ctx context.Context, input ModalInvokeInput) (*ModalInvokeOutput, error) {
-	return c.modalInvoke(ctx, "/api/v1/ai/video/invoke", input)
-}
-
-func (c *Client) TTSInvoke(ctx context.Context, input ModalInvokeInput) (*ModalInvokeOutput, error) {
-	return c.modalInvoke(ctx, "/api/v1/ai/tts/invoke", input)
-}
-
-func (c *Client) modalInvoke(ctx context.Context, path string, input ModalInvokeInput) (*ModalInvokeOutput, error) {
-	var raw json.RawMessage
-	if err := c.doJSON(ctx, http.MethodPost, path, input, &raw); err != nil {
-		return nil, err
-	}
-	return &ModalInvokeOutput{Data: append(json.RawMessage(nil), raw...)}, nil
-}
-
 func (c *Client) doJSON(ctx context.Context, method, path string, input any, output any) error {
 	return c.doJSONWithHeaders(ctx, method, path, input, output, nil)
 }
@@ -221,7 +195,7 @@ func (c *Client) doJSONWithHeaders(ctx context.Context, method, path string, inp
 		return err
 	}
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return &HTTPError{StatusCode: resp.StatusCode, ReasonCode: hostcontract.ParseReasonCode(payload, "AI_UPSTREAM_DEPENDENCY"), Body: string(payload)}
+		return DecodeHTTPError(resp.StatusCode, resp.Header, payload)
 	}
 	if output == nil {
 		return nil
@@ -239,9 +213,16 @@ func (c *Client) doJSONWithHeaders(ctx context.Context, method, path string, inp
 }
 
 type HTTPError struct {
-	StatusCode int
-	ReasonCode string
-	Body       string
+	StatusCode      int
+	ErrorCode       string
+	ReasonCode      string
+	Details         map[string]any
+	TraceID         string
+	RequestID       string
+	UpstreamStatus  int
+	UpstreamCode    string
+	ProviderTraceID string
+	Body            string
 }
 
 func (e *HTTPError) Error() string {

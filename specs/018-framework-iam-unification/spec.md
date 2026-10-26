@@ -94,7 +94,7 @@
 ### Key Entities *(include if feature involves data)*
 
 - **IAM Adapter**: framework 约束的模式实现单元（local/delegated）。
-- **Identity Context**: 统一身份上下文（tenant/user/roles/permissions/policy_version）。
+- **Identity Context**: 统一身份上下文（tenant/user/member/is_root/roles/permissions/policy_version）。`is_root` 由启动时选定的已认证适配器提供：local 从当前有效用户记录读取，delegated 沿用已验证的宿主身份。业务不得从角色名称、请求参数或未验签 claims 推断 Root；仅解码 claims 的 resolver 不授予 Root。
 - **Organization Node**: 组织结构节点（tenant、department、member 的层级关系）。
 - **Tenant**: 本地 IAM 租户主体，作为组织与权限边界。
 - **Department**: 租户内部门层级节点，承载组织树关系。

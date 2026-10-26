@@ -88,3 +88,11 @@ export type {
 } from "./logger";
 export { createRegressionClient, validateRegressionEvent, applyRegressionEvent, regressionUUID, regressionTerminal } from './regression';
 export type { RegressionClient, RegressionClientOptions, SuiteDefinition, CaseDefinition, ProfileDefinition, RunDetail, Run, CaseExecution, AssertionResult, Evidence, FixtureResource, RegressionEvent, EventMeta, Report, CreateRun } from './regression';
+
+export { createAIMediaClient, AIMediaStreamError, isMediaTaskTerminal, validateMediaTask, mediaOperationDefaults } from './ai-media';
+export type { AIMediaClientOptions, MediaTaskWatchOptions, MediaCapability, MediaModality, MediaParameterSchema, MediaModelOperation, MediaModel, MediaModelCatalog, MediaProviderCatalog, MediaCatalogFilter, MediaInvokeInput, MediaGenerationInput, MediaAnalysis, MediaAssetResult, MediaTask } from './ai-media';
+export { PluginSSEHTTPError } from './sse';
+export { createImageDerivativesClient, validateImageDerivatives, findImageDerivative, ImageDerivativesError } from './image-derivatives';
+export type { ImageDerivatives, ImageDerivativeItem, ImageDerivativeStatus, ImageDerivativesClientOptions, ImageDerivativeWatchOptions } from './image-derivatives';
+export { businessNotificationCardContract, businessNotificationCardContractV2, validateBusinessCardPresentation, upsertNotificationByRevision } from './notifications';
+export type { BusinessCardReference, BusinessCardPresentation, BusinessCardPresentationV2, BusinessCardPresentationSnapshot, CardRendition, CardRenditionStatus, BusinessCardPresentationSource, NotificationNavigation, NotificationAction, NotificationPayload, NotificationUpdatedEvent, NotificationReadReceiptInput, NotificationReadReceipt, InvalidateCardInput, InvalidateCardResult } from './notifications';

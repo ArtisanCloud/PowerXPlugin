@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/hosthttp"
 	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
 	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"github.com/google/uuid"
@@ -71,6 +72,7 @@ type Config struct {
 
 	// Operations 配置。
 	Operations *OperationsConfig `yaml:"operations" json:"operations"`
+	Regression RegressionConfig  `yaml:"regression" json:"regression"`
 
 	// AdminConsole 配置。
 	AdminConsole *AdminConsoleConfig `yaml:"admin_console" json:"admin_console"`
@@ -151,18 +153,43 @@ type ServerConfig struct {
 
 // RuntimeConfig 运行时配置
 type RuntimeConfig struct {
-	RunMigrate  bool                `yaml:"run_migrate" json:"run_migrate"`
-	GinMode     string              `yaml:"gin_mode" json:"gin_mode"`
-	HTTPLog     *bool               `yaml:"http_log" json:"http_log"`
-	RouteLog    *bool               `yaml:"route_log" json:"route_log"`
-	Logging     *LoggingConfig      `yaml:"logging" json:"logging"`
-	Monitoring  *MonitoringConfig   `yaml:"monitoring" json:"monitoring"`
-	RuntimeOps  *RuntimeOpsDefaults `yaml:"runtime_ops" json:"runtime_ops"`
-	EventBridge *EventBridgeConfig  `yaml:"event_bridge" json:"event_bridge"`
-	WSBus       *WSBusConfig        `yaml:"ws_bus" json:"ws_bus"`
-	Integration *IntegrationConfig  `yaml:"integration" json:"integration"`
-	Cache       *RuntimeCacheConfig `yaml:"cache" json:"cache"`
-	Knowledge   *KnowledgeConfig    `yaml:"knowledge" json:"knowledge"`
+	Media         RuntimeMediaConfig         `yaml:"media" json:"media"`
+	Notifications RuntimeNotificationsConfig `yaml:"notifications" json:"notifications"`
+	RunMigrate    bool                       `yaml:"run_migrate" json:"run_migrate"`
+	GinMode       string                     `yaml:"gin_mode" json:"gin_mode"`
+	HTTPLog       *bool                      `yaml:"http_log" json:"http_log"`
+	RouteLog      *bool                      `yaml:"route_log" json:"route_log"`
+	Logging       *LoggingConfig             `yaml:"logging" json:"logging"`
+	Monitoring    *MonitoringConfig          `yaml:"monitoring" json:"monitoring"`
+	RuntimeOps    *RuntimeOpsDefaults        `yaml:"runtime_ops" json:"runtime_ops"`
+	EventBridge   *EventBridgeConfig         `yaml:"event_bridge" json:"event_bridge"`
+	WSBus         *WSBusConfig               `yaml:"ws_bus" json:"ws_bus"`
+	Integration   *IntegrationConfig         `yaml:"integration" json:"integration"`
+	Cache         *RuntimeCacheConfig        `yaml:"cache" json:"cache"`
+	Knowledge     *KnowledgeConfig           `yaml:"knowledge" json:"knowledge"`
+}
+
+// RuntimeNotificationsConfig explicitly selects local API-key Core simulation.
+type RuntimeNotificationsConfig struct {
+	Channel string `yaml:"channel" json:"channel"`
+}
+
+type RuntimeMediaConfig struct {
+	Channel string `yaml:"channel" json:"channel"`
+}
+
+func (c *Config) MediaChannel() string {
+	if c.Runtime == nil {
+		return ""
+	}
+	return c.Runtime.Media.Channel
+}
+
+func (c *Config) NotificationChannel() string {
+	if c.Runtime == nil {
+		return ""
+	}
+	return c.Runtime.Notifications.Channel
 }
 
 type RuntimeCacheConfig struct {
@@ -488,6 +515,13 @@ func loadWithOptions(opts loadOptions) (*Config, error) {
 	if strings.TrimSpace(configDir) != "" {
 		loadEnvFiles(configDir, filepath.Dir(configDir))
 	}
+	if root := strings.TrimSpace(os.Getenv("POWERX_PLUGIN_ROOT")); root != "" {
+		pxlog.InfoCtx(pxlog.WithLogFields(context.Background(), map[string]interface{}{
+			"component": "config.loader", "plugin_root": root,
+			"config_directory": configDir, "ai_catalog_configured": cfg.AICatalog != nil,
+		}), "HOST_CONFIG_SOURCE_RESOLVED")
+	}
+
 	applyRuntimeNamespacesToLegacy(cfg)
 
 	loadSecurityBaselineConfig(cfg)
@@ -515,6 +549,9 @@ func loadWithOptions(opts loadOptions) (*Config, error) {
 
 	// 验证配置
 	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+	if err := applyRecoveryRedisBindings(cfg); err != nil {
 		return nil, err
 	}
 
@@ -696,7 +733,7 @@ func getDefaultConfig() *Config {
 		SecurityBaseline: defaultSecurityBaselineConfig(),
 		Gateway: &GatewayConfig{
 			BaseURL:   "http://127.0.0.1:8077",
-			APIPrefix: "/api/v1",
+			APIPrefix: hosthttp.DefaultAPIPrefix,
 			UseMock:   []string{},
 		},
 		CustomerAuth: &CustomerAuthConfig{
@@ -908,6 +945,17 @@ func resolveConfigCandidates() []string {
 				)
 			}
 		}
+	}
+
+	// Host-managed and recovery processes do not run from the plugin directory.
+	// Resolve the packaged application configuration only within the explicit
+	// host root; host-values contains env bindings, not application defaults.
+	if root := strings.TrimSpace(os.Getenv("POWERX_PLUGIN_ROOT")); root != "" {
+		return uniqueNonEmptyStrings(append(candidates,
+			filepath.Join(root, "config", "config.yaml"),
+			filepath.Join(root, "backend", "etc", "config.yaml"),
+			filepath.Join(root, "etc", "config.yaml"),
+		))
 	}
 
 	candidates = append(candidates,
@@ -1124,6 +1172,18 @@ func loadEnvConfig(cfg *Config) {
 	}
 
 	// Gateway 能力调用配置
+	if channel := strings.TrimSpace(os.Getenv("PX_MEDIA_CHANNEL")); channel != "" {
+		if cfg.Runtime == nil {
+			cfg.Runtime = &RuntimeConfig{}
+		}
+		cfg.Runtime.Media.Channel = channel
+	}
+	if channel := strings.TrimSpace(os.Getenv("PX_NOTIFICATION_CHANNEL")); channel != "" {
+		if cfg.Runtime == nil {
+			cfg.Runtime = &RuntimeConfig{}
+		}
+		cfg.Runtime.Notifications.Channel = channel
+	}
 	if cfg.Gateway == nil {
 		cfg.Gateway = &GatewayConfig{}
 	}
@@ -1476,16 +1536,9 @@ func normalizeGatewayAuthScheme(raw string) string {
 func normalizeGatewayAPIPrefix(raw string) string {
 	value := strings.TrimSpace(raw)
 	if value == "" {
-		return "/api/v1"
+		return hosthttp.DefaultAPIPrefix
 	}
-	if !strings.HasPrefix(value, "/") {
-		value = "/" + value
-	}
-	value = "/" + strings.Trim(strings.TrimSpace(value), "/")
-	if value == "/" {
-		return "/api/v1"
-	}
-	return value
+	return "/" + strings.Trim(value, "/")
 }
 
 func inferGatewayAuthScheme(cfg *Config) string {
@@ -1569,6 +1622,21 @@ func (c *Config) IsJWTMode() bool {
 
 // Validate 验证配置
 func (c *Config) Validate() error {
+	if c.MediaChannel() != "" && c.MediaChannel() != "core_host" {
+		return NewConfigError("MEDIA_CHANNEL_INVALID")
+	}
+	if c.MediaChannel() == "core_host" && ((c.Context != nil && c.Context.ProviderMode == "delegated") || c.Gateway == nil || !strings.EqualFold(c.Gateway.AuthScheme, "apikey") || strings.TrimSpace(c.Gateway.APIKey) == "" || strings.TrimSpace(c.Gateway.BaseURL) == "") {
+		return NewConfigError("MEDIA_CORE_HOST_CONFIGURATION_INVALID")
+	}
+	if c.NotificationChannel() != "" && c.NotificationChannel() != "core_host" {
+		return NewConfigError("NOTIFICATION_CHANNEL_INVALID")
+	}
+	if c.NotificationChannel() == "core_host" && ((c.Context != nil && c.Context.ProviderMode == "delegated") || c.Gateway == nil || !strings.EqualFold(c.Gateway.AuthScheme, "apikey") || strings.TrimSpace(c.Gateway.APIKey) == "" || strings.TrimSpace(c.Gateway.BaseURL) == "") {
+		return NewConfigError("NOTIFICATION_CORE_HOST_CONFIGURATION_INVALID")
+	}
+	if err := c.Regression.Validate(); err != nil {
+		return err
+	}
 	// 数据库配置验证
 	if c.Database == nil {
 		return NewConfigError("database config is required")

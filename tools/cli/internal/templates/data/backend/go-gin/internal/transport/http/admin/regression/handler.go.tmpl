@@ -1,0 +1,215 @@
+package regression
+
+import (
+	"encoding/json"
+	Regression "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/regression"
+	Contracts "{{ .BackendModulePath }}/internal/contracts"
+	Middleware "{{ .BackendModulePath }}/internal/middleware"
+	App "{{ .BackendModulePath }}/internal/shared/app"
+	"github.com/gin-gonic/gin"
+	"io"
+	"net/http"
+	"strconv"
+)
+
+type Handler struct{ runner *Regression.Runner }
+
+func RegisterRoutes(admin *gin.RouterGroup, deps *App.Deps) {
+	if deps == nil || deps.Regression == nil {
+		return
+	}
+	h := &Handler{runner: deps.Regression}
+	g := admin.Group("/regression")
+	g.GET("/suites", h.Suites)
+	g.GET("/cases", h.Cases)
+	g.GET("/profiles", h.Profiles)
+	g.GET("/runs", h.List)
+	g.POST("/runs", h.Create)
+	g.GET("/runs/:run_uuid", h.Get)
+	g.POST("/runs/:run_uuid/cancel", h.Cancel)
+	g.POST("/runs/:run_uuid/cleanup", h.Cleanup)
+	g.GET("/runs/:run_uuid/events", h.Events)
+	g.GET("/runs/:run_uuid/report", h.Report)
+}
+func (h *Handler) actor(c *gin.Context) (Regression.Actor, bool) {
+	tc, ok := Middleware.GetTenantContext(c)
+	if !ok || !Regression.ValidUUID(tc.UserUUID) || !Regression.ValidUUID(tc.TenantUUID) {
+		Contracts.ResponseError(c, http.StatusUnauthorized, Regression.InvalidRequest, Regression.MessageKey(Regression.InvalidRequest))
+		return Regression.Actor{}, false
+	}
+	token, _ := Middleware.GetRawBearerToken(c)
+	a := Regression.Actor{TenantUUID: tc.TenantUUID, UUID: tc.UserUUID, MemberUUID: tc.MemberUUID, PluginID: App.PluginID, RequestID: c.GetString("request_id"), TraceID: c.GetString("trace_id"), Credential: token}
+	if err := Regression.ValidateActor(a); err != nil {
+		h.fail(c, err)
+		return a, false
+	}
+	if err := h.runner.Recover(c.Request.Context(), a); err != nil {
+		h.fail(c, err)
+		return a, false
+	}
+	return a, true
+}
+func (h *Handler) fail(c *gin.Context, err error) {
+	code := Regression.CodeOf(err)
+	status := http.StatusBadRequest
+	switch code {
+	case Regression.NotFound:
+		status = http.StatusNotFound
+	case Regression.Busy, Regression.RequestConflict:
+		status = http.StatusConflict
+	case Regression.StoreUnavailable, Regression.DependencyBlocked, Regression.CleanupUnavailable:
+		status = http.StatusServiceUnavailable
+	}
+	Contracts.ResponseError(c, status, code, Regression.MessageKey(code))
+}
+func (h *Handler) Suites(c *gin.Context) {
+	if _, ok := h.actor(c); ok {
+		Contracts.ResponseSuccess(c, gin.H{"items": h.runner.Registry.Suites()})
+	}
+}
+func (h *Handler) Cases(c *gin.Context) {
+	if _, ok := h.actor(c); !ok {
+		return
+	}
+	items := []Regression.CaseDefinition{}
+	for _, d := range h.runner.Registry.Cases() {
+		if v := c.Query("suite_uuid"); v != "" && v != d.SuiteUUID {
+			continue
+		}
+		match := true
+		if v := c.Query("tag"); v != "" {
+			match = false
+			for _, t := range d.Tags {
+				match = match || t == v
+			}
+		}
+		if v := c.Query("profile_kind"); v != "" {
+			supported := false
+			for _, kind := range d.SupportedProfileKinds {
+				supported = supported || kind == v
+			}
+			match = match && supported
+		}
+		if match {
+			items = append(items, d)
+		}
+	}
+	Contracts.ResponseSuccess(c, gin.H{"items": items})
+}
+func (h *Handler) Profiles(c *gin.Context) {
+	if _, ok := h.actor(c); ok {
+		Contracts.ResponseSuccess(c, gin.H{"items": h.runner.Registry.Profiles()})
+	}
+}
+func (h *Handler) List(c *gin.Context) {
+	a, ok := h.actor(c)
+	if !ok {
+		return
+	}
+	page, err := strconv.ParseUint(c.DefaultQuery("page", "1"), 10, 64)
+	if err != nil {
+		h.fail(c, Regression.NewError(Regression.InvalidRequest))
+		return
+	}
+	size, err := strconv.ParseUint(c.DefaultQuery("page_size", "20"), 10, 64)
+	if err != nil {
+		h.fail(c, Regression.NewError(Regression.InvalidRequest))
+		return
+	}
+	items, total, err := h.runner.Store.List(c.Request.Context(), a.TenantUUID, page, size, c.Query("profile_uuid"))
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	Contracts.ResponseSuccess(c, gin.H{"items": items, "total": total, "page": page, "page_size": size})
+}
+func (h *Handler) Create(c *gin.Context) {
+	a, ok := h.actor(c)
+	if !ok {
+		return
+	}
+	var in Regression.CreateRun
+	decoder := json.NewDecoder(c.Request.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&in); err != nil {
+		h.fail(c, Regression.NewError(Regression.InvalidRequest))
+		return
+	}
+	if err := decoder.Decode(new(any)); err != io.EOF {
+		h.fail(c, Regression.NewError(Regression.InvalidRequest))
+		return
+	}
+	d, _, err := h.runner.Create(c.Request.Context(), a, in)
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	Contracts.ResponseAccepted(c, d)
+}
+func (h *Handler) Get(c *gin.Context) {
+	a, ok := h.actor(c)
+	if !ok {
+		return
+	}
+	d, err := h.runner.Get(c.Request.Context(), a, c.Param("run_uuid"))
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	Contracts.ResponseSuccess(c, d)
+}
+func (h *Handler) Cancel(c *gin.Context) {
+	a, ok := h.actor(c)
+	if !ok {
+		return
+	}
+	d, err := h.runner.Cancel(c.Request.Context(), a, c.Param("run_uuid"))
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	Contracts.ResponseAccepted(c, d)
+}
+func (h *Handler) Cleanup(c *gin.Context) {
+	a, ok := h.actor(c)
+	if !ok {
+		return
+	}
+	d, err := h.runner.Cleanup(c.Request.Context(), a, c.Param("run_uuid"))
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	Contracts.ResponseAccepted(c, d)
+}
+func (h *Handler) Report(c *gin.Context) {
+	a, ok := h.actor(c)
+	if !ok {
+		return
+	}
+	d, err := h.runner.Get(c.Request.Context(), a, c.Param("run_uuid"))
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	events, err := h.runner.Store.Events(c.Request.Context(), a.TenantUUID, d.Run.UUID, "")
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	format := c.DefaultQuery("format", "json")
+	if format == "junit" {
+		data, err := Regression.JUnit(d)
+		if err != nil {
+			h.fail(c, err)
+			return
+		}
+		c.Data(http.StatusOK, "application/xml", data)
+		return
+	}
+	if format != "json" {
+		h.fail(c, Regression.NewError(Regression.InvalidRequest))
+		return
+	}
+	c.JSON(http.StatusOK, Regression.Export(d, events))
+}

@@ -1,0 +1,147 @@
+{
+  "schema": "framework_dev_release_validation.v1",
+  "recorded_at": "2026-10-26T04:40:13.218213+00:00",
+  "status": "local_dev_versions_ready",
+  "published": false,
+  "git_tagged": false,
+  "git_pushed": false,
+  "branch": "025-framework-business-regression",
+  "versions": {
+    "go": "v0.0.27-dev.20261026.1",
+    "client": "0.0.14-dev.20261026.1",
+    "admin": "0.0.13-dev.20261026.1",
+    "cli": "v1.0.4-dev.20261026.1"
+  },
+  "bundle": "artifacts/framework-release-dev-20261026/f5b2c51db58dae85",
+  "source_sha256": {
+    "go": "6c661ab50c6944d40b9d0f14614a393230099d63528c923b5b1cc3149fcf8f08",
+    "client": "98a73cc11e6935721d95f4ffc7136369b4f325355e5c23b9d05d923db2e6aa81",
+    "admin": "42112d132f245a9770f849c4680878d7124e785b2e679be59d893b072e1e5d79",
+    "cli": "e18b1ebb46fd3dbdfa7990c45ab16801de38ebe84741dcc3ddeb69822ecb5ecb",
+    "builder": "f755d051d9eae1a978463209ff34ce723b3b2b599edc66fe94c1a1e2f6ef0641"
+  },
+  "artifact_sha256": {
+    "go-proxy/github.com/!artisan!cloud/!power!x!plugin/framework/backend/go/@v/v0.0.27-dev.20261026.1.zip": "ce14b9b705f40be4f0ca7fee57ea689c21d68ef458f8531f043ddf5a28ce7a69",
+    "artisan-cloud-plugin-framework-client-0.0.14-dev.20261026.1.tgz": "2c5abb22c252941a99f13920e4f4512f759af536153ef0b2dcf94119fa84568a",
+    "artisan-cloud-plugin-framework-admin-0.0.13-dev.20261026.1.tgz": "8d1a85d979bbf0e998d5b0cd9c95091171a7e57486ce609be49c3fd16f23603e",
+    "px-plugin": "7c40f2db7e0187293e9936a1135a6c199999028656265b5bae6714229cc7594d"
+  },
+  "validation": {
+    "schema": "framework_dev_validation.v1",
+    "published": false,
+    "versions": {
+      "go": "v0.0.27-dev.20261026.1",
+      "client": "0.0.14-dev.20261026.1",
+      "admin": "0.0.13-dev.20261026.1",
+      "cli": "v1.0.4-dev.20261026.1"
+    },
+    "consumer_outside_repository": true,
+    "go_work": "off",
+    "isolated_go_module_cache": true,
+    "local_replace": false,
+    "source_symlinks": false,
+    "checks": {
+      "generated_plugin_install": "passed",
+      "installed_packages_match_tarballs": "passed",
+      "manifest_validation": "passed",
+      "generated_backend_tests": "passed",
+      "packaged_ai_contract_tests": "passed",
+      "generated_backend_build": "passed",
+      "installed_typescript_exports": "passed",
+      "generated_nuxt_production_build": "passed"
+    },
+    "consumer_removed": true,
+    "status": "passed",
+    "installed": {
+      "nuxt": "4.4.2",
+      "@artisan-cloud/plugin-framework-client": "0.0.14-dev.20261026.1",
+      "@artisan-cloud/plugin-framework-admin": "0.0.13-dev.20261026.1"
+    },
+    "toolchain": {
+      "go": "go version go1.26.7 darwin/arm64",
+      "node": "v22.23.2",
+      "npm": "11.6.0"
+    }
+  },
+  "installation": {
+    "schema": "framework_dev_installation.v1",
+    "versions": {
+      "go": "v0.0.27-dev.20261026.1",
+      "client": "0.0.14-dev.20261026.1",
+      "admin": "0.0.13-dev.20261026.1",
+      "cli": "v1.0.4-dev.20261026.1"
+    },
+    "bundle": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-dev-20261026/f5b2c51db58dae85",
+    "installed": [
+      {
+        "path": "/Users/michaelhu/go/bin/px-plugin",
+        "sha256": "7c40f2db7e0187293e9936a1135a6c199999028656265b5bae6714229cc7594d",
+        "version": "px-plugin version v1.0.4-dev.20261026.1 (commit f123a23-dirty)",
+        "bytes": 33439170,
+        "original_backup": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-dev-20261026/f5b2c51db58dae85/previous-cli/global-px-plugin"
+      },
+      {
+        "path": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/bin/px-plugin",
+        "sha256": "7c40f2db7e0187293e9936a1135a6c199999028656265b5bae6714229cc7594d",
+        "version": "px-plugin version v1.0.4-dev.20261026.1 (commit f123a23-dirty)",
+        "bytes": 33439170,
+        "original_backup": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-dev-20261026/f5b2c51db58dae85/previous-cli/repository-px-plugin"
+      }
+    ],
+    "global_go_config_changed": false,
+    "global_npm_config_changed": false
+  },
+  "checks": {
+    "framework-go-tests": {
+      "status": "passed",
+      "tested_packages": 61,
+      "log": "artifacts/framework-release-dev-20261026/framework-go-tests.log"
+    },
+    "skeleton-go-tests": {
+      "status": "passed",
+      "tested_packages": 75,
+      "log": "artifacts/framework-release-dev-20261026/skeleton-go-tests.log"
+    },
+    "cli-tests": {
+      "status": "passed",
+      "tested_packages": 21,
+      "log": "artifacts/framework-release-dev-20261026/cli-tests.log"
+    },
+    "contracts": {
+      "status": "passed",
+      "log": "artifacts/framework-release-dev-20261026/contracts-tests.log"
+    },
+    "frontend_unit": {
+      "status": "passed",
+      "files": 25,
+      "tests": 216
+    },
+    "cli_standalone": {
+      "status": "passed"
+    },
+    "installed_cli_activation_generation": "passed",
+    "template_sync": "passed",
+    "obsolete_template_guard": "passed",
+    "obsolete_template_files_removed": 84,
+    "git_diff_check": "passed",
+    "producer_binary_templates_absent": "passed",
+    "retired_binary_template_files": 4
+  },
+  "core_formal_contract_sha256": "d6d45d91dbe58115ae39fd08864171f356deadb80b6fe55901b07a900e8f439e",
+  "acceptance_boundaries": {
+    "core_modified": false,
+    "user_services_restarted": false,
+    "persistent_services_started": false,
+    "live_sts_plugin_browser_e2e": "not_run",
+    "next_fastapi_generation": "not_run",
+    "minimum_go_1_24": "not_run; tested with go1.26.7",
+    "public_registry_consumption": "not_run; unpublished artifacts"
+  },
+  "cleanup": {
+    "temporary_consumer_removed": true,
+    "temporary_node_shim_removed": true
+  },
+  "guide": "docs/releases/framework-dev-20261026.md",
+  "cli_binary_bytes": 33439170,
+  "retired_template_binaries": "artifacts/framework-release-dev-20261026/retired-template-binaries/manifest.json"
+}

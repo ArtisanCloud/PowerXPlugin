@@ -2,6 +2,7 @@ package manifest
 
 import (
 	"fmt"
+	fwmanifest "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
 	"os"
 	"path/filepath"
 
@@ -10,9 +11,10 @@ import (
 
 // PluginManifest represents the minimal fields needed from plugin.yaml.
 type PluginManifest struct {
-	ID      string `yaml:"id"`
-	Version string `yaml:"version"`
-	Backend struct {
+	NotificationPresentations []fwmanifest.NotificationPresentation `yaml:"notification_presentations"`
+	ID                        string                                `yaml:"id"`
+	Version                   string                                `yaml:"version"`
+	Backend                   struct {
 		Entry string `yaml:"entry"`
 	} `yaml:"backend"`
 }
@@ -41,6 +43,13 @@ func Load(path string) (*PluginManifest, error) {
 
 	if manifest.ID == "" || manifest.Version == "" {
 		return nil, fmt.Errorf("manifest missing id/version")
+	}
+	var raw map[string]any
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return nil, err
+	}
+	if _, err := fwmanifest.DecodeNotificationPresentations(raw["notification_presentations"]); err != nil {
+		return nil, fmt.Errorf("manifest notification_presentations: %w", err)
 	}
 
 	return &manifest, nil

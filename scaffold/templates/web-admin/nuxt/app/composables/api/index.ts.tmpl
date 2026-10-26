@@ -22,3 +22,5 @@ export type { Page, ApiResponse, ListQuery } from "./_base";
 
 export { useKnowledgeWorkspace, knowledgeWorkspaceKey } from "./useKnowledgeWorkspace";
 export { usePowerXKnowledgeWorkspace } from "./usePowerXKnowledgeWorkspace";
+
+export { useAIMediaApi } from './useAIMedia';

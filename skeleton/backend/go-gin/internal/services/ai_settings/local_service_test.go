@@ -3,10 +3,16 @@ package ai_settings
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
+
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/hostapi"
+	powerxai "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/ai"
+	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
@@ -167,8 +173,63 @@ func TestLocalSettingsServiceTestsTheProfileInsteadOfStaticRuntimeModels(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := svc.TestConnection(context.Background(), SaveInput{Provider: "ollama", ModelKey: "qwen3:8b", Endpoint: server.URL}); err != nil {
+	if err := svc.TestConnection(context.Background(), SaveInput{Modality: "llm", Provider: "ollama", ModelKey: "qwen3:8b", Endpoint: server.URL}); err != nil {
 		t.Fatalf("TestConnection() error = %v", err)
+	}
+}
+
+func TestLocalSettingsRejectsMediaAndPreservesExplicitLLMInputs(t *testing.T) {
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		var body struct {
+			Model    string `json:"model"`
+			Messages []struct {
+				Content string `json:"content"`
+			} `json:"messages"`
+			Options map[string]any `json:"options"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Error(err)
+		}
+		if body.Model != "fixture.unsaved" || len(body.Messages) != 1 || body.Messages[0].Content != "fixture.input" || body.Options["temperature"] != float64(0) {
+			t.Errorf("unexpected profile request: %+v", body)
+		}
+		_, _ = w.Write([]byte(`{"message":{"content":"fixture.output"},"done":true}`))
+	}))
+	defer server.Close()
+	ai, err := runtimeexample.NewLocalAI(nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo, err := repository.NewLocalSettingsRepository(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc, err := NewLocalSettingsService(repo, nil, ai)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, modality := range []string{"vlm", "image", "video", "audio_tts", "embedding"} {
+		in := SaveInput{Modality: modality, Provider: "ollama", ModelKey: "fixture.unsaved", Endpoint: server.URL}
+		for _, err := range []error{svc.TestConnection(context.Background(), in), func() error { _, err := svc.QuickCall(context.Background(), in); return err }()} {
+			var typed *hostapi.HTTPError
+			if !errors.As(err, &typed) || typed.StatusCode != 422 {
+				t.Fatalf("%s: %v", modality, err)
+			}
+		}
+	}
+	if calls.Load() != 0 {
+		t.Fatal("unsupported operations reached the provider")
+	}
+	ctx := authx.ContextWithTenantUUID(context.Background(), "11111111-1111-4111-8111-111111111111")
+	out, err := svc.InvokeLLM(ctx, SaveInput{Modality: "llm", Provider: "ollama", ModelKey: "fixture.unsaved", Endpoint: server.URL, Parameters: map[string]any{"temperature": 0}}, []powerxai.ContentItem{{Type: "text", Content: "fixture.input"}})
+	if err != nil || out == nil || out.Text != "fixture.output" || calls.Load() != 1 {
+		t.Fatalf("out=%+v err=%v calls=%d", out, err, calls.Load())
 	}
 }
 

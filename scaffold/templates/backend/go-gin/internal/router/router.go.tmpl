@@ -1,6 +1,7 @@
 package router
 
 import (
+	parceltool "{{ .BackendModulePath }}/internal/transport/http/parceltool"
 	stdhttp "net/http"
 	"os"
 	"strings"
@@ -176,6 +177,8 @@ func (r *Router) setupRoutes() {
 	if !strings.HasPrefix(prefix, "/") {
 		prefix = "/" + prefix
 	}
+
+	parceltool.Register(r.engine.Group(prefix))
 
 	// 鉴权/权限组件
 	jwtCfg := r.buildJWT()

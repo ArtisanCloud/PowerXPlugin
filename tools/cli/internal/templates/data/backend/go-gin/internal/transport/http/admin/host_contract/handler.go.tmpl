@@ -164,7 +164,7 @@ func (h *Handler) Probe(c *gin.Context) {
 		if err := h.probeRuntimeModule(c, request.Input, &result); err != nil {
 			status, reason, traceID := mapTypedClientError(err)
 			result.TraceID = firstNonEmpty(traceID, result.TraceID)
-			respondProbeError(c, result, status, reason)
+			respondProbeError(c, result, status, reason, err)
 			return
 		}
 	default:
@@ -503,7 +503,7 @@ func (h *Handler) probeRuntimeModule(c *gin.Context, input map[string]any, resul
 			}
 			result.Result = map[string]any{"ready": true, "binding": "runtime", "read_operations": []string{}}
 		case hostcontract.OperationNotificationCreate:
-			if err := ensureInputKeys(input, "title", "content", "type", "category", "is_important", "member_uuid", "metadata"); err != nil {
+			if err := ensureInputKeys(input, "title", "content", "type", "category", "is_important", "member_uuid", "metadata", "navigation"); err != nil {
 				return err
 			}
 			title, err := inputRequiredString(input, "title")
@@ -534,11 +534,43 @@ func (h *Handler) probeRuntimeModule(c *gin.Context, input map[string]any, resul
 			if err != nil {
 				return err
 			}
-			notification, err := publisher.Create(ctx, powerxnotifications.CreateInput{Title: title, Content: content, Type: typeName, Category: category, IsImportant: important, MemberUUID: memberUUID, Metadata: metadata})
+			var decoded powerxnotifications.CreateInput
+			if err := decodeNotificationInput(input, &decoded); err != nil {
+				return err
+			}
+			notification, err := publisher.Create(ctx, powerxnotifications.CreateInput{Title: title, Content: content, Type: typeName, Category: category, IsImportant: important, MemberUUID: memberUUID, Metadata: metadata, Navigation: decoded.Navigation})
 			if err != nil {
 				return err
 			}
 			result.Result = map[string]any{"notification": notification}
+		case hostcontract.OperationNotificationInvalidateCard:
+			var command powerxnotifications.InvalidateCardInput
+			if err := decodeNotificationInput(input, &command); err != nil {
+				return err
+			}
+			invalidator, err := h.notifications.CardInvalidator()
+			if err != nil {
+				return err
+			}
+			out, err := invalidator.InvalidateCard(ctx, command)
+			if err != nil {
+				return err
+			}
+			result.Result = map[string]any{"invalidation": out}
+		case hostcontract.OperationNotificationAcknowledgeRead:
+			var command powerxnotifications.ReadReceiptInput
+			if err := decodeNotificationInput(input, &command); err != nil {
+				return err
+			}
+			reader, err := h.notifications.ReadAcknowledger()
+			if err != nil {
+				return err
+			}
+			out, err := reader.Acknowledge(ctx, command)
+			if err != nil {
+				return err
+			}
+			result.Result = map[string]any{"receipt": out}
 		default:
 			return &hostcontract.Error{Reason: hostcontract.ReasonUnsupportedOperation}
 		}
@@ -950,9 +982,35 @@ func respondError(c *gin.Context, status int, reason hostcontract.ReasonCode) {
 	c.JSON(status, gin.H{"success": false, "error": hostcontract.ErrorEnvelope{ErrorCode: string(reason), ReasonCode: reason, TraceID: strings.TrimSpace(c.GetString("request_id"))}})
 }
 
-func respondProbeError(c *gin.Context, result hostcontract.ProbeResult, status int, reason hostcontract.ReasonCode) {
+func respondProbeError(c *gin.Context, result hostcontract.ProbeResult, status int, reason hostcontract.ReasonCode, causes ...error) {
 	result.ReasonCode = reason
-	c.JSON(status, gin.H{"success": false, "data": result, "error": hostcontract.ErrorEnvelope{ErrorCode: string(reason), ReasonCode: reason, TraceID: result.TraceID}})
+	envelope := hostcontract.ErrorEnvelope{ErrorCode: string(reason), ReasonCode: reason, TraceID: result.TraceID}
+	if len(causes) > 0 {
+		var upstream *powerxnotifications.HTTPError
+		if errors.As(causes[0], &upstream) {
+			envelope.ErrorCode = firstNonEmpty(upstream.ErrorCode, upstream.ReasonCode)
+			envelope.HTTPStatus, envelope.RequestID, envelope.Details = upstream.StatusCode, upstream.RequestID, upstream.Details
+		}
+		var mediaError *powerxmedia.HostHTTPError
+		if errors.As(causes[0], &mediaError) {
+			envelope.ErrorCode = firstNonEmpty(mediaError.ErrorCode, mediaError.ReasonCode)
+			envelope.HTTPStatus, envelope.RequestID, envelope.Details = mediaError.StatusCode, mediaError.RequestID, mediaError.Details
+		}
+	}
+	c.JSON(status, gin.H{"success": false, "data": result, "error": envelope})
+}
+
+func decodeNotificationInput(input map[string]any, out any) error {
+	raw, err := json.Marshal(input)
+	if err != nil {
+		return &hostcontract.Error{Reason: hostcontract.ReasonInvalidArgument}
+	}
+	decoder := json.NewDecoder(strings.NewReader(string(raw)))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(out); err != nil {
+		return &hostcontract.Error{Reason: hostcontract.ReasonInvalidArgument}
+	}
+	return nil
 }
 
 func mapIAMError(err error) (int, hostcontract.ReasonCode) {
@@ -963,6 +1021,10 @@ func mapIAMError(err error) (int, hostcontract.ReasonCode) {
 }
 
 func mapTypedClientError(err error) (int, hostcontract.ReasonCode, string) {
+	var mediaError *powerxmedia.HostHTTPError
+	if errors.As(err, &mediaError) {
+		return mediaError.StatusCode, hostcontract.ReasonCode(mediaError.ReasonCode), mediaError.TraceID
+	}
 	var bindingError *fwmodule.Error
 	if errors.As(err, &bindingError) {
 		return http.StatusServiceUnavailable, hostcontract.ReasonCode(bindingError.Code), ""
@@ -1015,7 +1077,7 @@ func mapTypedClientError(err error) (int, hostcontract.ReasonCode, string) {
 	}
 	var notificationError *powerxnotifications.HTTPError
 	if errors.As(err, &notificationError) && notificationError != nil {
-		return mapHTTPStatus(notificationError.StatusCode), reasonForHTTPStatus(notificationError.StatusCode), ""
+		return notificationError.StatusCode, hostcontract.ReasonCode(notificationError.ReasonCode), notificationError.TraceID
 	}
 	return http.StatusFailedDependency, hostcontract.ReasonUpstreamDependency, ""
 }

@@ -2,7 +2,9 @@ package app
 
 import (
 	"context"
+	fwmanifest "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/cache"
+	Regression "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/regression"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/taskcenter"
 	"os"
 	"strings"
@@ -72,6 +74,8 @@ type DelegatedAuthProxy interface {
 
 // Deps bundles shared infrastructure dependencies for handlers and services.
 type Deps struct {
+	NotificationPresentations      []fwmanifest.NotificationPresentation
+	Regression                     *Regression.Runner
 	KnowledgeProvider              fwknowledge.KnowledgeProvider
 	CacheRuntime                   *cache.Runtime
 	TaskCenterRuntime              *taskcenter.Runtime
@@ -138,6 +142,10 @@ type Deps struct {
 	IAMDirectoryService          fwiamcontracts.DirectoryService
 	IAMAuthzService              fwiamcontracts.AuthzService
 	IAMContextService            fwiamcontracts.IdentityContextService
+	// LocalAuthorizationBaselines must be supplied by a plugin-owned authority.
+	LocalAuthorizationBaselines     fwiamcontracts.AuthorizationBaselineService
+	IAMAuthorizationBaselines       fwiamcontracts.AuthorizationBaselineService
+	IAMAuthorizationBaselineEnabled bool
 }
 
 type gatewayClient interface {

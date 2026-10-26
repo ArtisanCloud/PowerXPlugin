@@ -11,11 +11,12 @@ type Menu struct {
 
 // Plugin 汇总插件向宿主上报的基础信息。
 type Plugin struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	Version     string   `json:"version,omitempty"`
-	Menus       []Menu   `json:"menus,omitempty"`
-	Permissions []string `json:"permissions,omitempty"`
+	NotificationPresentations []NotificationPresentation `json:"notification_presentations,omitempty" yaml:"notification_presentations,omitempty"`
+	ID                        string                     `json:"id"`
+	Name                      string                     `json:"name"`
+	Version                   string                     `json:"version,omitempty"`
+	Menus                     []Menu                     `json:"menus,omitempty"`
+	Permissions               []string                   `json:"permissions,omitempty"`
 }
 
 // App 定义宿主侧可接受 Manifest 的能力。

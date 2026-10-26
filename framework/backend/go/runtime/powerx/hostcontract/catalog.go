@@ -46,6 +46,8 @@ const (
 	OperationKnowledgeDocumentDelete          Operation = "document.delete"
 	OperationKnowledgeIndexRebuild            Operation = "index.rebuild"
 	OperationMediaAssetsList                  Operation = "assets.list"
+	OperationImageDerivativesStatus           Operation = "derivatives.status"
+	OperationImageDerivativesEnsure           Operation = "derivatives.ensure"
 	OperationAgentHealthSummary               Operation = "health.summary"
 	OperationAgentFreeze                      Operation = "bridge.freeze"
 	OperationAgentRecover                     Operation = "bridge.recover"
@@ -54,6 +56,8 @@ const (
 	OperationCapabilityRegistryList           Operation = "capabilities.list"
 	OperationSkillInvoke                      Operation = "skill.invoke"
 	OperationNotificationCreate               Operation = "notification.create"
+	OperationNotificationInvalidateCard       Operation = "notification.invalidate_card"
+	OperationNotificationAcknowledgeRead      Operation = "notification.acknowledge_read"
 	OperationIntegrationRoutesList            Operation = "routes.list"
 	OperationIntegrationRouteInvoke           Operation = "route.invoke"
 	OperationPluginRuntimeKnowledgeSpacesList Operation = "knowledge_spaces.list"
@@ -119,9 +123,12 @@ func (r ProbeResult) Audit() AuditFields {
 }
 
 type ErrorEnvelope struct {
-	ErrorCode  string     `json:"error_code"`
-	ReasonCode ReasonCode `json:"reason_code"`
-	TraceID    string     `json:"trace_id,omitempty"`
+	HTTPStatus int            `json:"http_status,omitempty"`
+	RequestID  string         `json:"request_id,omitempty"`
+	Details    map[string]any `json:"details,omitempty"`
+	ErrorCode  string         `json:"error_code"`
+	ReasonCode ReasonCode     `json:"reason_code"`
+	TraceID    string         `json:"trace_id,omitempty"`
 }
 
 type Error struct {
@@ -213,20 +220,22 @@ var moduleOperations = map[Module]map[Operation]OperationDescriptor{
 		OperationKnowledgeIndexRebuild:   descriptor(ModuleKnowledge, OperationKnowledgeIndexRebuild, "com.corex.knowledge.document.manage", false, true),
 	},
 	ModuleMedia: {
-		"asset.get":                descriptor(ModuleMedia, "asset.get", "com.corex.media.assets.read", true, false),
-		"asset.create":             descriptor(ModuleMedia, "asset.create", "com.corex.media.assets.manage", false, true),
-		"asset.update":             descriptor(ModuleMedia, "asset.update", "com.corex.media.assets.manage", false, true),
-		"asset.delete":             descriptor(ModuleMedia, "asset.delete", "com.corex.media.assets.manage", false, true),
-		"asset.presign_upload":     descriptor(ModuleMedia, "asset.presign_upload", "com.corex.media.assets.manage", false, true),
-		"asset.complete_upload":    descriptor(ModuleMedia, "asset.complete_upload", "com.corex.media.assets.manage", false, true),
-		"asset.presign_download":   descriptor(ModuleMedia, "asset.presign_download", "com.corex.media.assets.read", true, false),
-		"variant.create":           descriptor(ModuleMedia, "variant.create", "com.corex.media.assets.manage", false, true),
-		"variant.get":              descriptor(ModuleMedia, "variant.get", "com.corex.media.assets.read", true, false),
-		"variant.presign_upload":   descriptor(ModuleMedia, "variant.presign_upload", "com.corex.media.assets.manage", false, true),
-		"variant.complete_upload":  descriptor(ModuleMedia, "variant.complete_upload", "com.corex.media.assets.manage", false, true),
-		"variant.presign_download": descriptor(ModuleMedia, "variant.presign_download", "com.corex.media.assets.read", true, false),
-		OperationStatus:            descriptor(ModuleMedia, OperationStatus, "com.corex.media.assets.read", true, false),
-		OperationMediaAssetsList:   descriptor(ModuleMedia, OperationMediaAssetsList, "com.corex.media.assets.read", true, false),
+		OperationImageDerivativesStatus: descriptor(ModuleMedia, OperationImageDerivativesStatus, "com.corex.media.image_derivatives.read", true, false),
+		OperationImageDerivativesEnsure: descriptor(ModuleMedia, OperationImageDerivativesEnsure, "com.corex.media.image_derivatives.ensure", false, true),
+		"asset.get":                     descriptor(ModuleMedia, "asset.get", "com.corex.media.assets.read", true, false),
+		"asset.create":                  descriptor(ModuleMedia, "asset.create", "com.corex.media.assets.manage", false, true),
+		"asset.update":                  descriptor(ModuleMedia, "asset.update", "com.corex.media.assets.manage", false, true),
+		"asset.delete":                  descriptor(ModuleMedia, "asset.delete", "com.corex.media.assets.manage", false, true),
+		"asset.presign_upload":          descriptor(ModuleMedia, "asset.presign_upload", "com.corex.media.assets.manage", false, true),
+		"asset.complete_upload":         descriptor(ModuleMedia, "asset.complete_upload", "com.corex.media.assets.manage", false, true),
+		"asset.presign_download":        descriptor(ModuleMedia, "asset.presign_download", "com.corex.media.assets.read", true, false),
+		"variant.create":                descriptor(ModuleMedia, "variant.create", "com.corex.media.assets.manage", false, true),
+		"variant.get":                   descriptor(ModuleMedia, "variant.get", "com.corex.media.assets.read", true, false),
+		"variant.presign_upload":        descriptor(ModuleMedia, "variant.presign_upload", "com.corex.media.assets.manage", false, true),
+		"variant.complete_upload":       descriptor(ModuleMedia, "variant.complete_upload", "com.corex.media.assets.manage", false, true),
+		"variant.presign_download":      descriptor(ModuleMedia, "variant.presign_download", "com.corex.media.assets.read", true, false),
+		OperationStatus:                 descriptor(ModuleMedia, OperationStatus, "com.corex.media.assets.read", true, false),
+		OperationMediaAssetsList:        descriptor(ModuleMedia, OperationMediaAssetsList, "com.corex.media.assets.read", true, false),
 	},
 	ModuleAgent: {
 		"session.create":            descriptor(ModuleAgent, "session.create", "com.corex.agent.session.manage", false, true),
@@ -268,8 +277,10 @@ var moduleOperations = map[Module]map[Operation]OperationDescriptor{
 		OperationSkillInvoke: descriptor(ModuleSkills, OperationSkillInvoke, "", false, true),
 	},
 	ModuleNotifications: {
-		OperationStatus:             descriptor(ModuleNotifications, OperationStatus, "", true, false),
-		OperationNotificationCreate: descriptor(ModuleNotifications, OperationNotificationCreate, "com.corex.notifications.create", false, true),
+		OperationStatus:                      descriptor(ModuleNotifications, OperationStatus, "", true, false),
+		OperationNotificationCreate:          descriptor(ModuleNotifications, OperationNotificationCreate, "com.corex.notifications.create", false, true),
+		OperationNotificationInvalidateCard:  descriptor(ModuleNotifications, OperationNotificationInvalidateCard, "com.corex.notifications.invalidate_card", false, true),
+		OperationNotificationAcknowledgeRead: descriptor(ModuleNotifications, OperationNotificationAcknowledgeRead, "com.corex.notifications.read_receipts", false, true),
 	},
 	ModulePluginRuntime: {
 		OperationStatus: descriptor(ModulePluginRuntime, OperationStatus, "", true, false),

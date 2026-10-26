@@ -1,9 +1,13 @@
 package runtimeexample
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"image"
+	_ "image/jpeg"
+	_ "image/png"
 	"io"
 	"net/http"
 	"sort"
@@ -29,12 +33,13 @@ type LocalMedia struct {
 	now     func() time.Time
 }
 type mediaObject struct {
-	tenant   string
-	asset    dto.HostAsset
-	variant  *dto.Variant
-	checksum string
-	data     []byte
-	uploaded bool
+	variantType string
+	tenant      string
+	asset       dto.HostAsset
+	variant     *dto.Variant
+	checksum    string
+	data        []byte
+	uploaded    bool
 }
 type mediaTicket struct {
 	id, method string
@@ -210,11 +215,14 @@ func (s *LocalMedia) CreateVariant(ctx context.Context, id string, in dto.Create
 	if !validMedia(in.VariantType, in.MimeType, in.Checksum, in.SizeBytes) || len(in.Name) > 256 {
 		return nil, mediaError(400, "INVALID_ARGUMENT")
 	}
+	if in.VariantType == dto.VariantThumbnail64 && ((in.MimeType != "image/jpeg" && in.MimeType != "image/png") || in.SizeBytes < 1 || in.SizeBytes > dto.Thumbnail64MaxBytes) {
+		return nil, mediaError(400, "VARIANT_INVALID")
+	}
 	if len(s.objects) >= 64 {
 		return nil, mediaError(409, "LOCAL_CAPACITY_EXCEEDED")
 	}
 	v := dto.Variant{VariantUUID: uuid.NewString(), AssetUUID: id, Name: in.Name, MimeType: in.MimeType, SizeBytes: in.SizeBytes, Status: "pending_upload"}
-	s.objects[v.VariantUUID] = &mediaObject{tenant: parent.tenant, variant: &v, checksum: in.Checksum}
+	s.objects[v.VariantUUID] = &mediaObject{tenant: parent.tenant, variant: &v, variantType: in.VariantType, checksum: in.Checksum}
 	out := v
 	return &out, nil
 }
@@ -303,6 +311,16 @@ func (s *LocalMedia) complete(ctx context.Context, asset, id string, in dto.Comp
 		return nil, mediaError(409, "UPLOAD_INCOMPLETE")
 	}
 	if o.variant != nil {
+		if o.variantType == dto.VariantThumbnail64 {
+			config, format, err := image.DecodeConfig(bytes.NewReader(o.data))
+			mime := "image/" + format
+			if err != nil || (format != "jpeg" && format != "png") || mime != o.variant.MimeType || config.Width < 1 || config.Height < 1 || config.Width > dto.Thumbnail64MaxEdge || config.Height > dto.Thumbnail64MaxEdge || len(o.data) > dto.Thumbnail64MaxBytes {
+				return nil, mediaError(400, "THUMBNAIL_64_INVALID")
+			}
+			if _, _, err := image.Decode(bytes.NewReader(o.data)); err != nil {
+				return nil, mediaError(400, "THUMBNAIL_64_INVALID")
+			}
+		}
 		o.variant.Status = "ready"
 		if o.variant.CompletedAt == nil {
 			now := s.now().UTC()

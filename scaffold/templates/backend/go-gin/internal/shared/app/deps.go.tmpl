@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	fwmanifest "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/cache"
 	Regression "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/regression"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/taskcenter"
@@ -73,6 +74,7 @@ type DelegatedAuthProxy interface {
 
 // Deps bundles shared infrastructure dependencies for handlers and services.
 type Deps struct {
+	NotificationPresentations      []fwmanifest.NotificationPresentation
 	Regression                     *Regression.Runner
 	KnowledgeProvider              fwknowledge.KnowledgeProvider
 	CacheRuntime                   *cache.Runtime

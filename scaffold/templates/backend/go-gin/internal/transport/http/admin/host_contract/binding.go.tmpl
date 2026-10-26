@@ -59,5 +59,11 @@ func (h *Handler) probeBinding(input map[string]any, result *hostcontract.ProbeR
 	}
 	result.ReasonCode = hostcontract.ReasonCode(reason)
 	result.Result = map[string]any{"adapter_available": err == nil, "connectivity_verified": false}
+	if result.Module == hostcontract.ModuleNotifications {
+		result.Result["channel"] = h.notifications.Channel()
+	}
+	if result.Module == hostcontract.ModuleMedia {
+		result.Result["channel"] = h.media.Channel()
+	}
 	return nil
 }

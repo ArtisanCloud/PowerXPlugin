@@ -2,10 +2,12 @@
 
 本文是 `px-plugin` 的主流程文档：从 CLI 构建、`init` 项目、数据库初始化、本地启动，到安装到 PowerX。
 
+使用当前尚未公开发布的 Framework／CLI 时，先按 [2026-10-26 开发版本说明](../../../releases/framework-dev-20261026.md) 激活配套包源，再生成项目。`PX_PLUGIN_CLI_VERSION` 只设置构建版本标记，不会选择对应 Git 源码或升级生成项目的 SDK 依赖。
+
 ## 0) 前置条件
 
 - 命令默认在仓库根目录执行：`/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin`
-- 已安装 Go 1.24+、Node.js 18+、npm 9+、PostgreSQL（或 SQLite）
+- 已安装 Go 1.24+、PostgreSQL（或 SQLite）；当前开发版本的前端按 Node.js 22.23.2、npm 11.6.0 验证。
 
 ## 1) 构建并安装 `px-plugin`
 

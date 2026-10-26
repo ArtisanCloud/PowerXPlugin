@@ -1,0 +1,9 @@
+notification_presentations:
+  - business_type: sample_track
+    contract: business_notification_card.v1
+    presentation_path: /admin/operations/order-content-notifications/sample-tracks/{delivery_key}/presentation
+    preview_path: /admin/operations/order-content-notifications/sample-tracks/{delivery_key}/images/{image_key}
+  - business_type: bulk_order
+    contract: business_notification_card.v1
+    presentation_path: /admin/operations/order-content-notifications/bulk-orders/{delivery_key}/presentation
+    preview_path: /admin/operations/order-content-notifications/bulk-orders/{delivery_key}/images/{image_key}

@@ -15,6 +15,11 @@ import (
 // Local adapters are plugin-owned; delegated adapters use the typed PowerX
 // client. The Factory selects one adapter at bootstrap and never falls back.
 type GenerativeService interface {
+	ListMediaModels(context.Context, powerxai.MediaCatalogFilter) (*powerxai.MediaModelCatalog, error)
+	ListMediaProviders(context.Context, string) (*powerxai.MediaProviderCatalog, error)
+	GetMediaTask(context.Context, string) (*powerxai.MediaTask, error)
+	CancelMediaTask(context.Context, string) (*powerxai.MediaTask, error)
+	SubscribeMediaTask(context.Context, string, powerxai.MediaTaskSubscriptionOptions, func(powerxai.MediaTaskEvent) error) error
 	ListLLMModels(context.Context, string) (*powerxai.ListLLMModelsOutput, error)
 	LLMInvoke(context.Context, powerxai.LLMInvokeInput) (*powerxai.LLMInvokeOutput, error)
 	LLMStream(context.Context, powerxai.LLMStreamInput, func(powerxai.LLMStreamEvent) error) error
@@ -22,10 +27,10 @@ type GenerativeService interface {
 	AppendLLMSessionMessage(context.Context, string, powerxai.AppendLLMSessionMessageInput) error
 	LLMSessionStream(context.Context, string, func(powerxai.LLMStreamEvent) error) error
 	EmbeddingInvoke(context.Context, powerxai.EmbeddingInvokeInput) (*powerxai.EmbeddingInvokeOutput, error)
-	VLMInvoke(context.Context, powerxai.ModalInvokeInput) (*powerxai.ModalInvokeOutput, error)
-	ImageInvoke(context.Context, powerxai.ModalInvokeInput) (*powerxai.ModalInvokeOutput, error)
-	VideoInvoke(context.Context, powerxai.ModalInvokeInput) (*powerxai.ModalInvokeOutput, error)
-	TTSInvoke(context.Context, powerxai.ModalInvokeInput) (*powerxai.ModalInvokeOutput, error)
+	VLMInvoke(context.Context, powerxai.MediaInvokeInput) (*powerxai.AnalysisResult, error)
+	ImageInvoke(context.Context, powerxai.MediaInvokeInput) (*powerxai.MediaTask, error)
+	VideoInvoke(context.Context, powerxai.MediaInvokeInput) (*powerxai.MediaTask, error)
+	TTSInvoke(context.Context, powerxai.MediaInvokeInput) (*powerxai.MediaTask, error)
 }
 
 type Runtime struct {

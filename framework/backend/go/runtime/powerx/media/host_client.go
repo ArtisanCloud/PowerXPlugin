@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/hosthttp"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/hostcontract"
 )
 
@@ -27,8 +28,9 @@ type HostTokenProviderFunc func(context.Context) (string, error)
 func (f HostTokenProviderFunc) Token(ctx context.Context) (string, error) { return f(ctx) }
 
 type HostClientConfig struct {
-	BaseURL string
-	Timeout time.Duration
+	APIPrefix string
+	BaseURL   string
+	Timeout   time.Duration
 }
 type HostClient struct {
 	baseURL string
@@ -37,9 +39,26 @@ type HostClient struct {
 	http    *http.Client
 }
 
+func (c *HostClient) CredentialScheme() string {
+	if c == nil {
+		return ""
+	}
+	if c.apiKey != "" {
+		return "apikey"
+	}
+	if c.tokens != nil {
+		return "bearer"
+	}
+	return ""
+}
+
 // NewHostClientWithAPIKey binds standalone proxy authentication explicitly.
 // Installed plugins must use NewHostClientWithTokenProvider instead.
 func NewHostClientWithAPIKey(cfg HostClientConfig, apiKey string, httpClient *http.Client) (*HostClient, error) {
+	apiBase, err := hosthttp.APIBaseURL(cfg.BaseURL, cfg.APIPrefix)
+	if err != nil {
+		return nil, err
+	}
 	if strings.TrimSpace(cfg.BaseURL) == "" || strings.TrimSpace(apiKey) == "" {
 		return nil, errors.New("MEDIA_PROXY_BASE_URL_AND_API_KEY_REQUIRED")
 	}
@@ -50,10 +69,14 @@ func NewHostClientWithAPIKey(cfg HostClientConfig, apiKey string, httpClient *ht
 		}
 		httpClient = &http.Client{Timeout: timeout}
 	}
-	return &HostClient{baseURL: strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/"), apiKey: strings.TrimSpace(apiKey), http: httpClient}, nil
+	return &HostClient{baseURL: apiBase, apiKey: strings.TrimSpace(apiKey), http: httpClient}, nil
 }
 
 func NewHostClientWithTokenProvider(cfg HostClientConfig, tokens HostTokenProvider, httpClient *http.Client) (*HostClient, error) {
+	apiBase, err := hosthttp.APIBaseURL(cfg.BaseURL, cfg.APIPrefix)
+	if err != nil {
+		return nil, err
+	}
 	if strings.TrimSpace(cfg.BaseURL) == "" {
 		return nil, errors.New("powerx media base_url is required")
 	}
@@ -67,7 +90,7 @@ func NewHostClientWithTokenProvider(cfg HostClientConfig, tokens HostTokenProvid
 		}
 		httpClient = &http.Client{Timeout: timeout}
 	}
-	return &HostClient{baseURL: strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/"), tokens: tokens, http: httpClient}, nil
+	return &HostClient{baseURL: apiBase, tokens: tokens, http: httpClient}, nil
 }
 
 type HostAsset struct {
@@ -135,7 +158,7 @@ func (c *HostClient) PresignVariantDownload(ctx context.Context, assetUUID, vari
 }
 
 func variantPath(assetUUID, variantUUID string) string {
-	return "/api/v1/tenant/media/assets/" + url.PathEscape(assetUUID) + "/variants/" + url.PathEscape(variantUUID)
+	return "/tenant/media/assets/" + url.PathEscape(assetUUID) + "/variants/" + url.PathEscape(variantUUID)
 }
 
 func validateVariantRequest(ctx context.Context, assetUUID, variantUUID string) error {
@@ -201,7 +224,7 @@ func (c *HostClient) ListAssets(ctx context.Context, in ListAssetsInput) (*ListA
 	if strings.TrimSpace(in.Keyword) != "" {
 		q.Set("keyword", in.Keyword)
 	}
-	path := "/api/v1/tenant/media/assets"
+	path := "/tenant/media/assets"
 	if q.Encode() != "" {
 		path += "?" + q.Encode()
 	}
@@ -222,45 +245,52 @@ func (c *HostClient) ListAssets(ctx context.Context, in ListAssetsInput) (*ListA
 }
 func (c *HostClient) GetAsset(ctx context.Context, id string) (*HostAsset, error) {
 	var out HostAsset
-	err := c.do(ctx, http.MethodGet, "/api/v1/tenant/media/assets/"+url.PathEscape(id), nil, &out)
+	err := c.do(ctx, http.MethodGet, "/tenant/media/assets/"+url.PathEscape(id), nil, &out)
 	return &out, err
 }
 func (c *HostClient) CreateAsset(ctx context.Context, in CreateAssetInput) (*HostAsset, error) {
 	var out HostAsset
-	err := c.do(ctx, http.MethodPost, "/api/v1/tenant/media/assets", in, &out)
+	err := c.do(ctx, http.MethodPost, "/tenant/media/assets", in, &out)
 	return &out, err
 }
 func (c *HostClient) UpdateAsset(ctx context.Context, id string, in UpdateAssetInput) (*HostAsset, error) {
 	var out HostAsset
-	err := c.do(ctx, http.MethodPatch, "/api/v1/tenant/media/assets/"+url.PathEscape(id), in, &out)
+	err := c.do(ctx, http.MethodPatch, "/tenant/media/assets/"+url.PathEscape(id), in, &out)
 	return &out, err
 }
 func (c *HostClient) DeleteAsset(ctx context.Context, id string) error {
-	return c.do(ctx, http.MethodDelete, "/api/v1/tenant/media/assets/"+url.PathEscape(id), nil, nil)
+	return c.do(ctx, http.MethodDelete, "/tenant/media/assets/"+url.PathEscape(id), nil, nil)
 }
 func (c *HostClient) PresignUpload(ctx context.Context, id string) (*TransferTicket, error) {
 	var out TransferTicket
-	err := c.do(ctx, http.MethodPost, "/api/v1/tenant/media/assets/"+url.PathEscape(id)+"/presign-upload", struct{}{}, &out)
+	err := c.do(ctx, http.MethodPost, "/tenant/media/assets/"+url.PathEscape(id)+"/presign-upload", struct{}{}, &out)
 	return &out, err
 }
 func (c *HostClient) CompleteUpload(ctx context.Context, id string, in CompleteUploadInput) (*HostAsset, error) {
 	var out HostAsset
-	err := c.do(ctx, http.MethodPost, "/api/v1/tenant/media/assets/"+url.PathEscape(id)+"/complete-upload", in, &out)
+	err := c.do(ctx, http.MethodPost, "/tenant/media/assets/"+url.PathEscape(id)+"/complete-upload", in, &out)
 	return &out, err
 }
 func (c *HostClient) PresignDownload(ctx context.Context, id string) (*TransferTicket, error) {
 	var out TransferTicket
-	err := c.do(ctx, http.MethodPost, "/api/v1/tenant/media/assets/"+url.PathEscape(id)+"/presign-download", struct{}{}, &out)
+	err := c.do(ctx, http.MethodPost, "/tenant/media/assets/"+url.PathEscape(id)+"/presign-download", struct{}{}, &out)
 	return &out, err
 }
 func (c *HostClient) CreateVariant(ctx context.Context, id string, in CreateVariantInput) (*Variant, error) {
+	if in.VariantType == VariantThumbnail64 {
+		sum, err := hex.DecodeString(in.Checksum)
+		if !validMediaUUID(id) || err != nil || len(sum) != 32 || (in.MimeType != "image/jpeg" && in.MimeType != "image/png") || in.SizeBytes < 1 || in.SizeBytes > Thumbnail64MaxBytes {
+			return nil, derivativeError(400, "MEDIA_VARIANT_INVALID")
+		}
+	}
+
 	var out Variant
-	err := c.do(ctx, http.MethodPost, "/api/v1/tenant/media/assets/"+url.PathEscape(id)+"/variants", in, &out)
+	err := c.do(ctx, http.MethodPost, "/tenant/media/assets/"+url.PathEscape(id)+"/variants", in, &out)
 	return &out, err
 }
 func (c *HostClient) GetVariant(ctx context.Context, id string) (*Variant, error) {
 	var out Variant
-	err := c.do(ctx, http.MethodGet, "/api/v1/tenant/media/assets/variants/"+url.PathEscape(id), nil, &out)
+	err := c.do(ctx, http.MethodGet, "/tenant/media/assets/variants/"+url.PathEscape(id), nil, &out)
 	return &out, err
 }
 func (c *HostClient) do(ctx context.Context, method, path string, input, out any) error {
@@ -279,17 +309,8 @@ func (c *HostClient) do(ctx context.Context, method, path string, input, out any
 	if err != nil {
 		return err
 	}
-	if c.apiKey != "" {
-		req.Header.Set("Authorization", "ApiKey "+c.apiKey)
-	} else {
-		token, err := c.tokens.Token(ctx)
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		if err != nil || strings.TrimSpace(token) == "" {
-			return mediaHostError(http.StatusServiceUnavailable, nil)
-		}
-		req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(token))
+	if err := c.authorize(ctx, req); err != nil {
+		return err
 	}
 	req.Header.Set("Accept", "application/json")
 	if input != nil {
@@ -311,24 +332,30 @@ func (c *HostClient) do(ctx context.Context, method, path string, input, out any
 		return mediaHostError(http.StatusBadGateway, nil)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return mediaHostError(resp.StatusCode, raw)
+		return DecodeHostHTTPError(resp.StatusCode, resp.Header, raw)
 	}
 	if out == nil {
 		return nil
 	}
-	var envelope struct {
-		Data json.RawMessage `json:"data"`
+	if err := hostcontract.DecodeData(raw, out); err != nil {
+		failure := DecodeHostHTTPError(502, resp.Header, raw)
+		failure.ReasonCode = "MEDIA_RESPONSE_INVALID"
+		return failure
 	}
-	if err := json.Unmarshal(raw, &envelope); err != nil || len(envelope.Data) == 0 || string(bytes.TrimSpace(envelope.Data)) == "null" {
-		return mediaHostError(http.StatusBadGateway, nil)
-	}
-	if err := json.Unmarshal(envelope.Data, out); err != nil {
-		return mediaHostError(http.StatusBadGateway, nil)
-	}
+
 	switch value := out.(type) {
 	case *HostAsset:
 		if strings.TrimSpace(value.AssetUUID) == "" {
 			return mediaHostError(http.StatusBadGateway, nil)
+		}
+		if value.Derivatives != nil && value.Derivatives.Recipe == ImageRecipeV2 {
+			var fields map[string]json.RawMessage
+			if err := hostcontract.DecodeData(raw, &fields); err != nil {
+				return derivativeError(502, "MEDIA_DERIVATIVES_RESPONSE_INVALID")
+			}
+			if _, err := decodeDerivativeSnapshot(fields["derivatives"], value.AssetUUID); err != nil {
+				return err
+			}
 		}
 	case *Variant:
 		if strings.TrimSpace(value.VariantUUID) == "" || strings.TrimSpace(value.AssetUUID) == "" {
@@ -346,6 +373,10 @@ type HostHTTPError struct {
 	StatusCode int
 	ReasonCode string
 	Body       string
+	ErrorCode  string
+	TraceID    string
+	RequestID  string
+	Details    map[string]any
 }
 
 func (e *HostHTTPError) Error() string {
@@ -356,20 +387,5 @@ func (e *HostHTTPError) Error() string {
 }
 
 func mediaHostError(status int, raw []byte) *HostHTTPError {
-	reason := hostcontract.ParseReasonCode(raw, "")
-	if reason == "" {
-		switch status {
-		case http.StatusBadRequest:
-			reason = "MEDIA_INVALID_ARGUMENT"
-		case http.StatusUnauthorized:
-			reason = "MEDIA_UNAUTHORIZED"
-		case http.StatusForbidden:
-			reason = "MEDIA_FORBIDDEN"
-		case http.StatusNotFound:
-			reason = "MEDIA_ASSET_NOT_FOUND"
-		default:
-			reason = "MEDIA_UPSTREAM_DEPENDENCY"
-		}
-	}
-	return &HostHTTPError{StatusCode: status, ReasonCode: reason, Body: string(raw)}
+	return DecodeHostHTTPError(status, nil, raw)
 }

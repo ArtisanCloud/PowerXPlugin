@@ -153,18 +153,43 @@ type ServerConfig struct {
 
 // RuntimeConfig 运行时配置
 type RuntimeConfig struct {
-	RunMigrate  bool                `yaml:"run_migrate" json:"run_migrate"`
-	GinMode     string              `yaml:"gin_mode" json:"gin_mode"`
-	HTTPLog     *bool               `yaml:"http_log" json:"http_log"`
-	RouteLog    *bool               `yaml:"route_log" json:"route_log"`
-	Logging     *LoggingConfig      `yaml:"logging" json:"logging"`
-	Monitoring  *MonitoringConfig   `yaml:"monitoring" json:"monitoring"`
-	RuntimeOps  *RuntimeOpsDefaults `yaml:"runtime_ops" json:"runtime_ops"`
-	EventBridge *EventBridgeConfig  `yaml:"event_bridge" json:"event_bridge"`
-	WSBus       *WSBusConfig        `yaml:"ws_bus" json:"ws_bus"`
-	Integration *IntegrationConfig  `yaml:"integration" json:"integration"`
-	Cache       *RuntimeCacheConfig `yaml:"cache" json:"cache"`
-	Knowledge   *KnowledgeConfig    `yaml:"knowledge" json:"knowledge"`
+	Media         RuntimeMediaConfig         `yaml:"media" json:"media"`
+	Notifications RuntimeNotificationsConfig `yaml:"notifications" json:"notifications"`
+	RunMigrate    bool                       `yaml:"run_migrate" json:"run_migrate"`
+	GinMode       string                     `yaml:"gin_mode" json:"gin_mode"`
+	HTTPLog       *bool                      `yaml:"http_log" json:"http_log"`
+	RouteLog      *bool                      `yaml:"route_log" json:"route_log"`
+	Logging       *LoggingConfig             `yaml:"logging" json:"logging"`
+	Monitoring    *MonitoringConfig          `yaml:"monitoring" json:"monitoring"`
+	RuntimeOps    *RuntimeOpsDefaults        `yaml:"runtime_ops" json:"runtime_ops"`
+	EventBridge   *EventBridgeConfig         `yaml:"event_bridge" json:"event_bridge"`
+	WSBus         *WSBusConfig               `yaml:"ws_bus" json:"ws_bus"`
+	Integration   *IntegrationConfig         `yaml:"integration" json:"integration"`
+	Cache         *RuntimeCacheConfig        `yaml:"cache" json:"cache"`
+	Knowledge     *KnowledgeConfig           `yaml:"knowledge" json:"knowledge"`
+}
+
+// RuntimeNotificationsConfig explicitly selects local API-key Core simulation.
+type RuntimeNotificationsConfig struct {
+	Channel string `yaml:"channel" json:"channel"`
+}
+
+type RuntimeMediaConfig struct {
+	Channel string `yaml:"channel" json:"channel"`
+}
+
+func (c *Config) MediaChannel() string {
+	if c.Runtime == nil {
+		return ""
+	}
+	return c.Runtime.Media.Channel
+}
+
+func (c *Config) NotificationChannel() string {
+	if c.Runtime == nil {
+		return ""
+	}
+	return c.Runtime.Notifications.Channel
 }
 
 type RuntimeCacheConfig struct {
@@ -1147,6 +1172,18 @@ func loadEnvConfig(cfg *Config) {
 	}
 
 	// Gateway 能力调用配置
+	if channel := strings.TrimSpace(os.Getenv("PX_MEDIA_CHANNEL")); channel != "" {
+		if cfg.Runtime == nil {
+			cfg.Runtime = &RuntimeConfig{}
+		}
+		cfg.Runtime.Media.Channel = channel
+	}
+	if channel := strings.TrimSpace(os.Getenv("PX_NOTIFICATION_CHANNEL")); channel != "" {
+		if cfg.Runtime == nil {
+			cfg.Runtime = &RuntimeConfig{}
+		}
+		cfg.Runtime.Notifications.Channel = channel
+	}
 	if cfg.Gateway == nil {
 		cfg.Gateway = &GatewayConfig{}
 	}
@@ -1585,6 +1622,18 @@ func (c *Config) IsJWTMode() bool {
 
 // Validate 验证配置
 func (c *Config) Validate() error {
+	if c.MediaChannel() != "" && c.MediaChannel() != "core_host" {
+		return NewConfigError("MEDIA_CHANNEL_INVALID")
+	}
+	if c.MediaChannel() == "core_host" && ((c.Context != nil && c.Context.ProviderMode == "delegated") || c.Gateway == nil || !strings.EqualFold(c.Gateway.AuthScheme, "apikey") || strings.TrimSpace(c.Gateway.APIKey) == "" || strings.TrimSpace(c.Gateway.BaseURL) == "") {
+		return NewConfigError("MEDIA_CORE_HOST_CONFIGURATION_INVALID")
+	}
+	if c.NotificationChannel() != "" && c.NotificationChannel() != "core_host" {
+		return NewConfigError("NOTIFICATION_CHANNEL_INVALID")
+	}
+	if c.NotificationChannel() == "core_host" && ((c.Context != nil && c.Context.ProviderMode == "delegated") || c.Gateway == nil || !strings.EqualFold(c.Gateway.AuthScheme, "apikey") || strings.TrimSpace(c.Gateway.APIKey) == "" || strings.TrimSpace(c.Gateway.BaseURL) == "") {
+		return NewConfigError("NOTIFICATION_CORE_HOST_CONFIGURATION_INVALID")
+	}
 	if err := c.Regression.Validate(); err != nil {
 		return err
 	}

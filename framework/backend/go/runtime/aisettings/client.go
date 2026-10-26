@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/gateway"
+	powerxai "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/ai"
 )
 
 type restPayload struct {
@@ -17,88 +18,64 @@ type restPayload struct {
 	Body     any            `json:"body,omitempty"`
 }
 
-// CatalogProviders reads the canonical catalog from the PowerX Agent settings
-// backend. It is only called when the plugin settings page explicitly selects
-// the PowerX catalog source.
-func (c *Client) CatalogProviders(ctx context.Context, modality, requestID string) ([]CatalogProvider, error) {
-	raw, err := c.invokeRawRESTForCapability(ctx, CapabilityAISettingsCatalogProviders, restPayload{
-		Method:   http.MethodGet,
-		Endpoint: "/api/v1/admin/agents/providers",
-		Query: map[string]any{
-			"env":      "dev",
-			"modality": strings.TrimSpace(modality),
-		},
-	}, requestID)
+// CatalogProviders and CatalogModels use the fixed media v2 service binding.
+func (c *Client) CatalogProviders(ctx context.Context, capability, requestID string) (*powerxai.MediaProviderCatalog, error) {
+	if err := powerxai.ValidateMediaCatalogFilter(powerxai.MediaCatalogFilter{Capability: capability}); err != nil {
+		return nil, err
+	}
+	var out powerxai.MediaProviderCatalog
+	err := c.invokeCatalog(ctx, CapabilityAISettingsCatalogProviders, map[string]any{"operation": "list_providers", "capability": capability}, requestID, &out)
 	if err != nil {
 		return nil, err
 	}
-	var direct []CatalogProvider
-	if json.Unmarshal(raw, &direct) == nil {
-		return direct, nil
-	}
-	var envelope struct {
-		// The Core REST binding returns the provider list under data.providers.
-		// The capability invocation envelope preserves that REST payload as-is.
-		Providers []CatalogProvider `json:"providers"`
-		Data      json.RawMessage   `json:"data"`
-	}
-	if err := json.Unmarshal(raw, &envelope); err != nil {
+	if err := out.Validate(); err != nil {
 		return nil, err
 	}
-	if envelope.Providers != nil {
-		return envelope.Providers, nil
-	}
-	var nested struct {
-		Providers []CatalogProvider `json:"providers"`
-	}
-	if err := json.Unmarshal(envelope.Data, &nested); err == nil && nested.Providers != nil {
-		return nested.Providers, nil
-	}
-	var items []CatalogProvider
-	if err := json.Unmarshal(envelope.Data, &items); err != nil {
-		return nil, err
-	}
-	if items == nil {
-		items = []CatalogProvider{}
-	}
-	return items, nil
+	return &out, nil
 }
-
-// CatalogModels reads the canonical model IDs from the PowerX Agent settings
-// backend. Model IDs are returned without UI label substitution.
-func (c *Client) CatalogModels(ctx context.Context, modality, provider, app, requestID string) ([]string, error) {
-	query := map[string]any{
-		"env":      "dev",
-		"modality": strings.TrimSpace(modality),
-		"provider": strings.TrimSpace(provider),
+func (c *Client) CatalogModels(ctx context.Context, capability, provider, app, requestID string) (*powerxai.MediaModelCatalog, error) {
+	if err := powerxai.ValidateMediaCatalogFilter(powerxai.MediaCatalogFilter{Capability: capability}); err != nil {
+		return nil, err
 	}
-	if strings.TrimSpace(app) != "" {
-		query["app"] = strings.TrimSpace(app)
-	}
-	raw, err := c.invokeRawRESTForCapability(ctx, CapabilityAISettingsCatalogModels, restPayload{
-		Method:   http.MethodGet,
-		Endpoint: "/api/v1/admin/agents/models",
-		Query:    query,
-	}, requestID)
+	var out powerxai.MediaModelCatalog
+	err := c.invokeCatalog(ctx, CapabilityAISettingsCatalogModels, map[string]any{"operation": "list_models", "capability": capability, "provider": provider, "app": app}, requestID, &out)
 	if err != nil {
 		return nil, err
 	}
-	var wrapped struct {
-		Models []string `json:"models"`
-		Data   struct {
-			Models []string `json:"models"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(raw, &wrapped); err != nil {
+	if err := out.Validate(); err != nil {
 		return nil, err
 	}
-	if wrapped.Models != nil {
-		return wrapped.Models, nil
+	return &out, nil
+}
+func (c *Client) invokeCatalog(ctx context.Context, capability string, body any, requestID string, out any) error {
+	if c == nil || c.invoker == nil {
+		return errors.New("AI_CLIENT_UNAVAILABLE")
 	}
-	if wrapped.Data.Models != nil {
-		return wrapped.Data.Models, nil
+	response, err := c.invoker.Invoke(ctx, gateway.InvokeRequest{CapabilityID: capability, PreferredProtocol: "core_internal", TenantUUID: c.tenantUUID, RequestID: requestID, Payload: map[string]any{"body": body}})
+	if err != nil {
+		var invocation *gateway.InvocationError
+		if errors.As(err, &invocation) {
+			headers := http.Header{}
+			headers.Set("X-Trace-ID", invocation.TraceID)
+			headers.Set("X-Request-ID", invocation.UpstreamRequestID)
+			return powerxai.DecodeHTTPError(invocation.StatusCode, headers, invocation.Body)
+		}
+		return err
 	}
-	return []string{}, nil
+	if response == nil || response.Data == nil || response.Data["protocol_used"] != "core_internal" || response.Data["fallback_used"] == true {
+		return errors.New("AI_CATALOG_RESPONSE_INVALID")
+	}
+	raw, err := json.Marshal(response.Data["payload"])
+	if err != nil {
+		return err
+	}
+	var payload struct {
+		Result json.RawMessage `json:"result"`
+	}
+	if json.Unmarshal(raw, &payload) != nil || len(payload.Result) == 0 || string(payload.Result) == "null" {
+		return errors.New("AI_CATALOG_RESPONSE_INVALID")
+	}
+	return json.Unmarshal(payload.Result, out)
 }
 
 func NewClient(cfg Config) (*Client, error) {

@@ -382,6 +382,10 @@ func main() {
 	defer closeWSHub()
 
 	manifestPath := security.DefaultManifestPath()
+	notificationPresentations, err := manifest.LoadNotificationPresentations(manifestPath)
+	if err != nil {
+		logger.WithError(err).Fatal("NOTIFICATION_PRESENTATION_MANIFEST_INVALID")
+	}
 	eventsData, err := os.ReadFile(filepath.Join(filepath.Dir(manifestPath), "plugin.d", "events.yaml"))
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to load realtime event descriptors")
@@ -446,7 +450,7 @@ func main() {
 		if err := fwcapability.RequireGrants(ctx, capabilityRegistry, requiredHostCapabilities); err != nil {
 			logger.WithError(err).Fatal("FRAMEWORK_REQUIRED_CAPABILITY_PREFLIGHT_FAILED")
 		}
-		mediaRuntime, err = powerxmedia.NewHostClientWithTokenProvider(powerxmedia.HostClientConfig{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL)}, powerxmedia.HostTokenProviderFunc(stsTokens.TokenFunc()), nil)
+		mediaRuntime, err = powerxmedia.NewHostClientWithTokenProvider(powerxmedia.HostClientConfig{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL), APIPrefix: cfg.Gateway.APIPrefix}, powerxmedia.HostTokenProviderFunc(stsTokens.TokenFunc()), nil)
 		if err != nil {
 			logger.WithError(err).Fatal("Failed to initialize delegated Media Host client")
 		}
@@ -459,7 +463,7 @@ func main() {
 			logger.WithError(err).Fatal("Failed to initialize delegated Knowledge QA bridge client")
 		}
 		knowledgeDirectory = knowledgeQABridge
-		notificationsRuntime, err = powerxnotifications.NewClientWithTokenProvider(powerxnotifications.Config{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL), APIPrefix: cfg.Gateway.APIPrefix}, powerxnotifications.TokenProviderFunc(stsTokens.TokenFunc()), nil)
+		notificationsRuntime, err = powerxnotifications.NewClientWithTokenProvider(powerxnotifications.Config{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL), APIPrefix: cfg.Gateway.APIPrefix, PluginID: app.PluginID}, powerxnotifications.TokenProviderFunc(stsTokens.TokenFunc()), nil)
 		if err != nil {
 			logger.WithError(err).Fatal("Failed to initialize delegated Notifications client")
 		}
@@ -494,6 +498,12 @@ func main() {
 			logger.WithError(err).Fatal("Failed to initialize delegated Customer membership resolver")
 		}
 	} else if cfg != nil && cfg.Gateway != nil && strings.TrimSpace(cfg.Gateway.BaseURL) != "" && strings.EqualFold(strings.TrimSpace(cfg.Gateway.AuthScheme), "apikey") && strings.TrimSpace(cfg.Gateway.APIKey) != "" {
+		// A read-only Core catalog client for the explicit Host simulation source.
+		// AIInvocation below still binds the local adapter for business execution.
+		aiRuntime, err = powerxai.NewClient(powerxai.Config{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL), AuthScheme: "apikey", APIKey: strings.TrimSpace(cfg.Gateway.APIKey), Timeout: cfg.Gateway.Timeout}, nil)
+		if err != nil {
+			logger.WithError(err).Fatal("AI_CATALOG_CLIENT_INITIALIZATION_FAILED")
+		}
 		capabilityRegistry, err = powerxcapability.NewClient(powerxcapability.Config{
 			BaseURL:    strings.TrimSpace(cfg.Gateway.BaseURL),
 			AuthScheme: "apikey",
@@ -620,6 +630,16 @@ func main() {
 		logger.WithError(err).Fatal("Failed to initialize local Notifications publisher")
 	}
 	notificationDeliveryRuntime, err = fwnotifications.NewRuntime(providerResolver.Mode(), localNotificationPublisher, notificationsRuntime)
+	if cfg.NotificationChannel() == "core_host" {
+		if providerResolver.Mode() != fwprovider.ModeLocal || cfg.Gateway == nil || !strings.EqualFold(cfg.Gateway.AuthScheme, "apikey") {
+			logger.Fatal("NOTIFICATION_CORE_HOST_CONFIGURATION_INVALID")
+		}
+		notificationsRuntime, err = powerxnotifications.NewClient(powerxnotifications.Config{BaseURL: cfg.Gateway.BaseURL, APIPrefix: cfg.Gateway.APIPrefix, AuthScheme: "apikey", APIKey: cfg.Gateway.APIKey, PluginID: app.PluginID, Timeout: cfg.Gateway.Timeout}, nil)
+		if err != nil {
+			logger.WithError(err).Fatal("NOTIFICATION_CORE_HOST_CONFIGURATION_INVALID")
+		}
+		notificationDeliveryRuntime, err = fwnotifications.NewCoreHostRuntime(notificationsRuntime)
+	}
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to initialize Notifications runtime")
 	}
@@ -660,7 +680,7 @@ func main() {
 	}
 	var localMedia *runtimeexample.LocalMedia
 	var localMediaService fwmedia.Service
-	if providerResolver.Mode() == fwprovider.ModeLocal {
+	if providerResolver.Mode() == fwprovider.ModeLocal && cfg.MediaChannel() != "core_host" {
 		host, port, splitErr := net.SplitHostPort(cfg.Server.BindAddr)
 		if splitErr != nil {
 			logger.WithError(splitErr).Fatal("MEDIA_LOCAL_BIND_ADDR_INVALID")
@@ -672,6 +692,16 @@ func main() {
 		localMediaService = localMedia
 	}
 	mediaCatalogRuntime, err = fwmedia.NewRuntime(providerResolver.Mode(), localMediaService, mediaRuntime)
+	if cfg.MediaChannel() == "core_host" {
+		if providerResolver.Mode() != fwprovider.ModeLocal {
+			logger.Fatal("MEDIA_CORE_HOST_CONFIGURATION_INVALID")
+		}
+		mediaRuntime, err = powerxmedia.NewHostClientWithAPIKey(powerxmedia.HostClientConfig{BaseURL: cfg.Gateway.BaseURL, APIPrefix: cfg.Gateway.APIPrefix, Timeout: cfg.Gateway.Timeout}, cfg.Gateway.APIKey, nil)
+		if err != nil {
+			logger.WithError(err).Fatal("MEDIA_CORE_HOST_CONFIGURATION_INVALID")
+		}
+		mediaCatalogRuntime, err = fwmedia.NewCoreHostRuntime(mediaRuntime)
+	}
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to initialize Media catalog runtime")
 	}
@@ -795,6 +825,7 @@ func main() {
 		bridgeEmitter = security.NewPermissionedEmitter(bridgeEmitter, perms, eventLogger)
 	}
 	deps := &app.Deps{
+		NotificationPresentations:      notificationPresentations,
 		DB:                             queryDB,
 		Ctx:                            rootCtx,
 		PowerXClient:                   pxc,
@@ -951,10 +982,12 @@ func main() {
 	})
 	registerWSRoute(fwApp, engine)
 
-	if err := manifest.Register(fwApp, manifestx.Plugin()); err != nil {
+	registeredManifest := manifestx.Plugin()
+	registeredManifest.NotificationPresentations = notificationPresentations
+	if err := manifest.Register(fwApp, registeredManifest); err != nil {
 		logger.WithError(err).Fatal("Failed to register manifest")
 	}
-	registerHealthzRoute(fwApp, manifestx.Plugin())
+	registerHealthzRoute(fwApp, registeredManifest)
 	// 宿主模式下注册 WS Bus topic（standalone 不触发）
 	wsRegisterTopics, err := security.LoadEventFabricTopics(eventLogger)
 	if err != nil {

@@ -10,8 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-
-	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/hostcontract"
 )
 
 type LLMStreamEvent struct {
@@ -65,7 +63,7 @@ func (c *Client) LLMStream(ctx context.Context, input LLMStreamInput, onEvent fu
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-		return &HTTPError{StatusCode: resp.StatusCode, ReasonCode: hostcontract.ParseReasonCode(raw, "AI_UPSTREAM_DEPENDENCY")}
+		return DecodeHTTPError(resp.StatusCode, resp.Header, raw)
 	}
 	return decodeLLMSSE(resp.Body, onEvent)
 }
@@ -94,7 +92,7 @@ func (c *Client) LLMSessionStream(ctx context.Context, sessionID string, onEvent
 	defer resp.Body.Close()
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-		return &HTTPError{StatusCode: resp.StatusCode, ReasonCode: hostcontract.ParseReasonCode(raw, "AI_UPSTREAM_DEPENDENCY")}
+		return DecodeHTTPError(resp.StatusCode, resp.Header, raw)
 	}
 	return decodeLLMSSE(resp.Body, onEvent)
 }

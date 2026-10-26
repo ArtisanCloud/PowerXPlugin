@@ -1008,7 +1008,7 @@
   "aiSettings": {
     "badge": "设置",
     "title": "AI 设置",
-    "description": "查看当前运行模式实际使用的 AI 配置和模型。配置状态不代表模型服务已通过连接测试。",
+    "description": "为当前环境选择模型，调整参数并测试可用性。",
     "providerNotConfigured": "AI 设置 Provider 未配置",
     "providerNotConfiguredDescription": "当前插件尚未接入本地或底座 AI 设置 Provider。接入后此页面会通过插件后端统一读取配置。",
     "empty": "暂无配置",
@@ -1018,10 +1018,23 @@
       "health": "健康状态"
     },
     "sections": {
-      "summary": "配置摘要",
-      "routing": "路由策略",
-      "providers": "模型服务商",
-      "models": "模型配置"
+      "label": "配置任务",
+      "model": "模型配置",
+      "parameters": "运行参数",
+      "test": "能力测试"
+    },
+    "workspace": {
+      "sourceHelp": "了解配置来源",
+      "openTest": "前往测试",
+      "closeTests": "关闭测试面板",
+      "testPanelTitle": "连接与能力测试",
+      "testDescription": "测试当前选择的模型；关闭面板会保留输入和结果。",
+      "testFailed": "测试失败",
+      "connectionPassed": "连接成功",
+      "modelDescription": "选择服务提供商和模型，配置连接信息。",
+      "parametersDescription": "调整当前模型的调用参数。",
+      "saveScope": "仅保存当前环境、来源与模态的配置。",
+      "save": "保存配置"
     },
     "columns": {
       "name": "名称",
@@ -1042,15 +1055,19 @@
       "powerx": "PowerX 底座配置"
     },
     "catalogUnavailable": "模型目录暂不可用",
+    "coreCatalogUnavailableDescription": "无法读取 PowerX AI 设置目录，请检查底座是否支持该目录接口以及当前访问授权。",
+    "coreConnectionManaged": "连接地址与凭据由 PowerX 底座管理；这里仅选择底座返回的模型。",
     "catalogUnavailableDescription": "无法读取所选目录，已保留当前 Profile；请完成 PowerX 目录访问授权后重试。",
     "modalityTabsLabel": "模态",
     "general": "通用",
     "parameters": "参数",
-    "provider": "Provider",
+    "provider": "服务提供商",
     "app": "应用",
     "model": "模型",
-    "searchModel": "搜索 Model...",
-    "baseURL": "Base URL",
+    "searchModel": "搜索模型…",
+    "noModelsInCatalog": "当前目录没有可选模型",
+    "noMatchingModels": "没有匹配的模型",
+    "baseURL": "服务地址",
     "credentialReference": "凭据引用",
     "credentialReferenceDescription": "仅保存由密钥服务托管的引用，不会保存或回显 API Key 明文。",
     "temperature": "温度 (Temperature)",
@@ -1067,6 +1084,7 @@
     "activeProfile": "当前模型 Profile",
     "connectionStatus": "连接状态",
     "notSelected": "未选择",
+    "mediaParameter": "参数 {parameter}",
     "modalityParametersPending": "当前模态没有可编辑的通用参数。",
     "actionUnavailable": "操作暂不可用",
     "notImplemented": {
@@ -1080,13 +1098,14 @@
     },
     "modalities": {
       "llm": "LLM 文本",
-      "image": "图像/视觉 (VLM)",
+      "image": "图像生成",
       "embedding": "向量嵌入",
       "audioTTS": "语音合成",
       "audioASR": "语音识别",
       "video": "视频生成",
       "model3d": "3D 生成",
-      "rerank": "重排序"
+      "rerank": "重排序",
+      "vlm": "视觉分析"
     },
     "loadFailed": "无法读取 AI 配置，请检查权限与后端日志。",
     "saveSucceeded": "AI Profile 已保存。",
@@ -1113,6 +1132,44 @@
       "local": "本地",
       "explicit_model_key": "明确指定模型",
       "false": "禁用"
+    },
+    "testing": {
+      "inProgress": "测试进行中",
+      "prompt": "测试内容",
+      "defaultPrompt": "请简短回复。",
+      "image": "图片引用",
+      "imageType": "图片格式",
+      "imageTypes": {
+        "image_url": "图片 URL",
+        "image_base64": "Base64 图片"
+      },
+      "generationCost": "两个测试操作都会实际提交生成任务，可能产生供应商费用。",
+      "attemptRetained": "重试将沿用本次请求和幂等键。开始新测试会创建新尝试，可能再次计费。",
+      "newAttempt": "开始新测试",
+      "taskAccepted": "生成任务已接收，请查看任务状态。",
+      "refreshTask": "刷新任务状态",
+      "cancelTask": "取消任务",
+      "diagnostics": "技术诊断",
+      "failed": "操作失败。请查看诊断信息并核对当前状态。",
+      "taskStatus": {
+        "queued": "排队中",
+        "running": "生成中",
+        "succeeded": "已完成",
+        "failed": "任务失败",
+        "cancelled": "已取消"
+      },
+      "blocked": {
+        "powerxRuntimeRequired": "当前为本地运行通道，底座文本模型需要在 PowerX 通道中测试。",
+        "runtimePending": "正在确认运行通道。",
+        "unsupported": "当前设置页尚不支持此能力的测试。",
+        "inputRequired": "请选择模型并填写测试内容。",
+        "modelUnavailable": "模型目录不可用，或当前模型未开放此能力。",
+        "coreCatalogRequired": "当前运行通道为 Core，请从 PowerX 目录选择模型。",
+        "unsupportedInput": "当前能力不支持所选输入格式。",
+        "localUnsupported": "本地适配器尚未实现此生成能力。",
+        "localProfileRequired": "需要已配置的本地模型；文本测试还需有效的 Ollama 地址。",
+        "imageRequired": "视觉分析需要提供图片。"
+      }
     }
   },
   "providerMode": {

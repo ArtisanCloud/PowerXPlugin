@@ -1,4 +1,11 @@
 mappings:
+  - name: ai-settings-llm-contract
+    source: docs/contracts
+    targets:
+      - path: tools/cli/internal/contracts/data/media-contracts
+    include:
+      - "ai-settings-llm-catalog.v1.md"
+      - "fixtures/ai-settings-catalog.v1.json"
   - name: web-admin
     source: skeleton/web-admin/nuxt
     targets:
@@ -139,6 +146,9 @@ mappings:
         replace: "Default dev URL: `http://localhost:{{ .FrontendPort }}`."
   - name: backend
     source: skeleton/backend/go-gin
+    prune:
+      - "**/*_test.go.tmpl"
+      - "bin/**"
     targets:
       - path: scaffold/templates/backend/go-gin
         suffix: .tmpl
@@ -322,6 +332,9 @@ mappings:
       - path: tools/cli/internal/templates/data
         suffix: .tmpl
     replacements:
+      - globs: ["plugin.yaml"]
+        literal: "notification_presentations: []"
+        replace: "{{ .NotificationPresentationsYAML }}"
       - globs: ["plugin.yaml"]
         literal: "id: com.powerx.plugins.base"
         replace: "id: {{ .PluginID }}"

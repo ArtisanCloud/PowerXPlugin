@@ -21,6 +21,9 @@ var (
 
 // Validate 检查 Manifest 是否符合 Schema 约束。
 func Validate(p Plugin) error {
+	if err := ValidateNotificationPresentations(p.NotificationPresentations); err != nil {
+		return err
+	}
 	manifestOnce.Do(func() {
 		compiler := jsonschema.NewCompiler()
 		if err := compiler.AddResource("manifest.json", io.NopCloser(bytes.NewReader(manifestSchemaData))); err != nil {

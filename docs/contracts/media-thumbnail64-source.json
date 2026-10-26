@@ -1,0 +1,30 @@
+{
+  "source_repository": "ArtisanCloud/PowerX",
+  "source_commit": "0be9945cf7544bf18d0ed58be1043a313bba9de8",
+  "source_worktree_uncommitted": true,
+  "snapshot_date": "2026-10-22",
+  "source_paths": {
+    "business-notification-card.md": "docs/contracts/business-notification-card.md",
+    "business-notification-card.openapi.yaml": "docs/contracts/business-notification-card.openapi.yaml",
+    "notification-member-delivery.openapi.yaml": "docs/contracts/notification-member-delivery.openapi.yaml",
+    "media-thumbnail64-framework-handoff.md": "docs/contracts/media-thumbnail64-framework-handoff.md",
+    "media-image-derivatives.md": "docs/contracts/media-image-derivatives.md",
+    "fixtures/business-notification-card.v1.json": "docs/contracts/fixtures/business-notification-card.v1.json",
+    "fixtures/business-notification-card.v2.json": "docs/contracts/fixtures/business-notification-card.v2.json",
+    "fixtures/media-image-derivatives.v2.json": "docs/contracts/fixtures/media-image-derivatives.v2.json",
+    "media-host.openapi.yaml": "specs/001-media-storage/contracts/http-openapi.yaml",
+    "image-derivatives.openapi.yaml": "specs/001-media-storage/contracts/image-derivatives.openapi.yaml"
+  },
+  "sha256": {
+    "business-notification-card.md": "7b2f3d63b4ec9c7f122c44b1d7a0be814e03840bada4ee17012a2838cf503df1",
+    "business-notification-card.openapi.yaml": "009562b46eb0f257cbbc427e0bbc6fdf3c32f33bc7337d614af870f095537718",
+    "notification-member-delivery.openapi.yaml": "0ea2f9cdd6c7f6c19156a0cbf6718b533af7d5c197380a08891f41c5f3083bfa",
+    "media-thumbnail64-framework-handoff.md": "14947aa6ed68cf589aeaaae2d631856de83eb3cdd81044a1190316b0c2672cf4",
+    "media-image-derivatives.md": "f00f2933bfae2bc721826e7724ed1a637bb858cd31a2f47fd711034a1046c4b6",
+    "fixtures/business-notification-card.v1.json": "b2368121349f94d1cf31788a183ccdbe27fa26f40dcd6cb9474fdede101273d8",
+    "fixtures/business-notification-card.v2.json": "7b1c37d54756b2dbe14b196ed01b57efedff27ecc8750f11647f36b08d3b6a1e",
+    "fixtures/media-image-derivatives.v2.json": "1add45ec2aa034890f33967c9fe8aabeb53b7e9b94133f603c5e6603f803e2db",
+    "media-host.openapi.yaml": "13f92b62fcd386e61cbc7a54222fd53485ed43f11e943daab75324b2e07a8063",
+    "image-derivatives.openapi.yaml": "9dc83e216393ecffb9ff703bf8d9b6032c57e2e04303ab296fecc53683bf08ca"
+  }
+}

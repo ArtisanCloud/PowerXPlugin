@@ -12,6 +12,39 @@ func (h *Handler) probeMediaTransfer(c *gin.Context, input map[string]any, resul
 		return err
 	}
 	ctx := c.Request.Context()
+	if result.Operation == hostcontract.OperationImageDerivativesStatus || result.Operation == hostcontract.OperationImageDerivativesEnsure {
+		if err := ensureInputKeys(input, "asset_uuid", "retry_failed"); err != nil {
+			return err
+		}
+		if result.Operation == hostcontract.OperationImageDerivativesStatus {
+			if err := ensureInputKeys(input, "asset_uuid"); err != nil {
+				return err
+			}
+		}
+		asset, err := inputUUID(input, "asset_uuid")
+		if err != nil {
+			return err
+		}
+		retry, err := inputOptionalBool(input, "retry_failed")
+		if err != nil {
+			return err
+		}
+		service, err := h.media.ImageDerivatives()
+		if err != nil {
+			return err
+		}
+		var state *dto.ImageDerivatives
+		if result.Operation == hostcontract.OperationImageDerivativesStatus {
+			state, err = service.GetImageDerivatives(ctx, asset)
+		} else {
+			state, err = service.EnsureImageDerivatives(ctx, asset, dto.EnsureImageDerivativesInput{RetryFailed: retry})
+		}
+		if err != nil {
+			return err
+		}
+		result.Result = map[string]any{"derivatives": state}
+		return nil
+	}
 	fields := make(map[string]any, len(input))
 	for k, v := range input {
 		fields[k] = v

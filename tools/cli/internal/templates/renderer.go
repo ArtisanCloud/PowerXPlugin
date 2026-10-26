@@ -3,6 +3,8 @@ package templates
 import (
 	"bytes"
 	"fmt"
+	fwmanifest "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
+	"gopkg.in/yaml.v3"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -20,23 +22,33 @@ var binaryExtensions = []string{
 
 // Data 提供渲染模板所需的上下文。
 type Data struct {
-	PluginID           string
-	PluginName         string
-	PluginSlug         string
-	PluginDBName       string
-	Version            string
-	GoVersion          string
-	BackendModulePath  string
-	BackendType        string
-	FrontendType       string
-	BackendPort        int
-	FrontendPort       int
-	FrameworkVersion   string
-	FrameworkReplace   string
-	SchemaDependency   string
-	FrameworkAdminRef  string
-	FrameworkClientRef string
-	AppFrontendType    string // 可选的第二个前端框架
+	NotificationPresentations []fwmanifest.NotificationPresentation
+	PluginID                  string
+	PluginName                string
+	PluginSlug                string
+	PluginDBName              string
+	Version                   string
+	GoVersion                 string
+	BackendModulePath         string
+	BackendType               string
+	FrontendType              string
+	BackendPort               int
+	FrontendPort              int
+	FrameworkVersion          string
+	FrameworkReplace          string
+	SchemaDependency          string
+	FrameworkAdminRef         string
+	FrameworkClientRef        string
+	AppFrontendType           string // 可选的第二个前端框架
+}
+
+func (d Data) NotificationPresentationsYAML() string {
+	bindings := d.NotificationPresentations
+	if bindings == nil {
+		bindings = []fwmanifest.NotificationPresentation{}
+	}
+	raw, _ := yaml.Marshal(map[string]any{"notification_presentations": bindings})
+	return strings.TrimSpace(string(raw))
 }
 
 // Options 控制渲染行为。
@@ -52,6 +64,9 @@ type Result struct {
 // RenderAll 将模板渲染到目标目录。
 func RenderAll(baseDir string, data Data, opts Options) (Result, error) {
 	var result Result
+	if err := fwmanifest.ValidateNotificationPresentations(data.NotificationPresentations); err != nil {
+		return result, err
+	}
 
 	err := fs.WalkDir(content, ".", func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -67,6 +82,9 @@ func RenderAll(baseDir string, data Data, opts Options) (Result, error) {
 		rel, err := relativeTemplatePath(path)
 		if err != nil {
 			return err
+		}
+		if strings.HasPrefix(rel, "backend/go-gin/bin/") {
+			return fmt.Errorf("TEMPLATE_BUILD_ARTIFACT_NOT_ALLOWED: %s", rel)
 		}
 		targetRel := rel
 		isTemplate := strings.HasSuffix(rel, ".tmpl")

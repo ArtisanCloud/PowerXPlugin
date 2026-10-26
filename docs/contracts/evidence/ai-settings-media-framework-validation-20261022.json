@@ -1,0 +1,285 @@
+{
+  "date": "2026-10-22",
+  "scope": "Framework AI settings capability dispatch, controlled registration/error contracts, generated consumer; no Core/MediaX changes",
+  "branch": "025-framework-business-regression",
+  "base_commit": "f123a2310568bd0e3625e825b4fa419b9cfb4f6c",
+  "implementation_commit": null,
+  "published": false,
+  "preexisting_worktree_changes_preserved": true,
+  "core_contract_source": {
+    "source_repository": "ArtisanCloud/PowerX",
+    "source_commit": "0be9945cf7544bf18d0ed58be1043a313bba9de8",
+    "source_worktree_uncommitted": true,
+    "snapshot_date": "2026-10-22",
+    "sha256": {
+      "ai-media-v2.md": "0abf7992153c206779ba1e8faba66f49d25ff4a049b99e718d859a11a0a75e4f",
+      "ai-media-v2.openapi.yaml": "ea8be3e47ddc28c4e35a8051ac5e02ed3d1b93f28944d7a443e72088309e16ad",
+      "fixtures/ai-media-v2.json": "eb456d570a615ce449b4acfebf3dbcca210dd843216946ee3124aabdd98bc33c",
+      "fixtures/capability-version-upgrade-errors.v1.json": "ff70b10ec2099bf96fe026fe1b91d55306e8ef1a5e24942aafc4bb9504a57faf"
+    }
+  },
+  "delivery": {
+    "bundle": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-ai-settings-20261022-ae21044e9e205ed3",
+    "profile": "ai-settings",
+    "published": false,
+    "changes_committed": false,
+    "base_commit": "f123a2310568bd0e3625e825b4fa419b9cfb4f6c",
+    "source_sha256": {
+      "go": "ea782ad8b674322bbb5ddcec0212aff275850188c546dff38fecba8e2714c5e9",
+      "nuxt": "1f47c36788746a870e0f2afaefeaf6ac1061fa7181df99061bb5578b95dd8f3c",
+      "generator": "cc2f82e8ac7e00002d0c04c7935b3ef9336736d74f4db2daab7eeaaf804fb42e",
+      "contracts": "159e30d15d62a053a1b4cfb9257b816b18e0bee11fa72fa49d5a7b1604b000e1",
+      "ai_contracts": "091569459818d25b30f8c1f53dc3d740407960c0fce3ba97659c89c5163027df"
+    },
+    "go_module": "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go",
+    "go_sdk_version": "v0.0.27-dev.aisettings.ea782ad8b674322b",
+    "go_proxy": "file:///private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-ai-settings-20261022-ae21044e9e205ed3/go-proxy",
+    "nuxt_client_version": "0.0.14-dev.aisettings.1f47c36788746a87",
+    "nuxt_client_ref": "file:/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-ai-settings-20261022-ae21044e9e205ed3/artisan-cloud-plugin-framework-client-0.0.14-dev.aisettings.1f47c36788746a87.tgz",
+    "nuxt_client_tarball": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-ai-settings-20261022-ae21044e9e205ed3/artisan-cloud-plugin-framework-client-0.0.14-dev.aisettings.1f47c36788746a87.tgz",
+    "generator_version": "v0.0.0-aisettings.cc2f82e8ac7e0000",
+    "generator_binary": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-ai-settings-20261022-ae21044e9e205ed3/px-plugin",
+    "consumer": {
+      "path": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-ai-settings-20261022-ae21044e9e205ed3/generated-consumer",
+      "go_work": "off",
+      "local_replace": false,
+      "four_bindings": "passed",
+      "manifest_validation": "passed",
+      "backend_build": "passed",
+      "shared_fixtures": "passed",
+      "packed_typescript": "passed"
+    },
+    "artifact_sha256": {
+      "px-plugin": "23f7eba992e48351dc7495d21d2758cbea3d4d644791e4047f5879fc4e07f6e2",
+      "artisan-cloud-plugin-framework-client-0.0.14-dev.aisettings.1f47c36788746a87.tgz": "f38578466a1047bd705536745b2d6bd922b05c3cd48df91b0eaa12ac82207441",
+      "go-proxy/github.com/!artisan!cloud/!power!x!plugin/framework/backend/go/@v/v0.0.27-dev.aisettings.ea782ad8b674322b.zip": "ae75f1c22d8149e0a3d0eac6b5b956e5bc44cc6b5831a56d45beecddc2a1ebc3"
+    }
+  },
+  "checks": {
+    "go": {
+      "packages": 10,
+      "test_events_including_subtests": 132,
+      "command": "go test -json ./framework/backend/go/runtime/powerx/ai ./framework/backend/go/runtime/ai ./framework/backend/go/runtime/aisettings ./skeleton/backend/go-gin/internal/transport/http/admin/ai_settings ./skeleton/backend/go-gin/internal/services/ai_settings ./skeleton/backend/go-gin/internal/services/runtimeexample ./skeleton/backend/go-gin/cmd/plugin ./tools/cli/cmd ./tools/cli/internal/templates ./tools/cli/internal/package ./tools/cli/internal/contracts",
+      "result": "passed"
+    },
+    "race": {
+      "packages": 5,
+      "result": "passed"
+    },
+    "vet": "passed",
+    "nuxt": {
+      "files": 4,
+      "tests": 19,
+      "result": "passed"
+    },
+    "typescript_helper_and_packed_sdk": "passed",
+    "skeleton_nuxt_build": "passed",
+    "browser": {
+      "tests": 4,
+      "desktop": [
+        1440,
+        1000
+      ],
+      "narrow": [
+        390,
+        844
+      ],
+      "api": "intercepted controlled fixtures, no provider charges",
+      "result": "passed"
+    },
+    "template_sync_and_root_contract_checks": "passed",
+    "generated_consumer": {
+      "path": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-ai-settings-20261022-ae21044e9e205ed3/generated-consumer",
+      "go_work": "off",
+      "local_replace": false,
+      "four_bindings": "passed",
+      "manifest_validation": "passed",
+      "backend_build": "passed",
+      "shared_fixtures": "passed",
+      "packed_typescript": "passed"
+    },
+    "upgrade_error_followup": {
+      "date": "2026-10-23",
+      "scope": "Error contract, fixtures, regression and package evidence only; AI runtime implementation and media protocol unchanged",
+      "go": {
+        "packages": 5,
+        "test_events_including_subtests": 92,
+        "commands": [
+          "go test -json ./framework/backend/go/runtime/powerx/ai ./framework/backend/go/runtime/aisettings ./tools/cli/internal/contracts",
+          "go test -json ./tools/cli/internal/templates ./tools/cli/cmd"
+        ],
+        "result": "passed"
+      },
+      "decoder": {
+        "authoritative_cases": 10,
+        "fields": [
+          "HTTP status",
+          "ErrorCode",
+          "ReasonCode",
+          "trace_id",
+          "request_id",
+          "details",
+          "raw body"
+        ],
+        "partial_execution_flags": [
+          "approval_persisted",
+          "runtime_confirmed",
+          "audit_id"
+        ],
+        "unknown_diagnostic_text_not_parsed": true,
+        "result": "passed"
+      },
+      "transport": {
+        "credential_paths": [
+          "API Key",
+          "STS token provider"
+        ],
+        "controlled_error_responses": 20,
+        "requests_per_case": 1,
+        "approval_or_alternate_route_requests": 0,
+        "retryable_does_not_trigger_automatic_retry": true,
+        "real_admin_approval_performed": false,
+        "result": "passed"
+      },
+      "consistency_guard": {
+        "cases": 6,
+        "negative_cases": 5,
+        "four_required_source_digests": true,
+        "docs_sdk_cli_byte_equality": true,
+        "result": "passed"
+      },
+      "race": {
+        "packages": 3,
+        "result": "passed"
+      },
+      "vet": {
+        "targets": 5,
+        "result": "passed"
+      },
+      "root_and_template_checks": "passed",
+      "generated_consumer": {
+        "path": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-ai-settings-20261022-ae21044e9e205ed3/generated-consumer",
+        "GOWORK": "off",
+        "framework_replace": false,
+        "authoritative_fixture_sha256": "ff70b10ec2099bf96fe026fe1b91d55306e8ef1a5e24942aafc4bb9504a57faf",
+        "fixture_byte_identical_to_core": true,
+        "four_source_hashes": "passed",
+        "sdk_upgrade_error_tests_from_module_proxy": "passed",
+        "backend_build": "passed"
+      },
+      "runtime_implementation_unchanged": true,
+      "mediax_snapshot_replacement_required": false,
+      "mediax_configuration_05_06_08_blocked_by_this_sync": false,
+      "new_persistent_services_started": false,
+      "frontend_browser_build_not_rerun": "No frontend change in this followup; original 2026-10-22 checks and proof retained separately."
+    }
+  },
+  "mediax_snapshot": {
+    "snapshot_date": "2026-10-20",
+    "ai_implementation_files_identical_to_current": true,
+    "automatic_dependency_upgrade": false,
+    "settings_endpoint_change": "inputs now required; explicit VLM modality; generation returns typed task/202 instead of text; adopt backend/page together"
+  },
+  "core_coordination": {
+    "old_tenant_migration": "Core-owned; controlled responses only here",
+    "upgrade_error": "Core has published capability_version_upgrade_error.v1 with 10 structured reasons. The existing DecodeHTTPError preserves status, ErrorCode, ReasonCode, trace, request_id, details and raw body; approval_persisted/runtime_confirmed retain partial execution state. retryable=true never authorizes automatic approval retry. Source, fixtures, CLI export and generated consumer are synchronized and verified.",
+    "api_key_and_sts": "controlled SDK credential paths; real exchange/live grants/revocation and upgraded tenant verification remain joint installed acceptance"
+  },
+  "language_matrix": {
+    "Go": "complete for this slice",
+    "Nuxt": "complete for this slice",
+    "Skeleton_and_CLI": "complete for this slice",
+    "dotnet": "AI media v2 remains deferred, not counted as full-language delivery"
+  },
+  "temporary_service": {
+    "pid": 77561,
+    "pgid": 77561,
+    "port": 3147,
+    "command": "PORT=3147 HOST=127.0.0.1 node .output/server/index.mjs",
+    "cwd": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/skeleton/web-admin/nuxt",
+    "stop_requested": true,
+    "prior_processes": [
+      {
+        "pid": 48891,
+        "pgid": 48891,
+        "stopped": true
+      },
+      {
+        "pid": 62206,
+        "pgid": 62206,
+        "stopped": true
+      }
+    ],
+    "port_released": true
+  },
+  "excluded": [
+    "Core source changes, database migration/seed, user service restart",
+    "MediaXStudio repository/snapshot changes",
+    "public SDK/CLI publishing",
+    "live installed tenant/provider media acceptance"
+  ],
+  "proof_sha256": {
+    "validation/upgrade-errors-20261023/template-check.log": "8bdb0af2ee1826f47f0e8e3d64d46fd652cd8e9eae0bc78da3dd20f67db858ca",
+    "validation/upgrade-errors-20261023/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "validation/upgrade-errors-20261023/runtime-unchanged.json": "ed085a0c2802e7b3357d10db8cd03f51a26f71de49636120d24cffb42e023f73",
+    "validation/upgrade-errors-20261023/cli-go-tests.jsonl": "e205f66a158e22180474ddb6bf64f8e4cf7d6a8d6397d97b074b0b87a6d2b37e",
+    "validation/upgrade-errors-20261023/go-tests.jsonl": "0e527e86f9096207dfd62e64d2696e8362b8f868eae6ad16c5ff4b1557900d89",
+    "validation/upgrade-errors-20261023/contract-check.log": "f786a1488028e8fbe4d4bcbd93ca91dc907c6f72b8b4471ef1969e6c53698d28",
+    "validation/upgrade-errors-20261023/generated-contract-sha256.json": "d97c2b811223e40735ad00a7f792577f0c5c91309f8cbcdb3afc19e47af07a79",
+    "validation/upgrade-errors-20261023/root-checks.log": "c8a320c964a62a8a6769c24ab84db7dbc5b69cbbb1cdeaf3f282cca541a00595",
+    "validation/upgrade-errors-20261023/race.log": "248e5f3ecce46fd9a790c99b1095c3dac4e40cf8a3f810009b280fa9610e0d5d",
+    "validation/original-20261022/browser.log": "bb6616d8702e5330872f2d5ead1a2474b706158aed834e580ec0e00c40139df4",
+    "validation/original-20261022/typescript.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "validation/original-20261022/template-check.log": "8bdb0af2ee1826f47f0e8e3d64d46fd652cd8e9eae0bc78da3dd20f67db858ca",
+    "validation/original-20261022/vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "validation/original-20261022/preview-process.json": "d60eff1fb57053cf5a9663edab026f7b6559b800f4b6732061c65908a0964695",
+    "validation/original-20261022/go-tests.jsonl": "687ce4e4db3793c15d19a8a8c8214c2ffed32e8d52da7a6dd506d8a66b0743e5",
+    "validation/original-20261022/nuxt-tests.log": "15e1cb44d863c6eec0db5a3292e0b5a92040913493a18b46f4ce4b0e036bdbdb",
+    "validation/original-20261022/root-checks.log": "a88cfc9b3bf44d1e7234c0bb0d47e2ae01a3071654bd3654e333cff2a11535f1",
+    "validation/original-20261022/race.log": "3c1c97c710a2e79db137ece029f90d88da53c5263287b9072e5692ce0e09276b",
+    "validation/original-20261022/build.log": "48fabb006bbb1a53912cb6923e5543407825927921518b7029d2f8c12324e1f1",
+    "validation/original-20261022/screenshots/ai-settings-actions-genera-aebfe-shes-cannot-overwrite-state-chromium-desktop.png": "ffe4523e523462b6703f1c6ef6662f3cf75dc1be3089da1c02967ee69c80ad8a",
+    "validation/original-20261022/screenshots/ai-settings-actions-genera-aebfe-shes-cannot-overwrite-state-chromium-narrow.png": "3a9e0883104c811aeb340a3ac7973e9140068b519b3ca6d3087bdf55ba539276",
+    "validation/original-20261022/screenshots/ai-media-catalog-media-cat-018c9--desktop-and-narrow-screens-chromium-narrow.png": "d2c3a367459be5bf813c794dbad7e6767831007e0e06a5fa84b7bc96819eba21",
+    "validation/original-20261022/screenshots/ai-media-catalog-media-cat-018c9--desktop-and-narrow-screens-chromium-desktop.png": "6d622b8922d4f3b73ce8de29bd71efb015a278bf6f5c909c4849ee75bab98788",
+    "consumer-validation.log": "603eb230bcba06a9828a549d30ff43db9d1d80bef6e0c0caa17f06752e13d21b"
+  },
+  "initial_delivery": {
+    "bundle": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-ai-settings-20261022-ee568be13a3bc959",
+    "profile": "ai-settings",
+    "published": false,
+    "changes_committed": false,
+    "base_commit": "f123a2310568bd0e3625e825b4fa419b9cfb4f6c",
+    "source_sha256": {
+      "go": "d7e3f97813b4488cc9351eb8d2b5a6ced478067e7fb0f1ef7b90287216ef41c4",
+      "nuxt": "1f47c36788746a870e0f2afaefeaf6ac1061fa7181df99061bb5578b95dd8f3c",
+      "generator": "bc2c921e821ce97f2066198cc18295be64f9affbe72830bcd370170bc5c6fb84",
+      "contracts": "159e30d15d62a053a1b4cfb9257b816b18e0bee11fa72fa49d5a7b1604b000e1",
+      "ai_contracts": "d26150168ff9e7582bf8fa685262133653f34fa646623368f2aa29c9abbda80b"
+    },
+    "go_module": "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go",
+    "go_sdk_version": "v0.0.27-dev.aisettings.d7e3f97813b4488c",
+    "go_proxy": "file:///private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-ai-settings-20261022-ee568be13a3bc959/go-proxy",
+    "nuxt_client_version": "0.0.14-dev.aisettings.1f47c36788746a87",
+    "nuxt_client_ref": "file:/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-ai-settings-20261022-ee568be13a3bc959/artisan-cloud-plugin-framework-client-0.0.14-dev.aisettings.1f47c36788746a87.tgz",
+    "nuxt_client_tarball": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-ai-settings-20261022-ee568be13a3bc959/artisan-cloud-plugin-framework-client-0.0.14-dev.aisettings.1f47c36788746a87.tgz",
+    "generator_version": "v0.0.0-aisettings.bc2c921e821ce97f",
+    "generator_binary": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-ai-settings-20261022-ee568be13a3bc959/px-plugin",
+    "consumer": {
+      "path": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-ai-settings-20261022-ee568be13a3bc959/generated-consumer",
+      "go_work": "off",
+      "local_replace": false,
+      "four_bindings": "passed",
+      "manifest_validation": "passed",
+      "backend_build": "passed",
+      "shared_fixtures": "passed",
+      "packed_typescript": "passed"
+    },
+    "artifact_sha256": {
+      "px-plugin": "ec0041f4f95f7e62dd1f0fe9866973e6cf31310608ab8d453e91ec7e27d76c28",
+      "artisan-cloud-plugin-framework-client-0.0.14-dev.aisettings.1f47c36788746a87.tgz": "f38578466a1047bd705536745b2d6bd922b05c3cd48df91b0eaa12ac82207441",
+      "go-proxy/github.com/!artisan!cloud/!power!x!plugin/framework/backend/go/@v/v0.0.27-dev.aisettings.d7e3f97813b4488c.zip": "17ba04d60bbf85b9dee630ed17e48eaafcee8b8760fe7fb8638570cc54d65637"
+    }
+  },
+  "last_updated": "2026-10-23"
+}

@@ -1008,7 +1008,7 @@
   "aiSettings": {
     "badge": "Settings",
     "title": "AI Settings",
-    "description": "Inspect the AI configuration used by the active runtime. Configuration is not proof of connectivity.",
+    "description": "Choose a model, adjust its parameters, and test availability for the current environment.",
     "providerNotConfigured": "AI settings provider is not configured",
     "providerNotConfiguredDescription": "This plugin has not connected a local or PowerX AI settings provider yet. Once connected, this page will read configuration through the plugin backend.",
     "empty": "No configuration",
@@ -1018,10 +1018,23 @@
       "health": "Health"
     },
     "sections": {
-      "summary": "Summary",
-      "routing": "Routing",
-      "providers": "Provider Profiles",
-      "models": "Model Profiles"
+      "label": "Configuration tasks",
+      "model": "Model",
+      "parameters": "Runtime parameters",
+      "test": "Capability test"
+    },
+    "workspace": {
+      "sourceHelp": "About configuration sources",
+      "openTest": "Open tests",
+      "closeTests": "Close test panel",
+      "testPanelTitle": "Connection and capability tests",
+      "testDescription": "Test the selected model. Closing the panel keeps your inputs and results.",
+      "testFailed": "Test failed",
+      "connectionPassed": "Connection succeeded",
+      "modelDescription": "Choose a provider and model, then configure the connection.",
+      "parametersDescription": "Adjust the request parameters for the current model.",
+      "saveScope": "Saves only this environment, source, and modality.",
+      "save": "Save configuration"
     },
     "columns": {
       "name": "Name",
@@ -1042,6 +1055,8 @@
       "powerx": "PowerX configuration"
     },
     "catalogUnavailable": "Model catalog is unavailable",
+    "coreCatalogUnavailableDescription": "Unable to read the PowerX AI Settings catalog. Check that Core supports this catalog contract and that access is granted.",
+    "coreConnectionManaged": "PowerX manages the connection and credentials. Select a model returned by Core here.",
     "catalogUnavailableDescription": "The selected catalog could not be loaded. The current profile has been kept; complete PowerX catalog access authorization and try again.",
     "modalityTabsLabel": "Modalities",
     "general": "General",
@@ -1049,7 +1064,9 @@
     "provider": "Provider",
     "app": "App",
     "model": "Model",
-    "searchModel": "Search Model...",
+    "searchModel": "Search models…",
+    "noModelsInCatalog": "No models are available in this catalog",
+    "noMatchingModels": "No matching models",
     "baseURL": "Base URL",
     "credentialReference": "Credential reference",
     "credentialReferenceDescription": "Only a secret-manager reference is stored; API key plaintext is neither stored nor returned.",
@@ -1067,6 +1084,7 @@
     "activeProfile": "Active model profile",
     "connectionStatus": "Connection status",
     "notSelected": "Not selected",
+    "mediaParameter": "Parameter {parameter}",
     "modalityParametersPending": "This modality has no editable generic parameters.",
     "actionUnavailable": "Action unavailable",
     "notImplemented": {
@@ -1080,13 +1098,14 @@
     },
     "modalities": {
       "llm": "LLM text",
-      "image": "Image / vision (VLM)",
+      "image": "Image generation",
       "embedding": "Embedding",
       "audioTTS": "Text to speech",
       "audioASR": "Speech recognition",
       "video": "Video generation",
       "model3d": "3D generation",
-      "rerank": "Rerank"
+      "rerank": "Rerank",
+      "vlm": "Vision analysis"
     },
     "loadFailed": "Unable to read AI settings. Check permissions and backend logs.",
     "saveSucceeded": "AI profile saved.",
@@ -1113,6 +1132,44 @@
       "local": "Local",
       "explicit_model_key": "Explicit model key",
       "false": "Disabled"
+    },
+    "testing": {
+      "inProgress": "Test in progress",
+      "prompt": "Test input",
+      "defaultPrompt": "Please reply briefly.",
+      "image": "Image reference",
+      "imageType": "Image format",
+      "imageTypes": {
+        "image_url": "Image URL",
+        "image_base64": "Base64 image"
+      },
+      "generationCost": "Both test actions submit a real generation task and may incur provider charges.",
+      "attemptRetained": "Retries retain this request and idempotency key. Starting a new test creates another attempt and may incur another charge.",
+      "newAttempt": "Start a new test",
+      "taskAccepted": "Generation task accepted. Check its task status.",
+      "refreshTask": "Refresh task status",
+      "cancelTask": "Cancel task",
+      "diagnostics": "Technical diagnostics",
+      "failed": "The operation failed. Check the diagnostics and current state.",
+      "taskStatus": {
+        "queued": "Queued",
+        "running": "Generating",
+        "succeeded": "Completed",
+        "failed": "Task failed",
+        "cancelled": "Cancelled"
+      },
+      "blocked": {
+        "powerxRuntimeRequired": "The runtime is local. Test Core text models through the PowerX runtime channel.",
+        "runtimePending": "Checking the runtime channel.",
+        "unsupported": "Testing this capability is not yet supported here.",
+        "inputRequired": "Select a model and enter test content.",
+        "modelUnavailable": "The catalog is unavailable or the model does not offer this operation.",
+        "coreCatalogRequired": "The runtime uses Core. Select a model from the PowerX catalog.",
+        "unsupportedInput": "This operation does not support the selected input format.",
+        "localUnsupported": "The local adapter does not implement this generation capability.",
+        "localProfileRequired": "A configured local model is required; text tests also need a valid Ollama endpoint.",
+        "imageRequired": "Vision analysis requires an image."
+      }
     }
   },
   "providerMode": {

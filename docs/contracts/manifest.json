@@ -32,6 +32,64 @@
     }
   },
   "properties": {
+    "notification_presentations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "business_type",
+          "contract",
+          "presentation_path",
+          "preview_path"
+        ],
+        "properties": {
+          "business_type": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,256}$"
+          },
+          "contract": {
+            "enum": ["business_notification_card.v1", "business_notification_card.v2"]
+          },
+          "presentation_path": {
+            "type": "string",
+            "pattern": "^/admin/(?:[A-Za-z0-9_-]|\\{delivery_key\\})+(?:/(?:[A-Za-z0-9_-]|\\{delivery_key\\})+)*$",
+            "allOf": [
+              {
+                "pattern": "\\{delivery_key\\}"
+              },
+              {
+                "not": {
+                  "pattern": "\\{delivery_key\\}.*\\{delivery_key\\}"
+                }
+              }
+            ]
+          },
+          "preview_path": {
+            "type": "string",
+            "pattern": "^/admin/(?:[A-Za-z0-9_-]|\\{delivery_key\\}|\\{image_key\\})+(?:/(?:[A-Za-z0-9_-]|\\{delivery_key\\}|\\{image_key\\})+)*$",
+            "allOf": [
+              {
+                "pattern": "\\{delivery_key\\}"
+              },
+              {
+                "not": {
+                  "pattern": "\\{delivery_key\\}.*\\{delivery_key\\}"
+                }
+              },
+              {
+                "pattern": "\\{image_key\\}"
+              },
+              {
+                "not": {
+                  "pattern": "\\{image_key\\}.*\\{image_key\\}"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
     "id": {
       "type": "string",
       "pattern": "^[a-z0-9.-]+$",

@@ -173,7 +173,7 @@ func TestAISettingsConnectionAndQuickCallUseDelegatedRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := &Handler{mode: fwprovider.ModeDelegated, deps: &app.Deps{AIInvocation: runtime}}
-	body := `{"source":"powerx","environment":"development","modality":"llm","provider":"ollama","model_key":"qwen3:8b","endpoint":"http://127.0.0.1:11434","parameters":{"temperature":0.2}}`
+	body := `{"source":"powerx","environment":"development","modality":"llm","provider":"ollama","model_key":"qwen3:8b","endpoint":"http://127.0.0.1:11434","parameters":{"temperature":0.2},"inputs":[{"role":"user","type":"text","content":"fixture.input"}]}`
 
 	for _, handler := range []gin.HandlerFunc{h.TestConnection, h.QuickCall} {
 		rec := httptest.NewRecorder()

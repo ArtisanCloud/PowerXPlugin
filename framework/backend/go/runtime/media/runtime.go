@@ -39,6 +39,7 @@ type Service interface {
 // It does not inspect requests or construct a local/delegated fallback.
 type Runtime struct {
 	mode    provider.Mode
+	channel string
 	service *module.Factory[Service]
 }
 
@@ -52,7 +53,24 @@ func NewRuntime(mode provider.Mode, local, delegated Service) (*Runtime, error) 
 	if err != nil {
 		return nil, err
 	}
-	return &Runtime{mode: mode, service: service}, nil
+	return &Runtime{mode: mode, channel: string(mode), service: service}, nil
+}
+
+func NewCoreHostRuntime(client *powerxmedia.HostClient) (*Runtime, error) {
+	if client == nil || client.CredentialScheme() != "apikey" {
+		return nil, module.NewError("FRAMEWORK_MEDIA_CORE_HOST_UNAVAILABLE", "FRAMEWORK_MEDIA_CORE_HOST_UNAVAILABLE")
+	}
+	runtime, err := NewRuntime(provider.ModeLocal, client, nil)
+	if err == nil {
+		runtime.channel = "core_host"
+	}
+	return runtime, err
+}
+func (r *Runtime) Channel() string {
+	if r == nil {
+		return ""
+	}
+	return r.channel
 }
 
 func (r *Runtime) Mode() provider.Mode {
@@ -79,6 +97,20 @@ func (r *Runtime) Media() (Service, error) {
 		return nil, module.NewError("FRAMEWORK_MODULE_ADAPTER_UNAVAILABLE", "media runtime is unavailable")
 	}
 	return r.service.Resolve()
+}
+
+// ImageDerivatives resolves an independent extension of the selected adapter.
+// Ordinary upload callers do not require this capability or its grants.
+func (r *Runtime) ImageDerivatives() (powerxmedia.ImageDerivativeService, error) {
+	service, err := r.Media()
+	if err != nil {
+		return nil, err
+	}
+	derivatives, ok := service.(powerxmedia.ImageDerivativeService)
+	if !ok {
+		return nil, module.NewError("FRAMEWORK_MEDIA_DERIVATIVES_UNAVAILABLE", "FRAMEWORK_MEDIA_DERIVATIVES_UNAVAILABLE")
+	}
+	return derivatives, nil
 }
 
 var _ Service = (*powerxmedia.HostClient)(nil)

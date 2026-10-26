@@ -2,7 +2,7 @@
 
 本文是 `px-plugin` 的主流程文档：从 CLI 构建、`init` 项目、数据库初始化、本地启动，到安装到 PowerX。
 
-使用当前尚未公开发布的 Framework／CLI 时，先按 [2026-10-26 开发版本说明](../../../releases/framework-dev-20261026.md) 激活配套包源，再生成项目。`PX_PLUGIN_CLI_VERSION` 只设置构建版本标记，不会选择对应 Git 源码或升级生成项目的 SDK 依赖。
+使用当前尚未公开发布的 Framework／CLI 时，先按 [dev.2 开发版本说明](../../../releases/framework-dev-20261026-2.md) 激活配套包源，再生成项目。`PX_PLUGIN_CLI_VERSION` 只设置构建版本标记，不会选择对应 Git 源码或升级生成项目的 SDK 依赖。
 
 ## 0) 前置条件
 

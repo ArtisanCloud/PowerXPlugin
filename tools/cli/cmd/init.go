@@ -20,10 +20,10 @@ import (
 const (
 	defaultVersion          = "0.1.0"
 	defaultGoVersion        = "1.24"
-	defaultFrameworkVersion = "v0.0.26"
+	defaultFrameworkVersion = "v0.0.27-dev.20261026.1"
 	schemaDependency        = "github.com/santhosh-tekuri/jsonschema/v5 v5.3.0"
-	defaultAdminVersion     = "0.0.12"
-	defaultClientVersion    = "0.0.13"
+	defaultAdminVersion     = "0.0.13-dev.20261026.1"
+	defaultClientVersion    = "0.0.14-dev.20261026.1"
 )
 
 var pluginIDPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$`)
@@ -37,21 +37,25 @@ func runInit(args []string) error {
 
 	fs := flag.NewFlagSet("init", flag.ContinueOnError)
 	var (
-		module              = fs.String("module", "", "override backend module import path (default derives from plugin id)")
-		backend             = fs.String("backend", templates.BackendGoGin, fmt.Sprintf("backend framework (supported: %v)", templates.SupportedBackends()))
-		adminFrontend       = fs.String("admin", templates.FrontendNuxt, fmt.Sprintf("admin frontend framework (supported: %v)", templates.SupportedFrontends()))
-		appFrontend         = fs.String("app", "", "app frontend framework (optional)")
-		backendPort         = fs.Int("backend-port", 8078, "backend service port")
-		frontendPort        = fs.Int("frontend-port", 3131, "frontend dev server port")
-		force               = fs.Bool("force", false, "overwrite existing files")
-		directory           = fs.String("directory", "", "target directory (default: ./<plugin-id>)")
-		version             = fs.String("version", defaultVersion, "plugin version")
-		goVersion           = fs.String("go-version", defaultGoVersion, "Go version to use")
-		installDeps         = fs.Bool("install-deps", false, "automatically install dependencies (go mod tidy & npm install)")
-		initConfig          = fs.Bool("init-config", true, "create local config files from *.example templates")
-		gitInit             = fs.Bool("git-init", true, "initialize git repository in target directory")
-		sbomPath            = fs.String("sbom-path", "", "path to write SBOM file (default: <target>/reports/sbom.json)")
-		publishManifestPath = fs.String("publish-manifest-path", "", "path to write publish manifest (default: <target>/publish.yml)")
+		module                        = fs.String("module", "", "override backend module import path (default derives from plugin id)")
+		backend                       = fs.String("backend", templates.BackendGoGin, fmt.Sprintf("backend framework (supported: %v)", templates.SupportedBackends()))
+		adminFrontend                 = fs.String("admin", templates.FrontendNuxt, fmt.Sprintf("admin frontend framework (supported: %v)", templates.SupportedFrontends()))
+		appFrontend                   = fs.String("app", "", "app frontend framework (optional)")
+		backendPort                   = fs.Int("backend-port", 8078, "backend service port")
+		frontendPort                  = fs.Int("frontend-port", 3131, "frontend dev server port")
+		force                         = fs.Bool("force", false, "overwrite existing files")
+		directory                     = fs.String("directory", "", "target directory (default: ./<plugin-id>)")
+		version                       = fs.String("version", defaultVersion, "plugin version")
+		goVersion                     = fs.String("go-version", defaultGoVersion, "Go version to use")
+		installDeps                   = fs.Bool("install-deps", false, "automatically install dependencies (go mod tidy & npm install)")
+		initConfig                    = fs.Bool("init-config", true, "create local config files from *.example templates")
+		gitInit                       = fs.Bool("git-init", true, "initialize git repository in target directory")
+		sbomPath                      = fs.String("sbom-path", "", "path to write SBOM file (default: <target>/reports/sbom.json)")
+		publishManifestPath           = fs.String("publish-manifest-path", "", "path to write publish manifest (default: <target>/publish.yml)")
+		notificationPresentationsPath = fs.String("notification-presentations", "", "notification_presentations")
+		frameworkVersionRef           = fs.String("framework-version", os.Getenv("PX_PLUGIN_FRAMEWORK_VERSION"), "framework_version")
+		frameworkAdminRef             = fs.String("framework-admin-ref", os.Getenv("PX_PLUGIN_FRAMEWORK_ADMIN_REF"), "framework_admin_ref")
+		frameworkClientRef            = fs.String("framework-client-ref", os.Getenv("PX_PLUGIN_FRAMEWORK_CLIENT_REF"), "framework_client_ref")
 	)
 	fs.SetOutput(os.Stdout)
 	if err := fs.Parse(args); err != nil {
@@ -113,6 +117,10 @@ func runInit(args []string) error {
 			targetRoot = filepath.Join(cwd, *directory)
 		}
 	}
+	bindings, err := loadNotificationPresentationsOption(*notificationPresentationsPath)
+	if err != nil {
+		return err
+	}
 	if err := ensureTargetDir(targetRoot, *force); err != nil {
 		return err
 	}
@@ -122,25 +130,36 @@ func runInit(args []string) error {
 
 	frameworkReplace := detectFrameworkReplace(backendDir)
 	adminRef, clientRef := detectWorkspaceRefs(webDir)
-
+	frameworkRef := defaultFrameworkVersion
+	if *frameworkVersionRef != "" {
+		frameworkRef = *frameworkVersionRef
+		frameworkReplace = ""
+	}
+	if *frameworkClientRef != "" {
+		clientRef = *frameworkClientRef
+	}
+	if *frameworkAdminRef != "" {
+		adminRef = *frameworkAdminRef
+	}
 	data := templates.Data{
-		PluginID:           pluginID,
-		PluginName:         pluginName,
-		PluginSlug:         pluginSlug,
-		PluginDBName:       pluginDBName,
-		Version:            *version,
-		GoVersion:          *goVersion,
-		BackendModulePath:  backendModule,
-		BackendType:        *backend,
-		FrontendType:       *adminFrontend,
-		AppFrontendType:    *appFrontend,
-		BackendPort:        *backendPort,
-		FrontendPort:       *frontendPort,
-		FrameworkVersion:   defaultFrameworkVersion,
-		FrameworkReplace:   frameworkReplace,
-		SchemaDependency:   schemaDependency,
-		FrameworkAdminRef:  adminRef,
-		FrameworkClientRef: clientRef,
+		NotificationPresentations: bindings,
+		PluginID:                  pluginID,
+		PluginName:                pluginName,
+		PluginSlug:                pluginSlug,
+		PluginDBName:              pluginDBName,
+		Version:                   *version,
+		GoVersion:                 *goVersion,
+		BackendModulePath:         backendModule,
+		BackendType:               *backend,
+		FrontendType:              *adminFrontend,
+		AppFrontendType:           *appFrontend,
+		BackendPort:               *backendPort,
+		FrontendPort:              *frontendPort,
+		FrameworkVersion:          frameworkRef,
+		FrameworkReplace:          frameworkReplace,
+		SchemaDependency:          schemaDependency,
+		FrameworkAdminRef:         adminRef,
+		FrameworkClientRef:        clientRef,
 	}
 
 	renderResult, err := templates.RenderAll(targetRoot, data, templates.Options{Force: *force})
@@ -198,7 +217,7 @@ func runInit(args []string) error {
 	// Install dependencies if requested
 	if *installDeps {
 		if err := installDependencies(backendDir, webDir); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: failed to install dependencies: %v\n", err)
+			return fmt.Errorf("PLUGIN_INIT_DEPENDENCIES_FAILED: %w", err)
 		}
 	}
 

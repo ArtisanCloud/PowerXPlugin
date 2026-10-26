@@ -3,6 +3,7 @@ package notifications
 import (
 	"context"
 	"errors"
+	"net/http"
 	"strings"
 	"time"
 
@@ -36,6 +37,9 @@ func NewLocalPublisher(db *gorm.DB, resolveTenant TrustedTenantResolver) (*Local
 }
 
 func (p *LocalPublisher) Create(ctx context.Context, input powerxnotifications.CreateInput) (*powerxnotifications.Notification, error) {
+	if _, exists := input.Metadata["business_card"]; exists {
+		return nil, &powerxnotifications.HTTPError{StatusCode: http.StatusServiceUnavailable, ReasonCode: "FRAMEWORK_NOTIFICATION_CARD_ADAPTER_UNAVAILABLE"}
+	}
 	if p == nil || p.db == nil || p.resolveTenant == nil {
 		return nil, errors.New("local notification publisher is unavailable")
 	}
@@ -50,6 +54,10 @@ func (p *LocalPublisher) Create(ctx context.Context, input powerxnotifications.C
 		return nil, errors.New("notification title and content are required")
 	}
 	now := p.now().UTC()
+	var actions []powerxnotifications.Action
+	if input.Navigation != nil {
+		actions = append(actions, powerxnotifications.Action{ID: "view_business", Label: input.Navigation.Label, Type: "primary", Action: "navigate", Params: map[string]string{"path": input.Navigation.Path}})
+	}
 	memberUUID := strings.TrimSpace(input.MemberUUID)
 	recipientType, recipientID := "tenant", tenantUUID
 	if memberUUID != "" {
@@ -70,6 +78,8 @@ func (p *LocalPublisher) Create(ctx context.Context, input powerxnotifications.C
 		Channel:       "in_app",
 		TemplateCode:  category,
 		Payload: datatypes.JSONMap{
+			"navigation":   input.Navigation,
+			"actions":      actions,
 			"title":        title,
 			"content":      content,
 			"type":         strings.TrimSpace(input.Type),
@@ -86,6 +96,7 @@ func (p *LocalPublisher) Create(ctx context.Context, input powerxnotifications.C
 		return nil, err
 	}
 	return &powerxnotifications.Notification{
+		Actions:     actions,
 		UUID:        record.ID,
 		Title:       title,
 		Content:     content,

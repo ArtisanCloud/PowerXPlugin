@@ -1,3 +1,18 @@
+export class PluginSSEHTTPError extends Error {
+  readonly errorCode: string;
+  readonly reasonCode: string;
+  readonly details: Record<string, unknown>;
+  constructor(public readonly status: number, public readonly body: string, public readonly traceID: string, public readonly requestID: string) {
+    super("SSE_HTTP_ERROR");
+    let data: Record<string, any> = {};
+    try { data = JSON.parse(body); } catch { /* An intermediary may return a non-JSON error body; retain it for diagnostics. */ }
+    this.details = data.details || {};
+    this.errorCode = data.error_code || '';
+    this.reasonCode = data.reason_code || this.details.reason_code || this.errorCode || '';
+    this.traceID = traceID || data.trace_id || '';
+    this.requestID = requestID || data.request_id || '';
+  }
+}
 import { getPowerXHostSession, PowerXHostSessionError } from './host-session';
 import { isPowerXEmbedded } from './bridge';
 export interface PluginSSEOptions {
@@ -24,6 +39,7 @@ export interface PluginSSEConnectOptions {
 }
 
 export interface PluginSSEStreamEvent {
+  id: string;
   event: string;
   data: string;
   payload: unknown;
@@ -45,7 +61,7 @@ export interface PluginSSEClient {
   buildURL(
     path: string,
     params?: Record<string, unknown>,
-    input?: { token?: string; tenantUuid?: string },
+    input?: { token?: string; tenantUuid?: string; headerAuth?: boolean },
   ): string;
   connect(options: PluginSSEConnectOptions): EventSource;
   stream(options: PluginSSEStreamOptions): Promise<void>;
@@ -102,7 +118,7 @@ export function createPluginSSEClient(
   const buildURL = (
     path: string,
     params?: Record<string, unknown>,
-    input?: { token?: string; tenantUuid?: string },
+    input?: { token?: string; tenantUuid?: string; headerAuth?: boolean },
   ) => {
     const rawPath = String(path || "").trim();
     const cleanPath =
@@ -120,8 +136,8 @@ export function createPluginSSEClient(
     if (hostSession && !snapshot) throw new PowerXHostSessionError('PLUGIN_AUTH_REQUIRED');
     const token = normalizeBearer(String(snapshot?.accessToken || input?.token || options.token || ""));
     const tenantUuid = String(hostSession ? snapshot?.identity?.tenantUuid || '' : input?.tenantUuid || options.tenantUuid || '').trim();
-    if (token) url.searchParams.set("authorization", token);
-    if (tenantUuid) url.searchParams.set("tenant_uuid", tenantUuid);
+    if (token && !input?.headerAuth) url.searchParams.set("authorization", token);
+    if (tenantUuid && !input?.headerAuth) url.searchParams.set("tenant_uuid", tenantUuid);
     return url.toString();
   };
 
@@ -173,6 +189,7 @@ export function createPluginSSEClient(
     try {
       const url = buildURL(streamOptions.path, streamOptions.params, {
         tenantUuid: streamOptions.tenantUuid,
+        headerAuth: true,
       });
       const headers: Record<string, string> = {
         Accept: "text/event-stream",
@@ -198,10 +215,10 @@ export function createPluginSSEClient(
         credentials: options.withCredentials === false ? "same-origin" : "include",
       });
       if (!response.ok) {
-        throw new Error(`SSE stream failed: HTTP ${response.status}`);
+        throw new PluginSSEHTTPError(response.status, await response.text(), response.headers.get("X-Trace-ID") || "", response.headers.get("X-Request-ID") || "");
       }
       if (!response.body) {
-        throw new Error("SSE stream response body is empty");
+        throw new Error("SSE_RESPONSE_BODY_REQUIRED");
       }
       await readSSEStream(response.body, event => {
         if (controller.signal.aborted || (snapshot && !hostSession!.isCurrent(snapshot))) throw new PowerXHostSessionError('AUTH_SESSION_CHANGED');
@@ -337,6 +354,8 @@ function emitSSEChunk(
     .map((line) => line.replace(/^data:\s*/, ""))
     .join("\n")
     .trim();
+  if (!data) return;
+  const id = lines.find(line => line.startsWith("id:"))?.replace(/^id:\s*/, "") || "";
   let payload: unknown = {};
   if (data) {
     try {
@@ -345,5 +364,5 @@ function emitSSEChunk(
       payload = { raw: data };
     }
   }
-  onEvent?.({ event: eventName, data, payload, raw });
+  onEvent?.({ id, event: eventName, data, payload, raw });
 }

@@ -14,8 +14,11 @@
     "check:framework-knowledge-boundary": "bash scripts/contracts/validate-framework-knowledge-boundary.sh",
     "check:host-contract-lab": "bash scripts/contracts/validate-host-contract-lab.sh",
     "check:iam-directory-boundary": "bash scripts/contracts/validate-iam-directory-boundary.sh",
+    "check:media-thumbnail64": "node scripts/contracts/validate-media-thumbnail64.mjs",
+    "check:business-notification-card": "node scripts/contracts/validate-business-notification-card.mjs",
+    "check:ai-media-v2-contract": "node scripts/contracts/validate-ai-media-v2.mjs && node --test scripts/contracts/validate-ai-media-v2.test.mjs",
     "check:realtime-transport": "bash scripts/contracts/validate-realtime-transport.sh",
-    "test": "node scripts/capabilities/run-from-package.mjs && npm run check:customer-auth-boundary && npm run check:framework-knowledge-boundary && npm run check:host-contract-lab && npm run check:iam-directory-boundary && npm run check:realtime-transport"
+    "test": "node scripts/capabilities/run-from-package.mjs && npm run check:customer-auth-boundary && npm run check:framework-knowledge-boundary && npm run check:host-contract-lab && npm run check:iam-directory-boundary && npm run check:realtime-transport && npm run check:ai-media-v2-contract && npm run check:business-notification-card && npm run check:media-thumbnail64"
   },
   "dependencies": {
     "fast-glob": "^3.3.3",

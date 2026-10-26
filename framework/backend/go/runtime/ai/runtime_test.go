@@ -10,7 +10,10 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 )
 
-type generativeStub struct{ text string }
+type generativeStub struct {
+	*powerxai.Client
+	text string
+}
 
 func (s generativeStub) ListLLMModels(context.Context, string) (*powerxai.ListLLMModelsOutput, error) {
 	return &powerxai.ListLLMModelsOutput{Items: []powerxai.LLMModel{{ModelKey: s.text}}}, nil
@@ -34,17 +37,17 @@ func (s generativeStub) LLMSessionStream(_ context.Context, _ string, emit func(
 func (s generativeStub) EmbeddingInvoke(context.Context, powerxai.EmbeddingInvokeInput) (*powerxai.EmbeddingInvokeOutput, error) {
 	return &powerxai.EmbeddingInvokeOutput{}, nil
 }
-func (s generativeStub) VLMInvoke(context.Context, powerxai.ModalInvokeInput) (*powerxai.ModalInvokeOutput, error) {
-	return &powerxai.ModalInvokeOutput{}, nil
+func (s generativeStub) VLMInvoke(context.Context, powerxai.MediaInvokeInput) (*powerxai.AnalysisResult, error) {
+	return &powerxai.AnalysisResult{}, nil
 }
-func (s generativeStub) ImageInvoke(context.Context, powerxai.ModalInvokeInput) (*powerxai.ModalInvokeOutput, error) {
-	return &powerxai.ModalInvokeOutput{}, nil
+func (s generativeStub) ImageInvoke(context.Context, powerxai.MediaInvokeInput) (*powerxai.MediaTask, error) {
+	return &powerxai.MediaTask{}, nil
 }
-func (s generativeStub) VideoInvoke(context.Context, powerxai.ModalInvokeInput) (*powerxai.ModalInvokeOutput, error) {
-	return &powerxai.ModalInvokeOutput{}, nil
+func (s generativeStub) VideoInvoke(context.Context, powerxai.MediaInvokeInput) (*powerxai.MediaTask, error) {
+	return &powerxai.MediaTask{}, nil
 }
-func (s generativeStub) TTSInvoke(context.Context, powerxai.ModalInvokeInput) (*powerxai.ModalInvokeOutput, error) {
-	return &powerxai.ModalInvokeOutput{}, nil
+func (s generativeStub) TTSInvoke(context.Context, powerxai.MediaInvokeInput) (*powerxai.MediaTask, error) {
+	return &powerxai.MediaTask{}, nil
 }
 
 func TestRuntimeSelectsOnlyConfiguredAdapter(t *testing.T) {

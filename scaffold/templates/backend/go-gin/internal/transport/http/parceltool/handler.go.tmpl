@@ -1,0 +1,80 @@
+package parceltool
+
+import (
+	"crypto/subtle"
+	"encoding/json"
+	"io"
+	"net/http"
+	"os"
+	"strings"
+
+	service "{{ .BackendModulePath }}/internal/services/parceltool"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+)
+
+const CapabilityID = "com.powerx.plugins.base.parcel.volume"
+const RelativePath = "/internal/tools/parcel-volumes"
+
+// Register 仅供 Core 已授权工具调用，不能靠 public-route 标记或浏览器 JWT 代替内部通道凭据。
+func Register(group *gin.RouterGroup) { group.POST(RelativePath, Handle) }
+func Handle(c *gin.Context) {
+	expected := os.Getenv("POWERX_INTERNAL_TOKEN")
+	if expected == "" || subtle.ConstantTimeCompare([]byte(expected), []byte(c.GetHeader("X-PowerX-Internal-Token"))) != 1 {
+		c.JSON(http.StatusUnauthorized, gin.H{"code": "parcel.transport_denied"})
+		return
+	}
+	for _, header := range []string{"X-PowerX-Tool-Tenant-UUID", "X-PowerX-Tool-Subject-UUID"} {
+		id, err := uuid.Parse(c.GetHeader(header))
+		if err != nil || id == uuid.Nil {
+			c.JSON(http.StatusForbidden, gin.H{"code": "parcel.subject_denied"})
+			return
+		}
+	}
+	if c.GetHeader("X-PowerX-Tool-Capability") != CapabilityID {
+		c.JSON(http.StatusForbidden, gin.H{"code": "parcel.capability_denied"})
+		return
+	}
+	raw, err := io.ReadAll(io.LimitReader(c.Request.Body, (1<<20)+1))
+	if err != nil || len(raw) > 1<<20 {
+		c.JSON(http.StatusBadRequest, gin.H{"code": "parcel.input_invalid"})
+		return
+	}
+	// 重复字段不能在标准 map 解码时被覆盖。仅允许固定的三个数值字段。
+	decoder := json.NewDecoder(strings.NewReader(string(raw)))
+	token, err := decoder.Token()
+	if err != nil || token != json.Delim('{') {
+		c.JSON(http.StatusBadRequest, gin.H{"code": "parcel.input_invalid"})
+		return
+	}
+	values := map[string]json.RawMessage{}
+	for decoder.More() {
+		keyToken, e := decoder.Token()
+		key, ok := keyToken.(string)
+		if e != nil || !ok || values[key] != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"code": "parcel.input_invalid"})
+			return
+		}
+		var value json.RawMessage
+		if decoder.Decode(&value) != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"code": "parcel.input_invalid"})
+			return
+		}
+		values[key] = value
+	}
+	if _, err := decoder.Token(); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": "parcel.input_invalid"})
+		return
+	}
+	if _, err := decoder.Token(); err != io.EOF {
+		c.JSON(http.StatusBadRequest, gin.H{"code": "parcel.input_invalid"})
+		return
+	}
+	volume, err := service.Volume(values)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": "parcel.input_invalid"})
+		return
+	}
+	_ = json.NewEncoder(os.Stdout).Encode(map[string]any{"event": "parcel.volume.invoked", "trace_id": c.GetHeader("X-PowerX-Trace-ID")})
+	c.JSON(http.StatusOK, gin.H{"volume_cm3": volume})
+}

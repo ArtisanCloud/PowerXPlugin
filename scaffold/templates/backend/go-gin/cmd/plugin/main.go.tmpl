@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/hostapi"
 	knowledgeprovider "{{ .BackendModulePath }}/internal/services/admin/knowledge"
+	Regression "{{ .BackendModulePath }}/internal/services/admin/regression"
 	"{{ .BackendModulePath }}/internal/services/runtimeexample"
 	"github.com/gin-gonic/gin"
 	"net"
@@ -20,6 +21,7 @@ import (
 	"time"
 
 	fwbootstrap "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
+	fwiamcontracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
 	fwiamdelegated "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/delegated"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
 	fwrouter "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/router"
@@ -140,10 +142,6 @@ func main() {
 	rootCtx := context.Background()
 	ctx, cancel := context.WithCancel(rootCtx)
 	defer cancel()
-
-	if os.Getenv("CONFIG_PATH") == "" && os.Getenv("POWERX_PLUGIN_CONFIG_DIR") != "" {
-		os.Setenv("CONFIG_PATH", os.Getenv("POWERX_PLUGIN_CONFIG_DIR"))
-	}
 
 	// 加载配置
 	cfg, err := config.Load()
@@ -384,6 +382,10 @@ func main() {
 	defer closeWSHub()
 
 	manifestPath := security.DefaultManifestPath()
+	notificationPresentations, err := manifest.LoadNotificationPresentations(manifestPath)
+	if err != nil {
+		logger.WithError(err).Fatal("NOTIFICATION_PRESENTATION_MANIFEST_INVALID")
+	}
 	eventsData, err := os.ReadFile(filepath.Join(filepath.Dir(manifestPath), "plugin.d", "events.yaml"))
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to load realtime event descriptors")
@@ -448,7 +450,7 @@ func main() {
 		if err := fwcapability.RequireGrants(ctx, capabilityRegistry, requiredHostCapabilities); err != nil {
 			logger.WithError(err).Fatal("FRAMEWORK_REQUIRED_CAPABILITY_PREFLIGHT_FAILED")
 		}
-		mediaRuntime, err = powerxmedia.NewHostClientWithTokenProvider(powerxmedia.HostClientConfig{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL)}, powerxmedia.HostTokenProviderFunc(stsTokens.TokenFunc()), nil)
+		mediaRuntime, err = powerxmedia.NewHostClientWithTokenProvider(powerxmedia.HostClientConfig{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL), APIPrefix: cfg.Gateway.APIPrefix}, powerxmedia.HostTokenProviderFunc(stsTokens.TokenFunc()), nil)
 		if err != nil {
 			logger.WithError(err).Fatal("Failed to initialize delegated Media Host client")
 		}
@@ -461,7 +463,7 @@ func main() {
 			logger.WithError(err).Fatal("Failed to initialize delegated Knowledge QA bridge client")
 		}
 		knowledgeDirectory = knowledgeQABridge
-		notificationsRuntime, err = powerxnotifications.NewClientWithTokenProvider(powerxnotifications.Config{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL)}, powerxnotifications.TokenProviderFunc(stsTokens.TokenFunc()), nil)
+		notificationsRuntime, err = powerxnotifications.NewClientWithTokenProvider(powerxnotifications.Config{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL), APIPrefix: cfg.Gateway.APIPrefix, PluginID: app.PluginID}, powerxnotifications.TokenProviderFunc(stsTokens.TokenFunc()), nil)
 		if err != nil {
 			logger.WithError(err).Fatal("Failed to initialize delegated Notifications client")
 		}
@@ -496,6 +498,12 @@ func main() {
 			logger.WithError(err).Fatal("Failed to initialize delegated Customer membership resolver")
 		}
 	} else if cfg != nil && cfg.Gateway != nil && strings.TrimSpace(cfg.Gateway.BaseURL) != "" && strings.EqualFold(strings.TrimSpace(cfg.Gateway.AuthScheme), "apikey") && strings.TrimSpace(cfg.Gateway.APIKey) != "" {
+		// A read-only Core catalog client for the explicit Host simulation source.
+		// AIInvocation below still binds the local adapter for business execution.
+		aiRuntime, err = powerxai.NewClient(powerxai.Config{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL), AuthScheme: "apikey", APIKey: strings.TrimSpace(cfg.Gateway.APIKey), Timeout: cfg.Gateway.Timeout}, nil)
+		if err != nil {
+			logger.WithError(err).Fatal("AI_CATALOG_CLIENT_INITIALIZATION_FAILED")
+		}
 		capabilityRegistry, err = powerxcapability.NewClient(powerxcapability.Config{
 			BaseURL:    strings.TrimSpace(cfg.Gateway.BaseURL),
 			AuthScheme: "apikey",
@@ -622,6 +630,16 @@ func main() {
 		logger.WithError(err).Fatal("Failed to initialize local Notifications publisher")
 	}
 	notificationDeliveryRuntime, err = fwnotifications.NewRuntime(providerResolver.Mode(), localNotificationPublisher, notificationsRuntime)
+	if cfg.NotificationChannel() == "core_host" {
+		if providerResolver.Mode() != fwprovider.ModeLocal || cfg.Gateway == nil || !strings.EqualFold(cfg.Gateway.AuthScheme, "apikey") {
+			logger.Fatal("NOTIFICATION_CORE_HOST_CONFIGURATION_INVALID")
+		}
+		notificationsRuntime, err = powerxnotifications.NewClient(powerxnotifications.Config{BaseURL: cfg.Gateway.BaseURL, APIPrefix: cfg.Gateway.APIPrefix, AuthScheme: "apikey", APIKey: cfg.Gateway.APIKey, PluginID: app.PluginID, Timeout: cfg.Gateway.Timeout}, nil)
+		if err != nil {
+			logger.WithError(err).Fatal("NOTIFICATION_CORE_HOST_CONFIGURATION_INVALID")
+		}
+		notificationDeliveryRuntime, err = fwnotifications.NewCoreHostRuntime(notificationsRuntime)
+	}
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to initialize Notifications runtime")
 	}
@@ -662,7 +680,7 @@ func main() {
 	}
 	var localMedia *runtimeexample.LocalMedia
 	var localMediaService fwmedia.Service
-	if providerResolver.Mode() == fwprovider.ModeLocal {
+	if providerResolver.Mode() == fwprovider.ModeLocal && cfg.MediaChannel() != "core_host" {
 		host, port, splitErr := net.SplitHostPort(cfg.Server.BindAddr)
 		if splitErr != nil {
 			logger.WithError(splitErr).Fatal("MEDIA_LOCAL_BIND_ADDR_INVALID")
@@ -674,6 +692,16 @@ func main() {
 		localMediaService = localMedia
 	}
 	mediaCatalogRuntime, err = fwmedia.NewRuntime(providerResolver.Mode(), localMediaService, mediaRuntime)
+	if cfg.MediaChannel() == "core_host" {
+		if providerResolver.Mode() != fwprovider.ModeLocal {
+			logger.Fatal("MEDIA_CORE_HOST_CONFIGURATION_INVALID")
+		}
+		mediaRuntime, err = powerxmedia.NewHostClientWithAPIKey(powerxmedia.HostClientConfig{BaseURL: cfg.Gateway.BaseURL, APIPrefix: cfg.Gateway.APIPrefix, Timeout: cfg.Gateway.Timeout}, cfg.Gateway.APIKey, nil)
+		if err != nil {
+			logger.WithError(err).Fatal("MEDIA_CORE_HOST_CONFIGURATION_INVALID")
+		}
+		mediaCatalogRuntime, err = fwmedia.NewCoreHostRuntime(mediaRuntime)
+	}
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to initialize Media catalog runtime")
 	}
@@ -797,6 +825,7 @@ func main() {
 		bridgeEmitter = security.NewPermissionedEmitter(bridgeEmitter, perms, eventLogger)
 	}
 	deps := &app.Deps{
+		NotificationPresentations:      notificationPresentations,
 		DB:                             queryDB,
 		Ctx:                            rootCtx,
 		PowerXClient:                   pxc,
@@ -906,8 +935,33 @@ func main() {
 	if err := pluginbootstrap.ValidateIAMBinding(deps); err != nil {
 		logger.WithError(err).Fatal("Framework IAM registry binding is incomplete")
 	}
+	requiredIAMCapabilities, err := capabilities.LoadRequiredHostCapabilities(manifestPath)
+	if err != nil {
+		logger.WithError(err).Fatal("FRAMEWORK_CAPABILITY_REQUIREMENTS_INVALID")
+	}
+	for _, capabilityID := range requiredIAMCapabilities {
+		if capabilityID == fwiamcontracts.AuthorizationBaselineCapability {
+			deps.IAMAuthorizationBaselineEnabled = true
+		}
+	}
+	if err := pluginbootstrap.ValidateAuthorizationBaselineFeature(ctx, deps, deps.IAMAuthorizationBaselineEnabled, requiredIAMCapabilities, capabilityRegistry); err != nil {
+		logger.WithError(err).Fatal("IAM_BASELINE_STARTUP_FAILED")
+	}
 	// All identity services must be bound before handlers capture dependencies.
 	r := pluginrouter.NewRouter(cfg, deps)
+	deps.Regression, err = Regression.NewService(ctx, deps)
+	if err != nil {
+		logger.WithError(err).Fatal("REGRESSION_STARTUP_FAILED")
+	}
+	if deps.Regression != nil {
+		defer func() {
+			stopCtx, stopCancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer stopCancel()
+			if err := deps.Regression.Close(stopCtx); err != nil {
+				logger.WithError(err).Error("REGRESSION_STOP_FAILED")
+			}
+		}()
+	}
 	engine := r.Setup()
 	if localMedia != nil {
 		engine.GET(runtimeexample.MediaTransferPath, gin.WrapH(http.HandlerFunc(localMedia.ServeTransfer)))
@@ -928,10 +982,12 @@ func main() {
 	})
 	registerWSRoute(fwApp, engine)
 
-	if err := manifest.Register(fwApp, manifestx.Plugin()); err != nil {
+	registeredManifest := manifestx.Plugin()
+	registeredManifest.NotificationPresentations = notificationPresentations
+	if err := manifest.Register(fwApp, registeredManifest); err != nil {
 		logger.WithError(err).Fatal("Failed to register manifest")
 	}
-	registerHealthzRoute(fwApp, manifestx.Plugin())
+	registerHealthzRoute(fwApp, registeredManifest)
 	// 宿主模式下注册 WS Bus topic（standalone 不触发）
 	wsRegisterTopics, err := security.LoadEventFabricTopics(eventLogger)
 	if err != nil {
@@ -980,34 +1036,38 @@ func main() {
 		})
 	}
 
-	if integrationScheduler != nil {
-		safeGo("integration_scheduler", func() error {
-			integrationScheduler.Start(groupCtx)
-			<-groupCtx.Done()
-			stopCtx, cancelStop := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancelStop()
-			integrationScheduler.Stop(stopCtx)
-			return nil
-		})
-	}
+	if !dbpkg.BackgroundWorkersDisabled() {
+		if integrationScheduler != nil {
+			safeGo("integration_scheduler", func() error {
+				integrationScheduler.Start(groupCtx)
+				<-groupCtx.Done()
+				stopCtx, cancelStop := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancelStop()
+				integrationScheduler.Stop(stopCtx)
+				return nil
+			})
+		}
 
-	if syncJob != nil {
-		safeGo("marketplace_sync_job", func() error {
-			syncJob.Run(groupCtx)
-			return nil
-		})
-	}
-	if renewalJob != nil {
-		safeGo("license_renewal_job", func() error {
-			renewalJob.Run(groupCtx)
-			return nil
-		})
-	}
-	if taskBusRuntime.StartConsumer != nil {
-		safeGo("taskbus_consumer", func() error {
-			taskBusRuntime.StartConsumer(groupCtx)
-			return nil
-		})
+		if syncJob != nil {
+			safeGo("marketplace_sync_job", func() error {
+				syncJob.Run(groupCtx)
+				return nil
+			})
+		}
+		if renewalJob != nil {
+			safeGo("license_renewal_job", func() error {
+				renewalJob.Run(groupCtx)
+				return nil
+			})
+		}
+		if taskBusRuntime.StartConsumer != nil {
+			safeGo("taskbus_consumer", func() error {
+				taskBusRuntime.StartConsumer(groupCtx)
+				return nil
+			})
+		}
+	} else {
+		logger.WithField("read_only", dbpkg.IsReadOnly()).Info("RECOVERY_BACKGROUND_WORKERS_DISABLED")
 	}
 
 	// 等待中断信号

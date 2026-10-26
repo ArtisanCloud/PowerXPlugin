@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/gateway"
+	powerxai "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/ai"
 )
 
 const (
@@ -33,8 +34,8 @@ type Service interface {
 // CatalogService is available only from the delegated PowerX client. Local
 // mode intentionally uses the plugin-owned catalog configured at startup.
 type CatalogService interface {
-	CatalogProviders(context.Context, string, string) ([]CatalogProvider, error)
-	CatalogModels(context.Context, string, string, string, string) ([]string, error)
+	CatalogProviders(context.Context, string, string) (*powerxai.MediaProviderCatalog, error)
+	CatalogModels(context.Context, string, string, string, string) (*powerxai.MediaModelCatalog, error)
 }
 
 type Config struct {
@@ -52,4 +53,3 @@ type ProviderProfile map[string]any
 type ModelProfile map[string]any
 type RoutingConfig map[string]any
 type HealthStatus map[string]any
-type CatalogProvider map[string]any

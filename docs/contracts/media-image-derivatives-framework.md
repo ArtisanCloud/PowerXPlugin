@@ -1,5 +1,7 @@
 # Media 标准图片预览 Framework 对齐
 
+> 本文保留此前对齐记录。2026-10-22 的派生 v2、服务态 SSE、卡片 v2 及当前升级引用见 [本轮交付](media-thumbnail64-framework.md)。此前本地快照不作为本轮功能版本。
+
 Framework 消费 [Core Media 标准图片预览合同](../../../../PowerX/docs/contracts/media-image-derivatives.md) 与 [OpenAPI](../../../../PowerX/specs/001-media-storage/contracts/image-derivatives.openapi.yaml)。Core 负责原图复用、标准图生成和统一 TaskBus 生命周期；Framework 负责响应类型与映射；插件负责业务关联、预览读取与页面状态展示。
 
 ## 已对齐的响应

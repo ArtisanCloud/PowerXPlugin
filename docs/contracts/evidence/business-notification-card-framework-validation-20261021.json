@@ -1,0 +1,197 @@
+{
+  "contract": "business_notification_card.v1",
+  "validated_at": "2026-10-21T07:28:10.527405+00:00",
+  "scope": "framework_source_and_controlled_contract_validation",
+  "framework": {
+    "branch": "025-framework-business-regression",
+    "base_commit": "f123a2310568bd0e3625e825b4fa419b9cfb4f6c",
+    "changes_committed": false,
+    "fix_commit": null,
+    "includes_preexisting_ai_media_changes": true
+  },
+  "core": {
+    "source_repository": "ArtisanCloud/PowerX",
+    "source_commit": "0be9945cf7544bf18d0ed58be1043a313bba9de8",
+    "source_worktree_uncommitted": true,
+    "snapshot_date": "2026-10-21",
+    "sha256": {
+      "business-notification-card.md": "04a9b3637909a6bea117d60ebf1c3284193e897ecdcfc4de852b86f3f92e5ba2",
+      "business-notification-card.openapi.yaml": "cfcedd3139058ff45c6a8d3b9cea09dec7b7953674cbad42248b856e80394a51",
+      "notification-member-delivery.openapi.yaml": "0ea2f9cdd6c7f6c19156a0cbf6718b533af7d5c197380a08891f41c5f3083bfa",
+      "fixtures/business-notification-card.v1.json": "b2368121349f94d1cf31788a183ccdbe27fa26f40dcd6cb9474fdede101273d8"
+    }
+  },
+  "matrix": {
+    "go": "implemented_controlled_tests_passed",
+    "manifest_cli_skeleton_templates": "implemented_package_and_generated_consumer_passed",
+    "nuxt": "types_and_revision_merge_implemented_tests_passed",
+    "dotnet": "not_implemented_deferred"
+  },
+  "checks": {
+    "go": {
+      "result": "passed",
+      "tested_packages": 13,
+      "passed_cases_including_subtests": 224,
+      "skipped_optional_gates": [
+        "TestIAMBaselineGeneratedPlugin",
+        "TestGeneratedBackendBuild",
+        "TestRegressionGeneratedPlugins"
+      ],
+      "packages": [
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest",
+        "github.com/powerx-plugin/cli/internal/manifest",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/notifications",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/hostcontract",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/notifications",
+        "github.com/powerx-plugin/cli/internal/package",
+        "github.com/powerx-plugin/cli/internal/templates",
+        "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/cmd/plugin",
+        "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/cmd/manifestcheck",
+        "github.com/powerx-plugin/cli/cmd",
+        "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/notifications",
+        "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/host_contract",
+        "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+      ]
+    },
+    "race": {
+      "result": "passed",
+      "packages": 6
+    },
+    "vet": {
+      "result": "passed",
+      "diagnostics": 0
+    },
+    "shared_contract_snapshot": {
+      "result": "passed",
+      "command": "node scripts/contracts/validate-business-notification-card.mjs"
+    },
+    "template_sync": {
+      "result": "passed",
+      "command": "node scripts/sync-templates.mjs --check"
+    },
+    "repository_contracts": {
+      "result": "passed",
+      "command": "npm test"
+    },
+    "nuxt": {
+      "result": "passed",
+      "files": [
+        "framework-notifications.spec.ts",
+        "framework-ai-media.spec.ts"
+      ],
+      "passed_tests": 8,
+      "notification_specific_tests": 2
+    },
+    "typescript": {
+      "result": "passed",
+      "scope": "framework-client/notifications.ts",
+      "options": [
+        "strict",
+        "noEmit",
+        "ES2022",
+        "bundler"
+      ]
+    },
+    "packaged_manifest": {
+      "result": "passed",
+      "test": "TestBuilderBuildSuccess",
+      "assertion": "decompress final tar.gz and validate exact sample_track and bulk_order declarations"
+    },
+    "generated_consumer": {
+      "path": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-business-card-20261021-f5edb08989906979/generated-consumer",
+      "go_work": "off",
+      "local_replace": false,
+      "two_bindings_retained": true,
+      "manifest_validation": "passed",
+      "backend_build": "passed",
+      "nuxt_tarball_contract_types": "passed"
+    },
+    "credential_channels": {
+      "api_key": "controlled ApiKey HTTP transport passed",
+      "sts": "controlled Bearer TokenProvider transport passed; installed bootstrap uses existing real exchange provider",
+      "live_core_credentials_tested": false
+    },
+    "cases": [
+      "create_metadata_navigation_and_versions",
+      "original_uuid_invalidation",
+      "stale_and_duplicate_changed_false_with_newer_current_watermark",
+      "stable_retry_version_and_reason",
+      "access_changed_passthrough",
+      "legacy_binding_reference_passthrough",
+      "binding_conflict_409_no_recreate",
+      "versioned_receipt_exact_echo",
+      "single_batch_409_no_refresh_or_split_or_credential_switch",
+      "incomplete_response_rejected",
+      "upstream_http_code_reason_details_trace_request_preserved",
+      "local_card_unavailable_no_core_uuid_fabrication",
+      "manifest_path_traversal_encoding_placeholder_validation",
+      "no_protocol_fallback"
+    ]
+  },
+  "artifacts": {
+    "bundle": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-business-card-20261021-f5edb08989906979",
+    "source_worktree_sha256": "f5edb08989906979c4a365cf5ac46d2f5874dbc5114cb048375da45ccf5beeea",
+    "go_module": "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go",
+    "go_sdk_version": "v0.0.26-dev.card.f5edb08989906979",
+    "go_proxy": "file:///private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-business-card-20261021-f5edb08989906979/go-proxy",
+    "nuxt_client_version": "0.0.14-dev.card.b47c4d7571973c64",
+    "generator_version": "v0.0.0-business-card.f5edb08989906979",
+    "published": false,
+    "base_commit": "f123a2310568bd0e3625e825b4fa419b9cfb4f6c",
+    "changes_committed": false,
+    "nuxt_client_tarball": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-business-card-20261021-f5edb08989906979/artisan-cloud-plugin-framework-client-0.0.14-dev.card.b47c4d7571973c64.tgz",
+    "nuxt_client_ref": "file:/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-business-card-20261021-f5edb08989906979/artisan-cloud-plugin-framework-client-0.0.14-dev.card.b47c4d7571973c64.tgz",
+    "generator_binary": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-business-card-20261021-f5edb08989906979/px-plugin",
+    "artifact_sha256": {
+      "px-plugin": "3eeedbd08a2a2960d2937a9c8672017c497ad7b93821e6f59ff528d1d721ec0e",
+      "artisan-cloud-plugin-framework-client-0.0.14-dev.card.b47c4d7571973c64.tgz": "789fc2c170b9fb1b8cc2fbecb53c86ea27e8ecca1209aff920bc5c4c7ff6ea81",
+      "go-proxy/github.com/!artisan!cloud/!power!x!plugin/framework/backend/go/@v/v0.0.26-dev.card.f5edb08989906979.zip": "7309b45214efe98a7e84ad65fc3de769bfe153d6ff02cca23bb07159a2987e11"
+    },
+    "generated_consumer": {
+      "path": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-business-card-20261021-f5edb08989906979/generated-consumer",
+      "go_work": "off",
+      "local_replace": false,
+      "two_bindings_retained": true,
+      "manifest_validation": "passed",
+      "backend_build": "passed",
+      "nuxt_tarball_contract_types": "passed"
+    }
+  },
+  "logs": {
+    "go-tests.jsonl": {
+      "path": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-business-card-20261021-f5edb08989906979/go-tests.jsonl",
+      "sha256": "a652d3d276c3aa3e509f2849ce702222b8f993d514647a208804827195f0828c"
+    },
+    "race.log": {
+      "path": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-business-card-20261021-f5edb08989906979/race.log",
+      "sha256": "72171af18c9764e1fe9e5402a3289caffbd023469ef162083835665719c702fe"
+    },
+    "vet.log": {
+      "path": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-business-card-20261021-f5edb08989906979/vet.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "root-checks.log": {
+      "path": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-business-card-20261021-f5edb08989906979/root-checks.log",
+      "sha256": "484ae8ca18b9b9f91618accfb0211397c250f12619ca0faee37cfaef17e7630f"
+    }
+  },
+  "not_claimed": [
+    "published_sdk_or_cli",
+    "committed_framework_fix",
+    "dotnet_completion",
+    "real_core_api_key_or_sts_grants",
+    "real_sts_exchange_in_this_validation",
+    "installed_ai_craft_delivery_and_ownership",
+    "business_content_or_image_permission_acceptance",
+    "core_bell_or_card_browser_acceptance"
+  ],
+  "remaining": [
+    "Core build containing uncommitted card implementation",
+    "publish and tenant registration and realtime service grants for both credentials",
+    "real owner migration replay and immutable binding conflicts",
+    "Core notification version and unread behavior and atomic receipt batch",
+    "current-user presentation and preview permissions plus AI Craft business reading cursor",
+    "commit and release SDK CLI and update generator default references"
+  ],
+  "runtime_services_started": false
+}

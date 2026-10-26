@@ -120,7 +120,7 @@ func TestLocalAIFailsClosed(t *testing.T) {
 	if _, e := s.LLMInvoke(context.Background(), in); e == nil {
 		t.Fatal("missing tenant")
 	}
-	if _, e := s.ImageInvoke(ctx, dto.ModalInvokeInput{ModelKey: "chat"}); e == nil {
+	if _, e := s.ImageInvoke(ctx, dto.MediaInvokeInput{ModelKey: "chat"}); e == nil {
 		t.Fatal("unsupported modality")
 	}
 	empty, _ := NewLocalAI(nil, nil)

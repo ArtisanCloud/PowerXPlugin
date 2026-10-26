@@ -57,6 +57,22 @@ for (const mapping of config.mappings) {
     onlyFiles: true,
   })
 
+  for (const target of mapping.targets || []) {
+    const targetRoot = path.resolve(rootDir, target.path)
+    const obsolete = mapping.prune?.length
+      ? fg.sync(mapping.prune, { cwd: targetRoot, dot: true, onlyFiles: true })
+      : []
+    for (const relative of obsolete) {
+      const outPath = path.join(targetRoot, relative)
+      if (checkMode) {
+        diffCount++
+        diffFiles.push(outPath)
+      } else {
+        fs.unlinkSync(outPath)
+      }
+    }
+  }
+
   for (const relative of files) {
     const srcPath = path.join(sourceRoot, relative)
     const isBinary = isBinaryAsset(relative, mapping.binaryExts)

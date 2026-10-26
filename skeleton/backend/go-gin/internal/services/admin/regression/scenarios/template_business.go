@@ -1,0 +1,654 @@
+package scenarios
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"sort"
+	"strings"
+	"time"
+
+	Regression "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/regression"
+	Contracts "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
+	Template "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/template"
+	Middleware "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
+	Templates "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/templates"
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
+
+const (
+	TemplateSearchUUID       = "22222222-2222-4222-8222-222222222224"
+	TemplatePaginationUUID   = "22222222-2222-4222-8222-222222222225"
+	TemplateDeleteUUID       = "22222222-2222-4222-8222-222222222226"
+	TemplateCloneUUID        = "22222222-2222-4222-8222-222222222227"
+	TemplatePartialCloneUUID = "22222222-2222-4222-8222-222222222228"
+	TemplateInvalidInputUUID = "22222222-2222-4222-8222-222222222229"
+	TemplateValidationUUID   = "22222222-2222-4222-8222-222222222230"
+)
+
+// Each factory is an independent business case, with its own input, evidence
+// and fixture ownership. Cases never consume another case's test resources.
+func TemplateScenarios() []Regression.ScenarioFactory {
+	return []Regression.ScenarioFactory{
+		func() Regression.Scenario { return &TemplateLifecycle{} },
+		func() Regression.Scenario { return &TemplateSearch{} },
+		func() Regression.Scenario { return &TemplatePagination{} },
+		func() Regression.Scenario { return &TemplateDeletion{} },
+		func() Regression.Scenario { return &TemplateClone{} },
+		func() Regression.Scenario { return &TemplatePartialClone{} },
+		func() Regression.Scenario { return &TemplateInvalidInput{} },
+		func() Regression.Scenario { return &TemplateValidation{} },
+	}
+}
+
+type templateScenario struct{}
+
+func (templateScenario) Preflight(_ context.Context, s *Regression.Scope) error {
+	_, err := dep(s)
+	return err
+}
+func (templateScenario) Prepare(context.Context, *Regression.Scope) error { return nil }
+func (templateScenario) Cleanup(ctx context.Context, s *Regression.Scope) error {
+	return (&TemplateLifecycle{}).Cleanup(ctx, s)
+}
+
+type templateInput struct {
+	Name           string `json:"name"`
+	Description    string `json:"description"`
+	Content        string `json:"content"`
+	UpdatedContent string `json:"updated_content"`
+}
+
+func businessDefinition(id, key string, assertions []string, steps []string, updated bool) Regression.CaseDefinition {
+	properties := map[string]any{
+		"name":        map[string]any{"type": "string", "minLength": 1, "maxLength": 24},
+		"description": map[string]any{"type": "string", "minLength": 1, "maxLength": 96},
+		"content":     map[string]any{"type": "string", "minLength": 1, "maxLength": 8000},
+	}
+	required := []string{"name", "description", "content"}
+	if updated {
+		properties["updated_content"] = map[string]any{"type": "string", "minLength": 1, "maxLength": 8000}
+		required = append(required, "updated_content")
+	}
+	if key == "validation" {
+		properties["content"] = map[string]any{"type": "string", "minLength": 10, "maxLength": 8000}
+	}
+	definition := Regression.CaseDefinition{
+		UUID: id, SuiteUUID: SuiteUUID, Key: "template." + key, Version: "v1",
+		TitleKey: "regression.scenarios." + key + ".title", DescriptionKey: "regression.scenarios." + key + ".description",
+		Tags: []string{"template", key}, SupportedProfileKinds: []string{"controlled"},
+		InputSchema:        Regression.JSON(map[string]any{"type": "object", "properties": properties, "required": required, "additionalProperties": false}),
+		ExecutionTimeoutMS: 30000, CleanupTimeoutMS: 10000, RequiredAssertionKeys: assertions,
+	}
+	for _, step := range steps {
+		boundary := "service"
+		if strings.HasPrefix(step, "reject") {
+			boundary = "http"
+		}
+		definition.Steps = append(definition.Steps, Regression.StepDefinition{
+			UUID: uuid.NewSHA1(uuid.MustParse(id), []byte(step)).String(), Key: step,
+			TitleKey: "regression.steps." + step, Phase: "execute", Boundary: boundary,
+		})
+	}
+	return definition
+}
+
+func businessScope(ctx context.Context, s *Regression.Scope) (context.Context, *Dependencies, templateInput, error) {
+	d, err := dep(s)
+	var input templateInput
+	if err != nil {
+		return ctx, nil, input, err
+	}
+	if json.Unmarshal(s.Input, &input) != nil {
+		return ctx, nil, input, Regression.NewError(Regression.InvalidRequest)
+	}
+	if strings.TrimSpace(input.Name) == "" || strings.TrimSpace(input.Description) == "" || strings.TrimSpace(input.Content) == "" {
+		return ctx, nil, input, Regression.NewError(Regression.InvalidRequest)
+	}
+	return Middleware.ContextWithTenantUUID(ctx, s.Actor.TenantUUID), d, input, nil
+}
+
+func namespace(s *Regression.Scope) string {
+	// Keep enough UUID entropy for isolated fixtures while reserving room for
+	// prefixes and multibyte business names within the real HTTP/model limits.
+	return "pxr" + strings.ReplaceAll(s.CaseExecutionUUID, "-", "")[:24]
+}
+
+func businessStep(ctx context.Context, s *Regression.Scope, key string, fn func(context.Context) error) error {
+	for _, step := range s.Definition.Steps {
+		if step.Key == key {
+			return s.Recorder.Step(ctx, step.UUID, fn)
+		}
+	}
+	return Regression.NewError(Regression.InvalidRequest)
+}
+
+func check(ctx context.Context, s *Regression.Scope, key string, expected, actual any, source, resource string) error {
+	return checkObserved(ctx, s, key, expected, actual, source, resource, actual)
+}
+
+// User-facing differences describe business facts. UUID collections stay in
+// technical evidence, rather than being rendered as the default explanation.
+func checkObserved(ctx context.Context, s *Regression.Scope, key string, expected, actual any, source, resource string, observed any) error {
+	return s.Recorder.Assert(ctx, "template."+key, "regression.assertions."+key, "passed", expected, actual, proof(source, resource, observed))
+}
+
+// Registration happens immediately after every write. If recording fails, clean
+// up all resources which have not yet been registered before returning.
+func registerTemplates(ctx context.Context, s *Regression.Scope, d *Dependencies, ids []string) error {
+	resources := make([]templateReference, 0, len(ids))
+	for _, id := range ids {
+		resources = append(resources, templateReference{id: id, role: "regression.resourceRoles.fixture"})
+	}
+	return registerTemplateReferences(ctx, s, d, resources)
+}
+
+type templateReference struct{ id, role, parent string }
+
+func registerTemplateReferences(ctx context.Context, s *Regression.Scope, d *Dependencies, resources []templateReference) error {
+	for index, reference := range resources {
+		value, err := d.Templates.GetByUUID(ctx, reference.id)
+		if err == nil {
+			err = s.Recorder.Register(ctx, Regression.FixtureResource{ResourceType: "template", ResourceUUID: reference.id, DisplayName: value.Name, RoleKey: reference.role, ParentResourceUUID: reference.parent, CleanupKey: "template.delete", CleanupParameters: Regression.JSON(map[string]any{})})
+		}
+		if err != nil {
+			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+			defer cancel()
+			cleanupFailed := false
+			for _, remaining := range resources[index:] {
+				if cleanupErr := d.Templates.Delete(cleanupCtx, remaining.id); cleanupErr != nil && !errors.Is(cleanupErr, gorm.ErrRecordNotFound) {
+					cleanupFailed = true
+				}
+			}
+			if cleanupFailed {
+				return Regression.NewError(Regression.CleanupFailed)
+			}
+			return err
+		}
+	}
+	return nil
+}
+
+func createTemplate(ctx context.Context, s *Regression.Scope, d *Dependencies, name, description, content string) (*Template.Template, error) {
+	return createTemplateWithRole(ctx, s, d, name, description, content, "regression.resourceRoles.fixture")
+}
+
+func createTemplateWithRole(ctx context.Context, s *Regression.Scope, d *Dependencies, name, description, content, role string) (*Template.Template, error) {
+	tpl, err := d.Templates.Create(ctx, name, description, content)
+	if err != nil {
+		return nil, err
+	}
+	if err = registerTemplateReferences(ctx, s, d, []templateReference{{id: tpl.UUID, role: role}}); err != nil {
+		return nil, err
+	}
+	return tpl, nil
+}
+
+func templateUUIDs(items []*Template.Template) []string {
+	ids := make([]string, 0, len(items))
+	for _, item := range items {
+		ids = append(ids, item.UUID)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+type TemplateSearch struct{ templateScenario }
+
+func (*TemplateSearch) Definition() Regression.CaseDefinition {
+	return businessDefinition(TemplateSearchUUID, "search", []string{"template.searchName", "template.searchDescription", "template.searchCase", "template.searchAbsent"}, []string{"seedSearch", "search"}, false)
+}
+func (*TemplateSearch) Execute(ctx context.Context, s *Regression.Scope) error {
+	ctx, d, input, err := businessScope(ctx, s)
+	if err != nil {
+		return err
+	}
+	token := namespace(s)
+	var fixtures []*Template.Template
+	if err = businessStep(ctx, s, "seedSearch", func(ctx context.Context) error {
+		values := [][2]string{{input.Name + " " + token + "name", input.Description}, {input.Name + " " + token + "other", input.Description + " " + token + "description"}, {input.Name + " " + token + "unrelated", input.Description}}
+		for _, value := range values {
+			tpl, e := createTemplate(ctx, s, d, value[0], value[1], input.Content)
+			if e != nil {
+				return e
+			}
+			fixtures = append(fixtures, tpl)
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	return businessStep(ctx, s, "search", func(ctx context.Context) error {
+		queries := []struct {
+			key, query string
+			ids        []string
+		}{
+			{"searchName", token + "name", []string{fixtures[0].UUID}},
+			{"searchDescription", token + "description", []string{fixtures[1].UUID}},
+			{"searchCase", strings.ToUpper(token + "name"), []string{fixtures[0].UUID}},
+			{"searchAbsent", token + "absent", []string{}},
+		}
+		for _, query := range queries {
+			page, e := d.Templates.List(ctx, query.query, 1, 20)
+			if e != nil {
+				return e
+			}
+			if e = checkObserved(ctx, s, query.key, map[string]any{"total": len(query.ids), "matching_templates": true}, map[string]any{"total": page.Total, "matching_templates": Regression.Equal(query.ids, templateUUIDs(page.List))}, "template.list", "", page); e != nil {
+				return e
+			}
+		}
+		return nil
+	})
+}
+
+type TemplatePagination struct{ templateScenario }
+
+func (*TemplatePagination) Definition() Regression.CaseDefinition {
+	return businessDefinition(TemplatePaginationUUID, "pagination", []string{"template.pagination", "template.pageOverflow"}, []string{"seedPagination", "paginate"}, false)
+}
+func (*TemplatePagination) Execute(ctx context.Context, s *Regression.Scope) error {
+	ctx, d, input, err := businessScope(ctx, s)
+	if err != nil {
+		return err
+	}
+	fixtures := []*Template.Template{}
+	if err = businessStep(ctx, s, "seedPagination", func(ctx context.Context) error {
+		for i := 0; i < 5; i++ {
+			tpl, e := createTemplate(ctx, s, d, fmt.Sprintf("%s %s %d", input.Name, namespace(s), i+1), input.Description, input.Content)
+			if e != nil {
+				return e
+			}
+			fixtures = append(fixtures, tpl)
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	return businessStep(ctx, s, "paginate", func(ctx context.Context) error {
+		counts, totals := []int{}, []int64{}
+		collected := []*Template.Template{}
+		for index := 1; index <= 3; index++ {
+			page, e := d.Templates.List(ctx, namespace(s), index, 2)
+			if e != nil {
+				return e
+			}
+			counts = append(counts, len(page.List))
+			totals = append(totals, page.Total)
+			collected = append(collected, page.List...)
+		}
+		if e := checkObserved(ctx, s, "pagination", map[string]any{"counts": []int{2, 2, 1}, "totals": []int64{5, 5, 5}, "complete_without_duplicates": true}, map[string]any{"counts": counts, "totals": totals, "complete_without_duplicates": Regression.Equal(templateUUIDs(fixtures), templateUUIDs(collected))}, "template.list", "", collected); e != nil {
+			return e
+		}
+		page, e := d.Templates.List(ctx, namespace(s), 4, 2)
+		if e != nil {
+			return e
+		}
+		return check(ctx, s, "pageOverflow", map[string]any{"total": 5, "count": 0}, map[string]any{"total": page.Total, "count": len(page.List)}, "template.list", "")
+	})
+}
+
+type TemplateDeletion struct{ templateScenario }
+
+func (*TemplateDeletion) Definition() Regression.CaseDefinition {
+	return businessDefinition(TemplateDeleteUUID, "deletion", []string{"template.deletedRead", "template.deletedList", "template.survivor"}, []string{"seedDeletion", "deleteTemplate", "verifyDeletion"}, false)
+}
+func (*TemplateDeletion) Execute(ctx context.Context, s *Regression.Scope) error {
+	ctx, d, input, err := businessScope(ctx, s)
+	if err != nil {
+		return err
+	}
+	fixtures := []*Template.Template{}
+	if err = businessStep(ctx, s, "seedDeletion", func(ctx context.Context) error {
+		for i := 0; i < 2; i++ {
+			tpl, e := createTemplate(ctx, s, d, fmt.Sprintf("%s %s %d", input.Name, namespace(s), i+1), input.Description, input.Content)
+			if e != nil {
+				return e
+			}
+			fixtures = append(fixtures, tpl)
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	if err = businessStep(ctx, s, "deleteTemplate", func(ctx context.Context) error { return d.Templates.Delete(ctx, fixtures[0].UUID) }); err != nil {
+		return err
+	}
+	return businessStep(ctx, s, "verifyDeletion", func(ctx context.Context) error {
+		_, e := d.Templates.GetByUUID(ctx, fixtures[0].UUID)
+		if e = check(ctx, s, "deletedRead", true, errors.Is(e, gorm.ErrRecordNotFound), "template.read", fixtures[0].UUID); e != nil {
+			return e
+		}
+		page, e := d.Templates.List(ctx, namespace(s), 1, 20)
+		if e != nil {
+			return e
+		}
+		if e = checkObserved(ctx, s, "deletedList", map[string]any{"count": 1, "only_control_template": true}, map[string]any{"count": len(page.List), "only_control_template": Regression.Equal([]string{fixtures[1].UUID}, templateUUIDs(page.List))}, "template.list", "", page); e != nil {
+			return e
+		}
+		other, e := d.Templates.GetByUUID(ctx, fixtures[1].UUID)
+		if e != nil {
+			return e
+		}
+		return check(ctx, s, "survivor", input.Content, other.Content, "template.read", other.UUID)
+	})
+}
+
+type TemplateClone struct{ templateScenario }
+
+func (*TemplateClone) Definition() Regression.CaseDefinition {
+	return businessDefinition(TemplateCloneUUID, "clone", []string{"template.cloneCount", "template.cloneContents", "template.cloneIndependent"}, []string{"seedClone", "cloneTemplates", "verifyClones"}, true)
+}
+func (*TemplateClone) Execute(ctx context.Context, s *Regression.Scope) error {
+	ctx, d, input, err := businessScope(ctx, s)
+	if err != nil {
+		return err
+	}
+	sources := []*Template.Template{}
+	if err = businessStep(ctx, s, "seedClone", func(ctx context.Context) error {
+		for index, content := range []string{input.Content, input.Content + "\n" + input.UpdatedContent} {
+			tpl, e := createTemplateWithRole(ctx, s, d, fmt.Sprintf("%s %s %d", input.Name, namespace(s), index+1), input.Description, content, "regression.resourceRoles.source")
+			if e != nil {
+				return e
+			}
+			sources = append(sources, tpl)
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	var result *Templates.BatchCloneResult
+	if err = businessStep(ctx, s, "cloneTemplates", func(ctx context.Context) error {
+		var e error
+		result, e = d.Templates.BatchClone(ctx, []string{sources[0].UUID, sources[1].UUID}, 2, Templates.BatchCloneOptions{NamePrefix: input.Name, DescriptionPrefix: input.Description})
+		if e != nil {
+			return e
+		}
+		references := []templateReference{}
+		for index, id := range result.CreatedUUIDs {
+			parent := ""
+			if index/2 < len(sources) {
+				parent = sources[index/2].UUID
+			}
+			references = append(references, templateReference{id: id, role: "regression.resourceRoles.copy", parent: parent})
+		}
+		if e = registerTemplateReferences(ctx, s, d, references); e != nil {
+			return e
+		}
+		unique := map[string]bool{}
+		for _, id := range result.CreatedUUIDs {
+			unique[id] = Regression.ValidUUID(id) && id != sources[0].UUID && id != sources[1].UUID
+		}
+		valid := len(unique) == 4
+		for _, value := range unique {
+			valid = valid && value
+		}
+		return check(ctx, s, "cloneCount", map[string]any{"count": 4, "failed": 0, "independent_uuids": true}, map[string]any{"count": len(result.CreatedUUIDs), "failed": len(result.Failed), "independent_uuids": valid}, "template.batch_clone", "")
+	}); err != nil {
+		return err
+	}
+	return businessStep(ctx, s, "verifyClones", func(ctx context.Context) error {
+		actual, expected := []map[string]any{}, []map[string]any{}
+		for index, id := range result.CreatedUUIDs {
+			clone, e := d.Templates.GetByUUID(ctx, id)
+			if e != nil {
+				return e
+			}
+			source := sources[index/2]
+			expected = append(expected, map[string]any{"name": fmt.Sprintf("%s %s #%d", input.Name, source.Name, index%2+1), "description": input.Description + " " + source.Description, "content": source.Content, "status": Templates.TemplateStatusDraft, "review_status": Templates.TemplateReviewPending})
+			actual = append(actual, map[string]any{"name": clone.Name, "description": clone.Description, "content": clone.Content, "status": clone.Status, "review_status": clone.ReviewStatus})
+		}
+		if e := check(ctx, s, "cloneContents", expected, actual, "template.read", ""); e != nil {
+			return e
+		}
+		clone, e := d.Templates.GetByUUID(ctx, result.CreatedUUIDs[0])
+		if e != nil {
+			return e
+		}
+		if _, e = d.Templates.Update(ctx, clone.UUID, clone.Name, clone.Description, input.UpdatedContent); e != nil {
+			return e
+		}
+		observed, wanted := []map[string]string{}, []map[string]string{}
+		for _, source := range sources {
+			wanted = append(wanted, map[string]string{"name": source.Name, "content": source.Content})
+			value, e := d.Templates.GetByUUID(ctx, source.UUID)
+			if e != nil {
+				return e
+			}
+			observed = append(observed, map[string]string{"name": value.Name, "content": value.Content})
+		}
+		for index, id := range result.CreatedUUIDs {
+			content := sources[index/2].Content
+			if index == 0 {
+				content = input.UpdatedContent
+			}
+			wanted = append(wanted, map[string]string{"name": expected[index]["name"].(string), "content": content})
+			value, e := d.Templates.GetByUUID(ctx, id)
+			if e != nil {
+				return e
+			}
+			observed = append(observed, map[string]string{"name": value.Name, "content": value.Content})
+		}
+		return check(ctx, s, "cloneIndependent", wanted, observed, "template.read", clone.UUID)
+	})
+}
+
+type TemplatePartialClone struct{ templateScenario }
+
+func (*TemplatePartialClone) Definition() Regression.CaseDefinition {
+	return businessDefinition(TemplatePartialCloneUUID, "partialClone", []string{"template.partialClone", "template.partialReadback"}, []string{"seedClone", "partialClone", "verifyPartial"}, false)
+}
+func (*TemplatePartialClone) Execute(ctx context.Context, s *Regression.Scope) error {
+	ctx, d, input, err := businessScope(ctx, s)
+	if err != nil {
+		return err
+	}
+	var source *Template.Template
+	if err = businessStep(ctx, s, "seedClone", func(ctx context.Context) error {
+		var e error
+		source, e = createTemplateWithRole(ctx, s, d, input.Name+" "+namespace(s), input.Description, input.Content, "regression.resourceRoles.source")
+		return e
+	}); err != nil {
+		return err
+	}
+	missing := uuid.NewString()
+	var result *Templates.BatchCloneResult
+	if err = businessStep(ctx, s, "partialClone", func(ctx context.Context) error {
+		var e error
+		result, e = d.Templates.BatchClone(ctx, []string{source.UUID, missing}, 1, Templates.BatchCloneOptions{NamePrefix: input.Name})
+		if e != nil {
+			return e
+		}
+		references := []templateReference{}
+		for _, id := range result.CreatedUUIDs {
+			references = append(references, templateReference{id: id, role: "regression.resourceRoles.copy", parent: source.UUID})
+		}
+		if e = registerTemplateReferences(ctx, s, d, references); e != nil {
+			return e
+		}
+		failed := []string{}
+		for _, failure := range result.Failed {
+			failed = append(failed, failure.SourceUUID)
+		}
+		return checkObserved(ctx, s, "partialClone", map[string]any{"created": 1, "failed": 1, "only_missing_source_failed": true}, map[string]any{"created": len(result.CreatedUUIDs), "failed": len(failed), "only_missing_source_failed": Regression.Equal([]string{missing}, failed)}, "template.batch_clone", source.UUID, result)
+	}); err != nil {
+		return err
+	}
+	return businessStep(ctx, s, "verifyPartial", func(ctx context.Context) error {
+		copy, e := d.Templates.GetByUUID(ctx, result.CreatedUUIDs[0])
+		if e != nil {
+			return e
+		}
+		original, e := d.Templates.GetByUUID(ctx, source.UUID)
+		if e != nil {
+			return e
+		}
+		page, e := d.Templates.List(ctx, namespace(s), 1, 20)
+		if e != nil {
+			return e
+		}
+		return check(ctx, s, "partialReadback", map[string]any{"source_content": input.Content, "copy_content": input.Content, "count": 2}, map[string]any{"source_content": original.Content, "copy_content": copy.Content, "count": page.Total}, "template.read", copy.UUID)
+	})
+}
+
+type TemplateInvalidInput struct{ templateScenario }
+
+func (c *TemplateInvalidInput) Preflight(ctx context.Context, s *Regression.Scope) error {
+	d, err := dep(s)
+	if err == nil && d.TemplateHTTP == nil {
+		return Regression.NewError(Regression.DependencyBlocked)
+	}
+	return err
+}
+func (*TemplateInvalidInput) Definition() Regression.CaseDefinition {
+	return businessDefinition(TemplateInvalidInputUUID, "invalidInput", []string{"template.rejectedCreate", "template.rejectedUpdate", "template.noPollution"}, []string{"seedInvalid", "rejectCreate", "rejectUpdate", "verifyUnchanged"}, false)
+}
+func (*TemplateInvalidInput) Execute(ctx context.Context, s *Regression.Scope) error {
+	ctx, d, input, err := businessScope(ctx, s)
+	if err != nil {
+		return err
+	}
+	var source *Template.Template
+	if err = businessStep(ctx, s, "seedInvalid", func(ctx context.Context) error {
+		var e error
+		source, e = createTemplate(ctx, s, d, input.Name+" "+namespace(s), input.Description+" "+namespace(s), input.Content)
+		return e
+	}); err != nil {
+		return err
+	}
+	oversized := strings.Repeat(strings.TrimSpace(input.Content), 10001/len(strings.TrimSpace(input.Content))+1)
+	for _, operation := range []struct{ step, assertion, method, path string }{
+		{"rejectCreate", "rejectedCreate", http.MethodPost, "/api/v1/templates"},
+		{"rejectUpdate", "rejectedUpdate", http.MethodPut, "/api/v1/templates/" + source.UUID},
+	} {
+		if err = businessStep(ctx, s, operation.step, func(ctx context.Context) error {
+			actual := []map[string]any{}
+			for _, fields := range []map[string]any{
+				{"name": "   ", "description": source.Description, "content": input.Content},
+				{"name": source.Name, "description": source.Description, "content": oversized},
+			} {
+				request := httptest.NewRequest(operation.method, operation.path, strings.NewReader(string(Regression.JSON(fields)))).WithContext(ctx)
+				request.Header.Set("Content-Type", "application/json")
+				request.Header.Set("X-Request-ID", s.Actor.RequestID)
+				response := httptest.NewRecorder()
+				d.TemplateHTTP.ServeHTTP(response, request)
+				var envelope struct {
+					Success bool                `json:"success"`
+					Data    *Template.Template  `json:"data"`
+					Error   *Contracts.APIError `json:"error"`
+				}
+				if json.Unmarshal(response.Body.Bytes(), &envelope) != nil {
+					return Regression.NewError(Regression.InvalidRequest)
+				}
+				if operation.method == http.MethodPost && envelope.Data != nil && Regression.ValidUUID(envelope.Data.UUID) {
+					if e := registerTemplates(ctx, s, d, []string{envelope.Data.UUID}); e != nil {
+						return e
+					}
+				}
+				// A regression may write a row even while returning a rejection.
+				// Discover only this case's unguessable namespace and register such
+				// unexpected rows before asserting, so a failing test still cleans up.
+				if operation.method == http.MethodPost {
+					page, e := d.Templates.List(ctx, namespace(s), 1, 20)
+					if e != nil {
+						return e
+					}
+					owned := map[string]bool{}
+					for _, fixture := range s.Recorder.ListOwned() {
+						owned[fixture.ResourceUUID] = true
+					}
+					for _, item := range page.List {
+						if !owned[item.UUID] {
+							if e = registerTemplates(ctx, s, d, []string{item.UUID}); e != nil {
+								return e
+							}
+						}
+					}
+				}
+				code, field := "", ""
+				if envelope.Error != nil {
+					code = envelope.Error.Code
+					if details, ok := envelope.Error.Details.(map[string]any); ok {
+						field, _ = details["field"].(string)
+					}
+				}
+				actual = append(actual, map[string]any{"status": response.Code, "success": envelope.Success, "code": code, "field": field})
+			}
+			expected := []map[string]any{{"status": http.StatusBadRequest, "success": false, "code": Contracts.ErrCodeValidationFailed, "field": "name"}, {"status": http.StatusBadRequest, "success": false, "code": Contracts.ErrCodeValidationFailed, "field": "content"}}
+			evidence := proof("template.http.validation", source.UUID, actual)
+			evidence[0].Boundary = "http"
+			return s.Recorder.Assert(ctx, "template."+operation.assertion, "regression.assertions."+operation.assertion, "passed", expected, actual, evidence)
+		}); err != nil {
+			return err
+		}
+	}
+	return businessStep(ctx, s, "verifyUnchanged", func(ctx context.Context) error {
+		value, e := d.Templates.GetByUUID(ctx, source.UUID)
+		if e != nil {
+			return e
+		}
+		page, e := d.Templates.List(ctx, namespace(s), 1, 20)
+		if e != nil {
+			return e
+		}
+		return checkObserved(ctx, s, "noPollution", map[string]any{"name": source.Name, "description": source.Description, "content": input.Content, "count": 1, "only_original": true}, map[string]any{"name": value.Name, "description": value.Description, "content": value.Content, "count": len(page.List), "only_original": Regression.Equal([]string{source.UUID}, templateUUIDs(page.List))}, "template.read", source.UUID, page)
+	})
+}
+
+type TemplateValidation struct{ templateScenario }
+
+func (*TemplateValidation) Definition() Regression.CaseDefinition {
+	return businessDefinition(TemplateValidationUUID, "validation", []string{"template.validationWarning", "template.validationStrict", "template.validationRepaired"}, []string{"seedValidation", "validateContent", "repairContent"}, false)
+}
+func (*TemplateValidation) Execute(ctx context.Context, s *Regression.Scope) error {
+	ctx, d, input, err := businessScope(ctx, s)
+	if err != nil {
+		return err
+	}
+	var source *Template.Template
+	if err = businessStep(ctx, s, "seedValidation", func(ctx context.Context) error {
+		var e error
+		source, e = createTemplate(ctx, s, d, input.Name+" "+namespace(s), input.Description, "")
+		return e
+	}); err != nil {
+		return err
+	}
+	if err = businessStep(ctx, s, "validateContent", func(ctx context.Context) error {
+		for _, mode := range []struct {
+			strict        bool
+			key, severity string
+		}{{false, "validationWarning", "warning"}, {true, "validationStrict", "error"}} {
+			result, e := d.Templates.Validate(ctx, source.UUID, []string{"content_min_length"}, mode.strict)
+			if e != nil {
+				return e
+			}
+			violations := []map[string]string{}
+			for _, violation := range result.Violations {
+				violations = append(violations, map[string]string{"field": violation.Field, "rule": violation.Rule, "severity": violation.Severity})
+			}
+			if e = check(ctx, s, mode.key, map[string]any{"valid": false, "violations": []map[string]string{{"field": "content", "rule": "content_min_length", "severity": mode.severity}}}, map[string]any{"valid": result.Valid, "violations": violations}, "template.validate", source.UUID); e != nil {
+				return e
+			}
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	return businessStep(ctx, s, "repairContent", func(ctx context.Context) error {
+		if _, e := d.Templates.Update(ctx, source.UUID, source.Name, source.Description, input.Content); e != nil {
+			return e
+		}
+		result, e := d.Templates.Validate(ctx, source.UUID, nil, true)
+		if e != nil {
+			return e
+		}
+		value, e := d.Templates.GetByUUID(ctx, source.UUID)
+		if e != nil {
+			return e
+		}
+		return check(ctx, s, "validationRepaired", map[string]any{"valid": true, "violations": 0, "content": input.Content}, map[string]any{"valid": result.Valid, "violations": len(result.Violations), "content": value.Content}, "template.validate", source.UUID)
+	})
+}

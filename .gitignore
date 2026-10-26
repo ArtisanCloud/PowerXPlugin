@@ -40,6 +40,7 @@ logs
 Thumbs.db
 
 # Testing artifacts (coverage reports, playwright output, temp CLI scaffolds)
+/artifacts/regression/
 /artifacts/framework-release-*/
 tmp/
 !tmp/README.md
@@ -48,8 +49,9 @@ tmp/
 .gomodcache/
 **/.gocache/
 **/.gomodcache/
-skeleton/web-admin/test-results/
-skeleton/web-admin/playwright-report/
+/skeleton/web-admin/**/test-results/
+/skeleton/web-admin/**/playwright-report/
+/skeleton/web-admin/**/blob-report/
 skeleton/backend/etc/config.yaml
 skeleton/backend/etc/host-values.yaml
 

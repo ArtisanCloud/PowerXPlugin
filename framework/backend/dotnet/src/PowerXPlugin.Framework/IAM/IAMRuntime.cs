@@ -13,7 +13,9 @@ namespace PowerXPlugin.Framework.IAM;
 public sealed record IAMAdapterBundle(
     IDirectoryService Directory,
     IAuthzService Authz,
-    IIdentityContextService IdentityContext);
+    IIdentityContextService IdentityContext,
+    IAuthorizationBaselineService? AuthorizationBaselines = null,
+    string PluginId = "");
 
 public static class IAMRuntime
 {
@@ -22,7 +24,10 @@ public static class IAMRuntime
         ArgumentNullException.ThrowIfNull(selected);
 
         var registry = new IAMRegistry();
-        registry.Bind(mode == ProviderMode.Local ? IAMAdapterMode.Local : IAMAdapterMode.Delegated, selected.Directory, selected.Authz, selected.IdentityContext);
+        if (selected.AuthorizationBaselines is not null && string.IsNullOrWhiteSpace(selected.PluginId))
+            throw new IAMAdapterException(IAMErrors.CodeAdapterNotBound);
+        registry.Bind(mode == ProviderMode.Local ? IAMAdapterMode.Local : IAMAdapterMode.Delegated, selected.Directory, selected.Authz, selected.IdentityContext,
+            selected.AuthorizationBaselines is null ? null : new ValidatedAuthorizationBaselineService(selected.PluginId, selected.AuthorizationBaselines));
         return registry;
     }
 

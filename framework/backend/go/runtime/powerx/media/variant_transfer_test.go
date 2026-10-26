@@ -19,7 +19,7 @@ func TestVariantTransferContract(t *testing.T) {
 		for _, status := range []int{200, 400, 401, 403, 404, 409, 422, 503} {
 			t.Run(fmt.Sprintf("%s/%d", action, status), func(t *testing.T) {
 				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					if r.Method != "POST" || r.URL.Path != variantPath(asset, variant)+"/"+action || r.Header.Get("Authorization") != "Bearer test-sts" || r.Header.Get("X-Tenant-UUID") != "" {
+					if r.Method != "POST" || r.URL.Path != "/api/v1"+variantPath(asset, variant)+"/"+action || r.Header.Get("Authorization") != "Bearer test-sts" || r.Header.Get("X-Tenant-UUID") != "" {
 						t.Errorf("method=%s path=%s", r.Method, r.URL.Path)
 					}
 					var body map[string]any

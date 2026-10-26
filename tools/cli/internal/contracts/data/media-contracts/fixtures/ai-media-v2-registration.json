@@ -1,0 +1,56 @@
+{
+  "fixture_owner": "Framework",
+  "contract_version": 2,
+  "scope": "Controlled HTTP client proof only; real tenant registration migration belongs to Core. Diagnostic strings are never parsed into machine codes.",
+  "catalog_errors": [
+    {
+      "name": "legacy_registration",
+      "status": 502,
+      "error_code": "integration.invoke_failed",
+      "body": {
+        "error_code": "integration.invoke_failed",
+        "error": "core_internal adapter selected for unsupported capability \"com.corex.ai.catalog.providers.read\"",
+        "request_id": "fixture.request"
+      }
+    },
+    {
+      "name": "version_locked",
+      "status": 409,
+      "error_code": "registry.version_locked",
+      "body": {
+        "error_code": "registry.version_locked",
+        "details": {
+          "manual_upgrade_required": true
+        },
+        "request_id": "fixture.request"
+      }
+    },
+    {
+      "name": "revoked_after_upgrade",
+      "status": 403,
+      "error_code": "registry.capability_forbidden",
+      "body": {
+        "error_code": "registry.capability_forbidden",
+        "request_id": "fixture.request"
+      }
+    }
+  ],
+  "upgrade_confirmation_error": {
+    "status": 409,
+    "body": {
+      "code": 409,
+      "message": "capability.upgrade_failed",
+      "error": "capability.upgrade_binding_mismatch",
+      "error_code": "capability.upgrade_binding_mismatch",
+      "reason_code": "capability.upgrade_binding_mismatch",
+      "details": {
+        "reason_code": "capability.upgrade_binding_mismatch",
+        "retryable": false,
+        "trace_id": "fixture.trace"
+      },
+      "request_id": "fixture.request"
+    },
+    "expected_reason_code": "capability.upgrade_binding_mismatch",
+    "machine_reason_published": true
+  }
+}

@@ -1,0 +1,164 @@
+package scenarios
+
+import (
+	"context"
+	"encoding/json"
+	Metadata "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/metadata"
+	Regression "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/regression"
+	Middleware "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
+	"sort"
+)
+
+const MetadataCaseUUID = "22222222-2222-4222-8222-222222222223"
+const MetadataBindStep = "33333333-3333-4333-8333-333333333334"
+const MetadataReplayStep = "33333333-3333-4333-8333-333333333336"
+const MetadataReadStep = "33333333-3333-4333-8333-333333333335"
+
+type MetadataDependencies struct {
+	Service      Metadata.Service
+	ResourceType string
+	ResourceUUID string
+}
+type MetadataTagBindings struct {
+	resourceUUID string
+	resourceType string
+	tagUUID      string
+	originalTags []string
+}
+
+func (*MetadataTagBindings) Definition() Regression.CaseDefinition {
+	return Regression.CaseDefinition{UUID: MetadataCaseUUID, SuiteUUID: SuiteUUID, Key: "metadata.tag_bindings", Version: "v1", TitleKey: "regression.scenarios.metadata.title", DescriptionKey: "regression.scenarios.metadata.description", Tags: []string{"metadata", "core"}, SupportedProfileKinds: []string{"live"}, ExecutionTimeoutMS: 30000, CleanupTimeoutMS: 15000, RequiredAssertionKeys: []string{"metadata.bound", "metadata.idempotency", "metadata.readback"}, Steps: []Regression.StepDefinition{{UUID: MetadataBindStep, Key: "bind", TitleKey: "regression.steps.binding", Phase: "execute", Boundary: "core.host"}, {UUID: MetadataReplayStep, Key: "replay", TitleKey: "regression.steps.replay", Phase: "verify", Boundary: "core.host"}, {UUID: MetadataReadStep, Key: "readback", TitleKey: "regression.steps.readback", Phase: "verify", Boundary: "core.host"}}, InputSchema: Regression.JSON(map[string]any{"type": "object", "additionalProperties": false, "required": []string{"resource_type", "tag_uuid"}, "properties": map[string]any{"resource_type": map[string]any{"type": "string", "minLength": 1}, "tag_uuid": map[string]any{"type": "string", "format": "uuid"}}})}
+}
+func metadataDep(s *Regression.Scope) (Metadata.Service, error) {
+	d, ok := s.Dependencies.(*MetadataDependencies)
+	if !ok || d == nil || d.Service == nil {
+		return nil, Regression.NewError(Regression.DependencyBlocked)
+	}
+	return d.Service, nil
+}
+func (m *MetadataTagBindings) Preflight(ctx context.Context, s *Regression.Scope) error {
+	ctx = Middleware.ContextWithTenantUUID(ctx, s.Actor.TenantUUID)
+	service, err := metadataDep(s)
+	if err != nil {
+		return err
+	}
+	var input struct {
+		ResourceType string `json:"resource_type"`
+		TagUUID      string `json:"tag_uuid"`
+	}
+	if json.Unmarshal(s.Input, &input) != nil || !Regression.ValidUUID(input.TagUUID) {
+		return Regression.NewError(Regression.InvalidRequest)
+	}
+	m.resourceType = input.ResourceType
+	m.tagUUID = input.TagUUID
+	dependency := s.Dependencies.(*MetadataDependencies)
+	if m.resourceType != dependency.ResourceType || !Regression.ValidUUID(dependency.ResourceUUID) {
+		return Regression.NewError(Regression.DependencyBlocked)
+	}
+	m.resourceUUID = dependency.ResourceUUID
+	resource, err := service.ResolveResourceType(ctx, m.resourceType)
+	if err != nil || resource == nil || !resource.BindingEnabled || resource.ValidatorStatus != "available" {
+		return Regression.NewError(Regression.DependencyBlocked)
+	}
+	original, err := service.ListTagBindings(ctx, Metadata.ListTagBindingsRequest{ResourceType: m.resourceType, ResourceUUID: m.resourceUUID, RequestID: s.Actor.RequestID})
+	if err != nil {
+		return Regression.NewError(Regression.DependencyBlocked)
+	}
+	m.originalTags = bindingTags(original)
+	return nil
+}
+func (m *MetadataTagBindings) Prepare(ctx context.Context, s *Regression.Scope) error {
+	return nil
+}
+func bindingTags(items []Metadata.TagBinding) []string {
+	out := []string{}
+	for _, b := range items {
+		out = append(out, b.TagUUID)
+	}
+	sort.Strings(out)
+	return out
+}
+func (m *MetadataTagBindings) Execute(ctx context.Context, s *Regression.Scope) error {
+	ctx = Middleware.ContextWithTenantUUID(ctx, s.Actor.TenantUUID)
+	service, err := metadataDep(s)
+	if err != nil {
+		return err
+	}
+	if err = s.Recorder.Step(ctx, MetadataBindStep, func(ctx context.Context) error {
+		items, err := service.ReplaceTagBindings(ctx, Metadata.ReplaceTagBindingsRequest{ResourceType: m.resourceType, ResourceUUID: m.resourceUUID, TagUUIDs: []string{m.tagUUID}, RequestID: s.Actor.RequestID})
+		if err != nil {
+			return Regression.NewError(Regression.DependencyBlocked)
+		}
+		if err = s.Recorder.Register(ctx, Regression.FixtureResource{ResourceType: "metadata.tag_bindings", ResourceUUID: m.resourceUUID, RoleKey: "regression.resourceRoles.binding", CleanupKey: "metadata.unbind", CleanupParameters: Regression.JSON(map[string]any{"resource_type": m.resourceType, "original_tag_uuids": m.originalTags})}); err != nil {
+			_, rollbackErr := service.ReplaceTagBindings(context.WithoutCancel(ctx), Metadata.ReplaceTagBindingsRequest{ResourceType: m.resourceType, ResourceUUID: m.resourceUUID, TagUUIDs: m.originalTags, RequestID: s.Actor.RequestID})
+			if rollbackErr != nil {
+				return Regression.NewError(Regression.CleanupFailed)
+			}
+			return err
+		}
+		return s.Recorder.Assert(ctx, "metadata.bound", "regression.assertions.binding", "passed", []string{m.tagUUID}, bindingTags(items), metadataProof("core.metadata.tag_bindings.replace", m.resourceUUID, items))
+	}); err != nil {
+		return err
+	}
+	if err = s.Recorder.Step(ctx, MetadataReplayStep, func(ctx context.Context) error {
+		items, err := service.ReplaceTagBindings(ctx, Metadata.ReplaceTagBindingsRequest{ResourceType: m.resourceType, ResourceUUID: m.resourceUUID, TagUUIDs: []string{m.tagUUID}, RequestID: s.Actor.RequestID})
+		if err != nil {
+			return Regression.NewError(Regression.DependencyBlocked)
+		}
+		return s.Recorder.Assert(ctx, "metadata.idempotency", "regression.assertions.idempotency", "passed", map[string]any{"count": 1, "tag_uuids": []string{m.tagUUID}}, map[string]any{"count": len(items), "tag_uuids": bindingTags(items)}, metadataProof("core.metadata.tag_bindings.replace", m.resourceUUID, items))
+	}); err != nil {
+		return err
+	}
+	return s.Recorder.Step(ctx, MetadataReadStep, func(ctx context.Context) error {
+		items, err := service.ListTagBindings(ctx, Metadata.ListTagBindingsRequest{ResourceType: m.resourceType, ResourceUUID: m.resourceUUID, RequestID: s.Actor.RequestID})
+		if err != nil {
+			return Regression.NewError(Regression.DependencyBlocked)
+		}
+		return s.Recorder.Assert(ctx, "metadata.readback", "regression.assertions.readback", "passed", []string{m.tagUUID}, bindingTags(items), metadataProof("core.metadata.tag_bindings.list", m.resourceUUID, items))
+	})
+}
+func (*MetadataTagBindings) Cleanup(ctx context.Context, s *Regression.Scope) error {
+	ctx = Middleware.ContextWithTenantUUID(ctx, s.Actor.TenantUUID)
+	owned := s.Recorder.ListOwned()
+	if len(owned) == 0 {
+		return nil
+	}
+	service, err := metadataDep(s)
+	if err != nil {
+		return err
+	}
+	for _, f := range owned {
+		if f.CleanupState == "succeeded" {
+			continue
+		}
+		if f.ResourceType != "metadata.tag_bindings" || f.CleanupKey != "metadata.unbind" || f.TenantUUID != s.Actor.TenantUUID || f.RunUUID != s.RunUUID {
+			return Regression.NewError(Regression.CleanupUnavailable)
+		}
+		var p struct {
+			ResourceType string   `json:"resource_type"`
+			OriginalTags []string `json:"original_tag_uuids"`
+		}
+		if json.Unmarshal(f.CleanupParameters, &p) != nil || p.ResourceType == "" {
+			return Regression.NewError(Regression.CleanupUnavailable)
+		}
+		if _, err = service.ReplaceTagBindings(ctx, Metadata.ReplaceTagBindingsRequest{ResourceType: p.ResourceType, ResourceUUID: f.ResourceUUID, TagUUIDs: p.OriginalTags, RequestID: s.Actor.RequestID}); err != nil {
+			return err
+		}
+		items, err := service.ListTagBindings(ctx, Metadata.ListTagBindingsRequest{ResourceType: p.ResourceType, ResourceUUID: f.ResourceUUID, RequestID: s.Actor.RequestID})
+		if err != nil || !Regression.Equal(bindingTags(items), p.OriginalTags) {
+			return Regression.NewError(Regression.CleanupFailed)
+		}
+		if err = s.Recorder.Cleaned(ctx, f.ResourceUUID, metadataProof("core.metadata.tag_bindings.restored", f.ResourceUUID, map[string]any{"original_restored": true, "tag_count": len(items)})); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func metadataProof(source, id string, data any) []Regression.Evidence {
+	evidence := proof(source, id, data)
+	for i := range evidence {
+		evidence[i].Boundary = "core.host"
+	}
+	return evidence
+}

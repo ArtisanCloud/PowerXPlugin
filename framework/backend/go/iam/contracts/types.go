@@ -129,9 +129,12 @@ type AuthorizationDecision struct {
 
 // IdentityContext 为统一身份上下文载体。
 type IdentityContext struct {
-	TenantUUID  string   `json:"tenant_uuid"`
-	UserUUID    string   `json:"user_uuid,omitempty"`
-	MemberUUID  string   `json:"member_uuid,omitempty"`
+	TenantUUID string `json:"tenant_uuid"`
+	UserUUID   string `json:"user_uuid,omitempty"`
+	MemberUUID string `json:"member_uuid,omitempty"`
+	// IsRoot is supplied by the selected authenticated identity adapter.
+	// Consumers must not infer it from role names or client assertions.
+	IsRoot      bool     `json:"is_root"`
 	Roles       []string `json:"roles,omitempty"`
 	Permissions []string `json:"permissions,omitempty"`
 	PolicyVer   string   `json:"policy_version,omitempty"`

@@ -1,0 +1,170 @@
+{
+  "validation_date": "2026-10-20",
+  "scope": "Framework Go/Nuxt media v2 source and controlled HTTP/browser validation",
+  "branch": "025-framework-business-regression",
+  "core_contract_source": "docs/contracts/ai-media-v2-source.json",
+  "checks": [
+    {
+      "name": "framework_runtime_suite",
+      "command": "go test ./framework/backend/go/runtime/...",
+      "exit_code": 0
+    },
+    {
+      "name": "race",
+      "command": "GOMAXPROCS=2 go test -race ./framework/backend/go/runtime/powerx/ai ./framework/backend/go/runtime/ai ./framework/backend/go/runtime/aisettings ./skeleton/backend/go-gin/internal/transport/http/admin/ai_settings ./skeleton/backend/go-gin/internal/services/runtimeexample -count=1 -timeout 180s",
+      "exit_code": 0,
+      "log": "/tmp/powerx-ai-media-race.log"
+    },
+    {
+      "name": "vet",
+      "command": "go vet ./framework/backend/go/runtime/powerx/ai ./framework/backend/go/runtime/ai ./framework/backend/go/runtime/aisettings ./skeleton/backend/go-gin/internal/transport/http/admin/ai_settings ./skeleton/backend/go-gin/internal/services/runtimeexample ./skeleton/backend/go-gin/cmd/plugin",
+      "exit_code": 0
+    },
+    {
+      "name": "nuxt_unit_suite",
+      "command": "node node_modules/vitest/dist/cli.js run --dir tests/unit",
+      "cwd": "skeleton/web-admin/nuxt",
+      "exit_code": 0,
+      "test_files": 22,
+      "tests": 203,
+      "log": "/tmp/powerx-ai-media-vitest.log"
+    },
+    {
+      "name": "sdk_typescript",
+      "command": "tsc --noEmit --target ES2022 --module ESNext --moduleResolution bundler --lib ES2022,DOM --skipLibCheck ai-media.ts sse.ts",
+      "exit_code": 0
+    },
+    {
+      "name": "nuxt_production_build",
+      "entrypoint": "nuxt.loadNuxt({dev:false,overrides:{buildDir,nitro.output.dir}}) + nuxt.build() + nuxt.close()",
+      "exit_code": 0,
+      "isolated_output": "/var/folders/zh/215y91n14h36h244d2c9tbv40000gn/T/powerx-ai-media-build-8gfunq",
+      "existing_dev_build_directory_untouched": true,
+      "warnings": [
+        "Nuxt/Tailwind transformation sourcemap warnings"
+      ],
+      "log": "/tmp/powerx-ai-media-nuxt-build.log"
+    },
+    {
+      "name": "generated_backend_with_framework_snapshot",
+      "command": "PX_TEST_GENERATED_BUILD=1 PX_TEST_FRAMEWORK_SNAPSHOT=1 go test ./tools/cli/internal/templates -run TestGeneratedBackendBuild -count=1 -timeout 180s",
+      "exit_code": 0,
+      "consumer_GOWORK": "off",
+      "local_replace": false,
+      "log": "/tmp/powerx-ai-media-generated-build.log"
+    },
+    {
+      "name": "desktop_narrow_browser",
+      "command": "PLAYWRIGHT_BASE_URL=http://localhost:3131 playwright test tests/e2e/ai-media-catalog.spec.ts --workers=1",
+      "exit_code": 0,
+      "viewports": [
+        [
+          1440,
+          1000
+        ],
+        [
+          390,
+          844
+        ]
+      ],
+      "api_transport": "intercepted controlled fixtures, no live backend writes",
+      "coverage": [
+        "media catalog label",
+        "schema enum/number/boolean/text fields",
+        "default parameters",
+        "zero-valued seed",
+        "draft retention across modality switch",
+        "save request values",
+        "no horizontal overflow",
+        "page errors empty"
+      ],
+      "screenshots": "skeleton/web-admin/nuxt/.cache/ai-media-v2-browser"
+    },
+    {
+      "name": "root_contract_checks",
+      "command": "npm test",
+      "exit_code": 0,
+      "log": "/tmp/powerx-ai-media-npm-test.log"
+    },
+    {
+      "name": "lint",
+      "command": "npm run lint",
+      "exit_code": 0,
+      "status": "repository_placeholder_not_static_analysis",
+      "log": "/tmp/powerx-ai-media-lint.log"
+    },
+    {
+      "name": "template_sync",
+      "command": "node scripts/sync-templates.mjs --check",
+      "exit_code": 0
+    },
+    {
+      "name": "fixture_hash_and_sdk_copy",
+      "command": "node scripts/contracts/validate-ai-media-v2.mjs",
+      "exit_code": 0
+    },
+    {
+      "name": "npm_sdk_pack",
+      "command": "npm pack --dry-run --json --workspace @artisan-cloud/plugin-framework-client",
+      "exit_code": 0,
+      "contains": [
+        "ai-media.ts",
+        "sse.ts",
+        "index.ts"
+      ],
+      "published": false
+    },
+    {
+      "name": "git_diff_check",
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "credential_validation": {
+    "api_key": "controlled HTTP Authorization header and shared fixture assertions",
+    "sts": "controlled shared TokenProvider callback and bearer HTTP assertions; renewed on SSE reconnect",
+    "live_core_or_sts_issuer": false
+  },
+  "controlled_coverage": [
+    "fixed core_internal binding and typed body only",
+    "media catalog and per-operation defaults/schema",
+    "VLM analysis vs image/video/TTS Core tasks",
+    "same business attempt key produces identical submission requests",
+    "missing key rejected without request",
+    "task get/cancel",
+    "HTTP status/details/trace/request ID retained",
+    "SSE same-task cursor/revision dedup",
+    "bounded reconnect and final HTTP diagnostics",
+    "revocation stops subscription",
+    "cancellation closes the read",
+    "local runtime does not call Core"
+  ],
+  "corrected_test_attempts": [
+    "Old client tests migrated after removing ModalInvokeOutput",
+    "SSE fixture compacted into a valid single data frame",
+    "Playwright JSON fixture loading uses Node fs instead of unsupported bare JSON imports"
+  ],
+  "remaining_boundaries": [
+    "SDK package publication and generator default-version update",
+    "Real Core API key grant-status and installed STS grants/revocation/tenant-subject isolation",
+    "Paid/live VLM/image/video/TTS provider calls and media playback",
+    ".NET AI media v2"
+  ],
+  "services": {
+    "owned_services_started": false,
+    "owned_services_left_running": false,
+    "existing_service_preserved": {
+      "port": 3131,
+      "pid": 13761
+    },
+    "existing_services_restarted": false
+  },
+  "database_or_live_data_modified": false,
+  "user_changes_preserved": [
+    "specs/025-framework-business-regression/evidence/live-integration.md",
+    "specs/025-framework-business-regression/tasks.md"
+  ],
+  "committed": false,
+  "pushed": false,
+  "sdk_published": false
+}

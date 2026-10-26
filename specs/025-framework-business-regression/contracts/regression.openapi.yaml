@@ -1,0 +1,1445 @@
+openapi: 3.0.3
+info:
+  title: PowerXPlugin Business Regression API
+  version: 1.0.0
+  description: 025 设计契约，尚未实现。所有 paths 相对于插件现有 API base（server.api_prefix/宿主反代）；使用现有 verified admin identity。普通响应复用现有 envelope，SSE 和下载为明确类型。
+security:
+  - bearerAuth: []
+paths:
+  /admin/regression/suites:
+    get:
+      operationId: listRegressionSuites
+      description: regression:read；返回当前注册套件。
+      parameters: []
+      responses:
+        "200":
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - timestamp
+                  - request_id
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                      - true
+                  data:
+                    type: object
+                    required:
+                      - items
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/SuiteDefinition"
+                  timestamp:
+                    type: string
+                    format: date-time
+                  request_id:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /admin/regression/cases:
+    get:
+      operationId: listRegressionCases
+      description: regression:read；场景名称由 title_key 本地化，UUID 仅为引用。
+      parameters:
+        - name: suite_uuid
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: 套件 UUID
+        - name: tag
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 机器标签
+        - name: profile_kind
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - controlled
+              - live
+          description: 回归类型
+      responses:
+        "200":
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - timestamp
+                  - request_id
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                      - true
+                  data:
+                    type: object
+                    required:
+                      - items
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/CaseDefinition"
+                  timestamp:
+                    type: string
+                    format: date-time
+                  request_id:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /admin/regression/profiles:
+    get:
+      operationId: listRegressionProfiles
+      description: regression:read；仅返回启动时注册配置，绝不返回凭据。
+      parameters: []
+      responses:
+        "200":
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - timestamp
+                  - request_id
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                      - true
+                  data:
+                    type: object
+                    required:
+                      - items
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/ProfileDefinition"
+                  timestamp:
+                    type: string
+                    format: date-time
+                  request_id:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /admin/regression/runs:
+    get:
+      operationId: listRegressionRuns
+      description: regression:read；仅返回可信身份当前租户历史。
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: 页码
+        - name: page_size
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: 每页数量
+        - name: profile_uuid
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: 配置 UUID
+      responses:
+        "200":
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - timestamp
+                  - request_id
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                      - true
+                  data:
+                    type: object
+                    required:
+                      - items
+                      - page
+                      - page_size
+                      - total
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Run"
+                      page:
+                        type: integer
+                        minimum: 1
+                      page_size:
+                        type: integer
+                        minimum: 1
+                      total:
+                        type: integer
+                        minimum: 0
+                  timestamp:
+                    type: string
+                    format: date-time
+                  request_id:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: createRegressionRun
+      description: regression:invoke；先持久化 queued 后执行。相同 client_request_uuid 与相同输入返回原批次；不同输入冲突。租户和操作者仅来自已验证身份。前置业务依赖失败保存在批次，不静默换模式。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRun"
+      responses:
+        "202":
+          description: 已接受或返回去重批次
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - timestamp
+                  - request_id
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                      - true
+                  data:
+                    $ref: "#/components/schemas/RunDetail"
+                  timestamp:
+                    type: string
+                    format: date-time
+                  request_id:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /admin/regression/runs/{run_uuid}:
+    get:
+      operationId: getRegressionRun
+      description: regression:read；快照与 last_event_uuid 在同一读取边界返回。
+      parameters:
+        - name: run_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - timestamp
+                  - request_id
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                      - true
+                  data:
+                    $ref: "#/components/schemas/RunDetail"
+                  timestamp:
+                    type: string
+                    format: date-time
+                  request_id:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /admin/regression/runs/{run_uuid}/cancel:
+    post:
+      operationId: cancelRegressionRun
+      description: regression:manage；协作式取消，不承诺撤回外部副作用；终结批次返回现状。
+      parameters:
+        - name: run_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: 无需进一步操作
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - timestamp
+                  - request_id
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                      - true
+                  data:
+                    $ref: "#/components/schemas/RunDetail"
+                  timestamp:
+                    type: string
+                    format: date-time
+                  request_id:
+                    type: string
+        "202":
+          description: 停止或清理操作已接受
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - timestamp
+                  - request_id
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                      - true
+                  data:
+                    $ref: "#/components/schemas/RunDetail"
+                  timestamp:
+                    type: string
+                    format: date-time
+                  request_id:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /admin/regression/runs/{run_uuid}/cleanup:
+    post:
+      operationId: cleanupRegressionRun
+      description: regression:manage；仅重试已登记资源的清理，保留原始 verdict；并发作业冲突。
+      parameters:
+        - name: run_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: 无需进一步操作
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - timestamp
+                  - request_id
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                      - true
+                  data:
+                    $ref: "#/components/schemas/RunDetail"
+                  timestamp:
+                    type: string
+                    format: date-time
+                  request_id:
+                    type: string
+        "202":
+          description: 停止或清理操作已接受
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - timestamp
+                  - request_id
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                      - true
+                  data:
+                    $ref: "#/components/schemas/RunDetail"
+                  timestamp:
+                    type: string
+                    format: date-time
+                  request_id:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /admin/regression/runs/{run_uuid}/events:
+    get:
+      operationId: streamRegressionEvents
+      description: regression:read；text/event-stream，id 为事件 UUID，event 为 powerx.regression.run.updated.v1，data 为 SSEEnvelope JSON。先订阅再补读，按 sequence 去重；终结补读后关闭；游标须属于同一租户和运行。
+      parameters:
+        - name: run_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: after_event_uuid
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: 排除该游标及之前事件，补读后继续订阅
+      responses:
+        "200":
+          description: 已持久化事件流；连接异常明确显示，不轮询
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /admin/regression/runs/{run_uuid}/report:
+    get:
+      operationId: exportRegressionReport
+      description: regression:read；JSON 保存完整事实，JUnit 为展示映射。允许导出当前快照，pending 不表示成功。
+      parameters:
+        - name: run_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: format
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - json
+              - junit
+            default: json
+          description: 导出格式
+      responses:
+        "200":
+          description: 标准报告，凭据与敏感输入已脱敏
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+            application/xml:
+              schema:
+                type: string
+                description: JUnit testsuites；失败为 failure，阻塞/取消/中断为 skipped
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 已有管理端测试身份凭据；宿主场景仍须遵守 verified host-session 链路，不新增绕过身份验证的入口。
+  responses:
+    Error:
+      description: 稳定机器错误码、i18n message key 与 request_id；不得包含凭据。
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+  schemas:
+    ErrorEnvelope:
+      type: object
+      required:
+        - success
+        - error
+        - timestamp
+        - request_id
+      properties:
+        success:
+          type: boolean
+          enum:
+            - false
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+              description: i18n key
+            reason_code:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+        timestamp:
+          type: string
+          format: date-time
+        request_id:
+          type: string
+    SuiteDefinition:
+      type: object
+      required:
+        - uuid
+        - key
+        - title_key
+        - description_key
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        title_key:
+          type: string
+        description_key:
+          type: string
+        key:
+          type: string
+    StepDefinition:
+      type: object
+      required:
+        - uuid
+        - key
+        - title_key
+        - phase
+        - boundary
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        key:
+          type: string
+        title_key:
+          type: string
+        phase:
+          type: string
+          enum:
+            - preflight
+            - prepare
+            - execute
+            - verify
+            - cleanup
+        boundary:
+          type: string
+    CaseDefinition:
+      type: object
+      required:
+        - uuid
+        - suite_uuid
+        - key
+        - version
+        - title_key
+        - description_key
+        - tags
+        - supported_profile_kinds
+        - input_schema
+        - execution_timeout_ms
+        - cleanup_timeout_ms
+        - steps
+        - required_assertion_keys
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        suite_uuid:
+          type: string
+          format: uuid
+        key:
+          type: string
+        version:
+          type: string
+        title_key:
+          type: string
+        description_key:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        supported_profile_kinds:
+          type: array
+          items:
+            type: string
+            enum:
+              - controlled
+              - live
+        input_schema:
+          type: object
+          additionalProperties: true
+        execution_timeout_ms:
+          type: integer
+          minimum: 1
+        cleanup_timeout_ms:
+          type: integer
+          minimum: 1
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/StepDefinition"
+          minItems: 1
+        required_assertion_keys:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            pattern: ^\S(?:.*\S)?$
+          description: 场景内非空、唯一的必要业务断言 key；随 definition_snapshot 冻结，不能降为可选。
+    ProfileDefinition:
+      type: object
+      required:
+        - uuid
+        - key
+        - title_key
+        - kind
+        - dependency_declarations
+        - fixture_namespace
+        - binding_revision
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        key:
+          type: string
+        title_key:
+          type: string
+        kind:
+          type: string
+          enum:
+            - controlled
+            - live
+        dependency_declarations:
+          type: array
+          items:
+            $ref: "#/components/schemas/DependencyDeclaration"
+        fixture_namespace:
+          type: string
+        binding_revision:
+          type: string
+          minLength: 1
+          description: 启动时对非敏感目标配置与 fixture namespace 计算的标识；清理重试必须匹配原快照，凭据不参与输出。
+    DependencyEvidence:
+      type: object
+      required:
+        - dependency_key
+        - declared_mode
+        - actual_mode
+        - boundary
+        - reason_code
+      properties:
+        dependency_key:
+          type: string
+        declared_mode:
+          type: string
+          enum:
+            - real
+            - test_double
+        actual_mode:
+          type: string
+          enum:
+            - real
+            - test_double
+            - unavailable
+        boundary:
+          type: string
+        reason_code:
+          type: string
+    Evidence:
+      type: object
+      required:
+        - kind
+        - boundary
+        - source_ref
+        - observed_at
+        - sanitized_data
+      properties:
+        kind:
+          type: string
+        boundary:
+          type: string
+        source_ref:
+          type: string
+        observed_at:
+          type: string
+          format: date-time
+        sanitized_data: {}
+        resource_uuid:
+          type: string
+          format: uuid
+        trace_id:
+          type: string
+        request_id:
+          type: string
+    AssertionResult:
+      type: object
+      required:
+        - uuid
+        - key
+        - title_key
+        - status
+        - required
+        - expected
+        - actual
+        - evidence
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        key:
+          type: string
+        title_key:
+          type: string
+        status:
+          type: string
+          enum:
+            - passed
+            - failed
+            - blocked
+            - skipped
+        required:
+          type: boolean
+          readOnly: true
+          description: 由冻结的必要 key 列表派生，调用方不得覆盖或降级。
+        expected: {}
+        actual: {}
+        evidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/Evidence"
+          description: 必要断言 passed 时至少一项有效证据；运行时校验 status/required/证据的关联条件。
+        reason_code:
+          type: string
+    StepResult:
+      type: object
+      required:
+        - uuid
+        - step_uuid
+        - phase
+        - title_key
+        - status
+        - started_at
+        - finished_at
+        - assertions
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        step_uuid:
+          type: string
+          format: uuid
+        phase:
+          type: string
+          enum:
+            - preflight
+            - prepare
+            - execute
+            - verify
+            - cleanup
+        title_key:
+          type: string
+        status:
+          type: string
+          enum:
+            - pending
+            - running
+            - passed
+            - failed
+            - blocked
+            - skipped
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
+        assertions:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssertionResult"
+    FixtureResource:
+      type: object
+      required:
+        - uuid
+        - resource_type
+        - resource_uuid
+        - display_name
+        - role_key
+        - parent_resource_uuid
+        - tenant_uuid
+        - run_uuid
+        - case_execution_uuid
+        - cleanup_key
+        - cleanup_parameters
+        - cleanup_state
+        - cleanup_evidence
+        - cleaned_at
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        resource_type:
+          type: string
+        resource_uuid:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+          description: Captured business name, sanitized; empty means not recorded.
+        role_key:
+          type: string
+          description: Plugin locale key for the resource role.
+        parent_resource_uuid:
+          type: string
+          description: Explicit registered source in this case execution; empty when absent.
+        cleanup_evidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/Evidence"
+        cleaned_at:
+          type: string
+          format: date-time
+          nullable: true
+        tenant_uuid:
+          type: string
+          format: uuid
+        run_uuid:
+          type: string
+          format: uuid
+        case_execution_uuid:
+          type: string
+          format: uuid
+        cleanup_key:
+          type: string
+        cleanup_parameters:
+          type: object
+          additionalProperties: true
+        cleanup_state:
+          type: string
+          enum:
+            - pending
+            - running
+            - succeeded
+            - failed
+            - not_required
+    Run:
+      type: object
+      required:
+        - uuid
+        - tenant_uuid
+        - actor_uuid
+        - profile_uuid
+        - client_request_uuid
+        - rerun_of_run_uuid
+        - profile_snapshot
+        - selection_snapshot
+        - input_snapshot
+        - source_snapshot
+        - phase
+        - verdict
+        - cleanup_state
+        - reason_code
+        - message_key
+        - revision
+        - created_at
+        - updated_at
+        - started_at
+        - finished_at
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        tenant_uuid:
+          type: string
+          format: uuid
+        actor_uuid:
+          type: string
+          format: uuid
+        profile_uuid:
+          type: string
+          format: uuid
+        client_request_uuid:
+          type: string
+          format: uuid
+        rerun_of_run_uuid:
+          type: string
+          format: uuid
+          nullable: true
+        profile_snapshot:
+          $ref: "#/components/schemas/ProfileDefinition"
+        selection_snapshot:
+          type: array
+          items:
+            $ref: "#/components/schemas/CaseDefinition"
+        input_snapshot:
+          type: object
+          additionalProperties: true
+        source_snapshot:
+          type: object
+          additionalProperties: true
+        phase:
+          type: string
+          enum:
+            - queued
+            - running
+            - cancelling
+            - completed
+            - cancelled
+            - interrupted
+        verdict:
+          type: string
+          enum:
+            - pending
+            - passed
+            - failed
+            - blocked
+        cleanup_state:
+          type: string
+          enum:
+            - pending
+            - running
+            - succeeded
+            - failed
+            - not_required
+        reason_code:
+          type: string
+        message_key:
+          type: string
+        revision:
+          type: integer
+          minimum: 1
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
+    CaseExecution:
+      type: object
+      required:
+        - uuid
+        - tenant_uuid
+        - run_uuid
+        - case_uuid
+        - ordinal
+        - definition_snapshot
+        - input_snapshot
+        - dependency_evidence
+        - phase
+        - verdict
+        - steps
+        - fixture_resources
+        - cleanup_state
+        - reason_code
+        - message_key
+        - revision
+        - created_at
+        - updated_at
+        - started_at
+        - finished_at
+        - missing_assertion_keys
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        tenant_uuid:
+          type: string
+          format: uuid
+        run_uuid:
+          type: string
+          format: uuid
+        case_uuid:
+          type: string
+          format: uuid
+        ordinal:
+          type: integer
+          minimum: 1
+        definition_snapshot:
+          $ref: "#/components/schemas/CaseDefinition"
+        input_snapshot:
+          type: object
+          additionalProperties: true
+        dependency_evidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/DependencyEvidence"
+        phase:
+          type: string
+          enum:
+            - pending
+            - preflight
+            - preparing
+            - executing
+            - verifying
+            - cleaning
+            - finished
+        verdict:
+          type: string
+          enum:
+            - pending
+            - passed
+            - failed
+            - blocked
+            - skipped
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/StepResult"
+        fixture_resources:
+          type: array
+          items:
+            $ref: "#/components/schemas/FixtureResource"
+        cleanup_state:
+          type: string
+          enum:
+            - pending
+            - running
+            - succeeded
+            - failed
+            - not_required
+        reason_code:
+          type: string
+        message_key:
+          type: string
+        revision:
+          type: integer
+          minimum: 1
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
+        missing_assertion_keys:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            pattern: ^\S(?:.*\S)?$
+          description: 执行核对得到的未报告必要 key；通过时必须为空，未核对时为空且 verdict 保持 pending。
+    RegressionEvent:
+      type: object
+      required:
+        - uuid
+        - tenant_uuid
+        - run_uuid
+        - case_execution_uuid
+        - sequence
+        - revision
+        - kind
+        - payload
+        - created_at
+        - updated_at
+        - meta
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        tenant_uuid:
+          type: string
+          format: uuid
+        run_uuid:
+          type: string
+          format: uuid
+        case_execution_uuid:
+          type: string
+          format: uuid
+          nullable: true
+        sequence:
+          type: integer
+          minimum: 1
+        revision:
+          type: integer
+          minimum: 1
+        kind:
+          type: string
+          enum:
+            - run.created
+            - run.updated
+            - case.updated
+            - assertion.recorded
+            - cleanup.updated
+            - run.finished
+        payload:
+          oneOf:
+            - $ref: "#/components/schemas/RunEventPayload"
+            - $ref: "#/components/schemas/CaseEventPayload"
+            - $ref: "#/components/schemas/AssertionEventPayload"
+          description: kind 与 payload 的必需字段须按 scenario-sdk.md 对应关系验证，所有 UUID/租户及 revision 需一致。
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        meta:
+          $ref: "#/components/schemas/EventMeta"
+      description: 事件与 meta 在同一事务保存；meta.tenant_uuid 与事件/Run 一致，回放保持原值。
+    RunDetail:
+      type: object
+      required:
+        - run
+        - case_executions
+        - last_event_uuid
+      properties:
+        run:
+          $ref: "#/components/schemas/Run"
+        case_executions:
+          type: array
+          items:
+            $ref: "#/components/schemas/CaseExecution"
+        last_event_uuid:
+          type: string
+          format: uuid
+          nullable: true
+    Report:
+      type: object
+      required:
+        - schema_version
+        - run
+        - case_executions
+        - events
+        - exported_at
+      properties:
+        schema_version:
+          type: string
+          enum:
+            - v1
+        run:
+          $ref: "#/components/schemas/Run"
+        case_executions:
+          type: array
+          items:
+            $ref: "#/components/schemas/CaseExecution"
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/RegressionEvent"
+        exported_at:
+          type: string
+          format: date-time
+    CreateRun:
+      type: object
+      required:
+        - client_request_uuid
+        - profile_uuid
+        - case_uuids
+      properties:
+        client_request_uuid:
+          type: string
+          format: uuid
+        profile_uuid:
+          type: string
+          format: uuid
+        case_uuids:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+        inputs:
+          type: object
+          description: 按 case_uuid 映射的场景输入，服务端依注册 schema 校验
+          additionalProperties:
+            type: object
+            additionalProperties: true
+        rerun_of_run_uuid:
+          type: string
+          format: uuid
+      additionalProperties: false
+    SSEEnvelope:
+      type: object
+      required:
+        - protocol
+        - channel
+        - event_type
+        - payload
+        - plugin_id
+        - tenant_uuid
+        - member_uuid
+        - trace_id
+        - request_id
+        - timestamp
+      properties:
+        protocol:
+          type: string
+          enum:
+            - sse
+        channel:
+          type: string
+        event_type:
+          type: string
+          enum:
+            - powerx.regression.run.updated.v1
+        payload:
+          $ref: "#/components/schemas/RegressionEvent"
+        plugin_id:
+          type: string
+        tenant_uuid:
+          type: string
+          format: uuid
+        member_uuid:
+          type: string
+          format: uuid
+        trace_id:
+          type: string
+        request_id:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+      description: payload.meta 必填完整；tenant_uuid/plugin_id 与原事件 tenant_uuid/source_plugin 一致，trace_id/request_id 使用原事件 Meta，member_uuid 为当前已验证订阅者，timestamp 为发送时间。
+    DependencyDeclaration:
+      type: object
+      additionalProperties: false
+      required:
+        - dependency_key
+        - mode
+        - boundary
+        - required_capabilities
+      properties:
+        dependency_key:
+          type: string
+        mode:
+          type: string
+          enum:
+            - real
+            - test_double
+        boundary:
+          type: string
+        required_capabilities:
+          type: array
+          items:
+            type: string
+    RunEventPayload:
+      type: object
+      additionalProperties: false
+      required:
+        - run
+      properties:
+        run:
+          $ref: "#/components/schemas/Run"
+    CaseEventPayload:
+      type: object
+      additionalProperties: false
+      required:
+        - run
+        - case_execution
+      properties:
+        run:
+          $ref: "#/components/schemas/Run"
+        case_execution:
+          $ref: "#/components/schemas/CaseExecution"
+    AssertionEventPayload:
+      type: object
+      additionalProperties: false
+      required:
+        - run
+        - case_execution
+        - step_result_uuid
+        - assertion
+      properties:
+        run:
+          $ref: "#/components/schemas/Run"
+        case_execution:
+          $ref: "#/components/schemas/CaseExecution"
+        step_result_uuid:
+          type: string
+          format: uuid
+        assertion:
+          $ref: "#/components/schemas/AssertionResult"
+    EventMeta:
+      type: object
+      additionalProperties: false
+      required:
+        - tenant_uuid
+        - request_id
+        - trace_id
+        - source_plugin
+        - occurred_at
+        - payload_version
+      properties:
+        tenant_uuid:
+          type: string
+          format: uuid
+        request_id:
+          type: string
+          minLength: 1
+          pattern: \S
+        trace_id:
+          type: string
+          minLength: 1
+          pattern: \S
+        source_plugin:
+          type: string
+          minLength: 1
+          pattern: \S
+        occurred_at:
+          type: string
+          format: date-time
+          pattern: Z$
+          description: 事实发生的 UTC 时间；补读和报告保留原值。
+        payload_version:
+          type: string
+          enum:
+            - v1
+      description: 复用 framework/backend/go/event.Meta；严格校验完整性、租户/来源/版本一致性，不从外层别名回填。

@@ -91,7 +91,7 @@ func BootstrapPlugin(ctx context.Context, cfg *config.Config) (*gorm.DB, error) 
 			"error":      err.Error(),
 		})
 	}
-	if cfg.LocalPGVectorEnabled() && cfg.Knowledge.VectorStore.PGVector.EnableMigrations {
+	if !db.IsReadOnly() && cfg.LocalPGVectorEnabled() && cfg.Knowledge.VectorStore.PGVector.EnableMigrations {
 		pg := cfg.Knowledge.VectorStore.PGVector
 		if err := localvector.EnsurePGVectorTable(ctx, queryDB, localvector.PGVectorConfig{
 			Schema:     pg.Schema,
@@ -178,9 +178,16 @@ func BindFrameworkIAM(deps *sharedapp.Deps, registry *fwiamadapters.Registry) er
 	default:
 		mode = fwiamcontracts.IAMAdapterModeLocal
 		bundle, err = localadapter.NewBundle(deps.IAMDirectory)
+		bundle.AuthorizationBaselines = deps.LocalAuthorizationBaselines
 	}
 	if err != nil {
 		return err
+	}
+	if bundle.AuthorizationBaselines != nil {
+		bundle.AuthorizationBaselines, err = fwiamadapters.ValidateAuthorizationBaselines(sharedapp.PluginID, bundle.AuthorizationBaselines)
+		if err != nil {
+			return err
+		}
 	}
 	if err := registry.Bind(mode, bundle); err != nil {
 		return err
@@ -191,5 +198,6 @@ func BindFrameworkIAM(deps *sharedapp.Deps, registry *fwiamadapters.Registry) er
 	deps.IAMDirectoryService, _ = registry.Directory()
 	deps.IAMAuthzService, _ = registry.Authz()
 	deps.IAMContextService, _ = registry.IdentityContext()
+	deps.IAMAuthorizationBaselines, _ = registry.AuthorizationBaselines()
 	return nil
 }

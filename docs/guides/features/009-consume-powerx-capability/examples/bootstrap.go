@@ -18,7 +18,7 @@ import (
 // validated configuration/manifest; tokens comes from the host STS provider.
 // local is the plugin's real implementation, not a Framework-created store.
 func BuildPublisher(ctx context.Context, mode provider.Mode, local notifications.Publisher,
-	baseURL string, tokens func(context.Context) (string, error), required []string,
+	baseURL, apiPrefix string, tokens func(context.Context) (string, error), required []string,
 	httpClient *http.Client,
 ) (notifications.Publisher, error) {
 	var delegated notifications.Publisher
@@ -33,7 +33,7 @@ func BuildPublisher(ctx context.Context, mode provider.Mode, local notifications
 		if err := capability.RequireGrants(ctx, checker, required); err != nil {
 			return nil, err
 		}
-		delegated, err = corenotifications.NewClientWithTokenProvider(corenotifications.Config{BaseURL: baseURL}, corenotifications.TokenProviderFunc(tokens), httpClient)
+		delegated, err = corenotifications.NewClientWithTokenProvider(corenotifications.Config{BaseURL: baseURL, APIPrefix: apiPrefix}, corenotifications.TokenProviderFunc(tokens), httpClient)
 		if err != nil {
 			return nil, err
 		}

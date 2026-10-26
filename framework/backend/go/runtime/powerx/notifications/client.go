@@ -9,16 +9,17 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"reflect"
 	"strings"
 	"time"
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/hosthttp"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/hostcontract"
-	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/sts"
 )
 
 type Config struct {
 	BaseURL, BearerToken, STSClientID, STSClientSecret, STSTokenURL string
+	AuthScheme, APIKey, PluginID                                    string
 	// APIPrefix comes from Gateway.APIPrefix / PX_GATEWAY_API_PREFIX.
 	APIPrefix string
 	Timeout   time.Duration
@@ -33,9 +34,18 @@ type TokenProviderFunc func(context.Context) (string, error)
 func (f TokenProviderFunc) Token(ctx context.Context) (string, error) { return f(ctx) }
 
 type Client struct {
-	baseURL string
-	http    *http.Client
-	tokens  TokenProvider
+	baseURL    string
+	pluginID   string
+	authScheme string
+	http       *http.Client
+	tokens     TokenProvider
+}
+
+func (c *Client) CredentialScheme() string {
+	if c == nil {
+		return ""
+	}
+	return strings.ToLower(c.authScheme)
 }
 
 // Publisher is the Framework boundary for tenant notification delivery.
@@ -70,23 +80,29 @@ type CreateInput struct {
 }
 
 type Notification struct {
-	Actions     []Action       `json:"actions,omitempty"`
-	UUID        string         `json:"id"`
-	Title       string         `json:"title"`
-	Content     string         `json:"content"`
-	Type        string         `json:"type"`
-	Category    string         `json:"category"`
-	IsRead      bool           `json:"isRead"`
-	IsImportant bool           `json:"isImportant"`
-	CreatedAt   time.Time      `json:"createdAt"`
-	UpdatedAt   time.Time      `json:"updatedAt"`
-	MemberUUID  string         `json:"userId,omitempty"`
-	Metadata    map[string]any `json:"metadata,omitempty"`
+	Revision       int64          `json:"revision"`
+	SourceRevision int64          `json:"sourceRevision,omitempty"`
+	Actions        []Action       `json:"actions,omitempty"`
+	UUID           string         `json:"id"`
+	Title          string         `json:"title"`
+	Content        string         `json:"content"`
+	Type           string         `json:"type"`
+	Category       string         `json:"category"`
+	IsRead         bool           `json:"isRead"`
+	IsImportant    bool           `json:"isImportant"`
+	CreatedAt      time.Time      `json:"createdAt"`
+	UpdatedAt      time.Time      `json:"updatedAt"`
+	MemberUUID     string         `json:"userId,omitempty"`
+	Metadata       map[string]any `json:"metadata,omitempty"`
 }
 
 type HTTPError struct {
 	StatusCode int
 	ReasonCode string
+	ErrorCode  string
+	TraceID    string
+	RequestID  string
+	Details    map[string]any
 	Body       string
 }
 
@@ -102,19 +118,29 @@ func NewClient(cfg Config, httpClient *http.Client) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
+	if strings.EqualFold(cfg.AuthScheme, "apikey") {
+		if strings.TrimSpace(cfg.APIKey) == "" {
+			return nil, errors.New("NOTIFICATION_API_KEY_REQUIRED")
+		}
+		c.authScheme = "ApiKey"
+		c.tokens = staticToken(strings.TrimSpace(cfg.APIKey))
+		return c, nil
+	}
+	if cfg.AuthScheme != "" && !strings.EqualFold(cfg.AuthScheme, "bearer") {
+		return nil, errors.New("NOTIFICATION_AUTH_SCHEME_INVALID")
+	}
 	if token := strings.TrimSpace(cfg.BearerToken); token != "" {
 		c.tokens = staticToken(token)
 		return c, nil
 	}
-	stsClient, err := sts.NewClient(sts.Config{TokenEndpoint: cfg.STSTokenURL, ClientID: cfg.STSClientID, ClientSecret: cfg.STSClientSecret})
-	if err != nil {
-		return nil, fmt.Errorf("powerx notifications delegated sts configuration: %w", err)
-	}
-	c.tokens = stsToken{client: stsClient}
-	return c, nil
+	// Installation STS uses the real bootstrap exchange through TokenProvider.
+	return nil, errors.New("NOTIFICATION_STS_TOKEN_PROVIDER_REQUIRED")
 }
 
 func NewClientWithTokenProvider(cfg Config, provider TokenProvider, httpClient *http.Client) (*Client, error) {
+	if cfg.AuthScheme != "" && !strings.EqualFold(cfg.AuthScheme, "bearer") {
+		return nil, errors.New("NOTIFICATION_AUTH_SCHEME_INVALID")
+	}
 	if strings.TrimSpace(cfg.BaseURL) == "" {
 		return nil, errors.New("powerx notifications base_url is required")
 	}
@@ -134,7 +160,7 @@ func newClient(cfg Config, httpClient *http.Client) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := &Client{baseURL: baseURL}
+	c := &Client{baseURL: baseURL, pluginID: cfg.PluginID, authScheme: "Bearer"}
 	if httpClient != nil {
 		c.http = httpClient
 		return c, nil
@@ -157,12 +183,48 @@ func (c *Client) Create(ctx context.Context, input CreateInput) (*Notification, 
 	if strings.TrimSpace(input.Content) == "" {
 		return nil, errors.New("notification content is required")
 	}
-	var out Notification
-	if err := c.doJSON(ctx, http.MethodPost, "/notifications", input, &out); err != nil {
+	ref, err := CardReference(input.Metadata)
+	if err != nil {
 		return nil, err
 	}
+	if ref != nil && (!validUUID(input.MemberUUID) || (c.pluginID != "" && c.pluginID != ref.SourcePlugin)) {
+		return nil, invalidCard()
+	}
+	var out Notification
+	var response json.RawMessage
+	if err := c.doJSON(ctx, http.MethodPost, "/notifications", input, &response); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(response, &out); err != nil {
+		return nil, contractError("NOTIFICATION_RESPONSE_INVALID")
+	}
 	if strings.TrimSpace(out.UUID) == "" {
-		return nil, errors.New("powerx notifications response missing notification uuid")
+		return nil, contractError("NOTIFICATION_RESPONSE_INVALID")
+	}
+	if ref != nil {
+		var fields map[string]json.RawMessage
+		if err := json.Unmarshal(response, &fields); err != nil {
+			return nil, contractError("NOTIFICATION_CARD_RESPONSE_INVALID")
+		}
+		for _, key := range []string{"id", "revision", "sourceRevision", "title", "content", "type", "category", "isRead", "isImportant", "createdAt", "updatedAt", "userId", "metadata"} {
+			if len(fields[key]) == 0 || bytes.Equal(bytes.TrimSpace(fields[key]), []byte("null")) {
+				return nil, contractError("NOTIFICATION_CARD_RESPONSE_INVALID")
+			}
+		}
+		actual, err := CardReference(out.Metadata)
+		if err != nil || actual == nil || *actual != *ref || !validUUID(out.UUID) || out.MemberUUID != input.MemberUUID || !validRevision(out.Revision) || !validRevision(out.SourceRevision) || out.SourceRevision < ref.SourceRevision {
+			return nil, contractError("NOTIFICATION_CARD_RESPONSE_INVALID")
+		}
+		// The complete caller metadata must survive creation, not only business_card.
+		for key, value := range input.Metadata {
+			expectedJSON, _ := json.Marshal(value)
+			var expected any
+			_ = json.Unmarshal(expectedJSON, &expected)
+			received, present := out.Metadata[key]
+			if !present || !reflect.DeepEqual(expected, received) {
+				return nil, contractError("NOTIFICATION_CARD_RESPONSE_INVALID")
+			}
+		}
 	}
 	if input.Navigation != nil {
 		matched := false
@@ -199,7 +261,7 @@ func (c *Client) doJSON(ctx context.Context, method, path string, input, output 
 	if strings.TrimSpace(token) == "" {
 		return errors.New("powerx notifications token provider returned an empty token")
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", c.authScheme+" "+token)
 	resp, err := c.http.Do(req)
 	if err != nil {
 		if ctx.Err() != nil {
@@ -216,10 +278,12 @@ func (c *Client) doJSON(ctx context.Context, method, path string, input, output 
 		return &HTTPError{StatusCode: 502, ReasonCode: "NOTIFICATION_UPSTREAM_DEPENDENCY"}
 	}
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return &HTTPError{StatusCode: resp.StatusCode, ReasonCode: hostcontract.ParseReasonCode(raw, "NOTIFICATION_UPSTREAM_DEPENDENCY"), Body: string(raw)}
+		return DecodeHTTPError(resp.StatusCode, resp.Header, raw)
 	}
 	if err := hostcontract.DecodeData(raw, output); err != nil {
-		return &HTTPError{StatusCode: 502, ReasonCode: "NOTIFICATION_UPSTREAM_DEPENDENCY"}
+		failure := DecodeHTTPError(502, resp.Header, raw)
+		failure.ReasonCode = "NOTIFICATION_RESPONSE_INVALID"
+		return failure
 	}
 	return nil
 }
@@ -227,16 +291,3 @@ func (c *Client) doJSON(ctx context.Context, method, path string, input, output 
 type staticToken string
 
 func (t staticToken) Token(context.Context) (string, error) { return string(t), nil }
-
-type stsToken struct{ client *sts.Client }
-
-func (t stsToken) Token(ctx context.Context) (string, error) {
-	if t.client == nil {
-		return "", errors.New("powerx notifications sts client is required")
-	}
-	token, err := t.client.Token(ctx)
-	if err != nil {
-		return "", err
-	}
-	return token.AccessToken, nil
-}

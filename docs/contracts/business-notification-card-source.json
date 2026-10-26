@@ -1,0 +1,13 @@
+{
+  "source_repository": "ArtisanCloud/PowerX",
+  "source_commit": "0be9945cf7544bf18d0ed58be1043a313bba9de8",
+  "source_worktree_uncommitted": true,
+  "snapshot_date": "2026-10-22",
+  "sha256": {
+    "business-notification-card.md": "7b2f3d63b4ec9c7f122c44b1d7a0be814e03840bada4ee17012a2838cf503df1",
+    "business-notification-card.openapi.yaml": "009562b46eb0f257cbbc427e0bbc6fdf3c32f33bc7337d614af870f095537718",
+    "notification-member-delivery.openapi.yaml": "0ea2f9cdd6c7f6c19156a0cbf6718b533af7d5c197380a08891f41c5f3083bfa",
+    "fixtures/business-notification-card.v1.json": "b2368121349f94d1cf31788a183ccdbe27fa26f40dcd6cb9474fdede101273d8",
+    "fixtures/business-notification-card.v2.json": "7b1c37d54756b2dbe14b196ed01b57efedff27ecc8750f11647f36b08d3b6a1e"
+  }
+}

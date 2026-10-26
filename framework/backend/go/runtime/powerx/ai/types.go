@@ -3,8 +3,6 @@
 // HTTP requests or passing raw Gateway payloads.
 package ai
 
-import "encoding/json"
-
 type ContentItem struct {
 	Role    string `json:"role,omitempty"`
 	Type    string `json:"type"`
@@ -69,17 +67,4 @@ type EmbeddingInvokeOutput struct {
 	Vectors [][]float32       `json:"vectors"`
 	Usage   map[string]any    `json:"usage,omitempty"`
 	Extra   map[string]string `json:"extra,omitempty"`
-}
-
-// ModalInvokeInput is shared by VLM, image, video and TTS endpoints. The
-// provider-specific result stays as JSON because Core intentionally exposes
-// provider-defined result schemas for these modalities.
-type ModalInvokeInput struct {
-	ModelKey string         `json:"model_key"`
-	Inputs   []ContentItem  `json:"inputs"`
-	Params   map[string]any `json:"params,omitempty"`
-}
-
-type ModalInvokeOutput struct {
-	Data json.RawMessage
 }

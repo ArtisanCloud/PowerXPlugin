@@ -1,0 +1,61 @@
+<template>
+  <section :class="embedded ? 'ai-settings-test-panel' : 'ai-settings-panel ai-settings-test-panel min-w-0 overflow-hidden rounded-xl border'" :aria-label="t('aiSettings.workspace.testPanelTitle')">
+    <h2 v-if="!embedded" class="border-b border-default px-4 py-3 font-semibold text-highlighted">{{ "{{ t('aiSettings.workspace.testPanelTitle') }}" }}</h2>
+    <div :class="embedded ? 'space-y-4' : 'space-y-4 p-4'">
+      <p class="ai-settings-copy break-words text-xs">{{ "{{ t('aiSettings.testTarget', { modality: currentTitle, provider: providerLabel, model: modelLabel }) }}" }}</p>
+      <UFormField :label="t('aiSettings.testing.prompt')">
+        <UTextarea data-testid="ai-test-prompt" v-model="prompt" :disabled="Boolean(state.attempt) || Boolean(testing)" :rows="2" class="w-full" />
+      </UFormField>
+      <template v-if="modality === 'vlm'">
+        <UFormField :label="t('aiSettings.testing.imageType')"><USelect data-testid="ai-test-image-type" v-model="imageType" :items="imageTypeOptions" class="w-full" :disabled="Boolean(testing)" /></UFormField>
+        <UFormField :label="t('aiSettings.testing.image')"><UTextarea data-testid="ai-test-image" v-model="image" class="w-full" :disabled="Boolean(testing)" /></UFormField>
+      </template>
+      <p v-if="generation" class="ai-settings-caution text-xs">{{ "{{ t('aiSettings.testing.generationCost') }}" }}</p>
+      <p v-if="blockedReason" data-testid="ai-test-blocked" class="ai-settings-copy text-xs">{{ "{{ t(`aiSettings.testing.blocked.${blockedReason}`) }}" }}</p>
+      <div class="flex flex-wrap gap-2">
+        <UButton data-testid="ai-test-connection" size="sm" color="neutral" variant="outline" icon="i-heroicons-wifi" :disabled="Boolean(blockedReason) || Boolean(testing) || Boolean(state.task)" :loading="testing === 'connection'" @click="emit('connection')">{{ "{{ t('aiSettings.testConnection') }}" }}</UButton>
+        <UButton data-testid="ai-test-quick" size="sm" color="neutral" variant="ghost" icon="i-heroicons-command-line" :disabled="Boolean(blockedReason) || Boolean(testing) || Boolean(state.task)" :loading="testing === 'quick'" @click="emit('quick')">{{ "{{ t('aiSettings.quickCall') }}" }}</UButton>
+      </div>
+      <div class="ai-settings-test-result rounded-lg border border-default p-3" role="status" :aria-busy="Boolean(testing)">
+        <p data-testid="ai-test-result" class="max-h-60 overflow-auto whitespace-pre-wrap break-words text-sm text-default">{{ "{{ state.text || t('aiSettings.noTestResult') }}" }}</p>
+      </div>
+      <template v-if="state.task">
+        <p data-testid="ai-test-task-status" class="text-sm font-medium text-default">{{ "{{ t(`aiSettings.testing.taskStatus.${state.task.status}`) }}" }}</p>
+        <div class="flex flex-wrap gap-2">
+          <UButton data-testid="ai-test-refresh" size="sm" color="neutral" variant="outline" :disabled="Boolean(testing)" @click="emit('refresh')">{{ "{{ t('aiSettings.testing.refreshTask') }}" }}</UButton>
+          <UButton data-testid="ai-test-cancel" size="sm" color="neutral" variant="ghost" :disabled="Boolean(testing) || isMediaTaskTerminal(state.task) || state.task.cancel_status !== 'none'" @click="emit('cancel')">{{ "{{ t('aiSettings.testing.cancelTask') }}" }}</UButton>
+        </div>
+      </template>
+      <template v-if="state.attempt">
+        <p class="ai-settings-copy text-xs">{{ "{{ t('aiSettings.testing.attemptRetained') }}" }}</p>
+        <UButton data-testid="ai-test-new" size="sm" color="neutral" variant="outline" :disabled="Boolean(testing) || Boolean(state.task && !isMediaTaskTerminal(state.task))" @click="emit('new-attempt')">{{ "{{ t('aiSettings.testing.newAttempt') }}" }}</UButton>
+      </template>
+      <details v-if="state.diagnostic">
+        <summary class="ai-settings-copy cursor-pointer text-xs">{{ "{{ t('aiSettings.testing.diagnostics') }}" }}</summary>
+        <pre class="mt-2 max-h-60 overflow-auto whitespace-pre-wrap break-all text-xs text-default">{{ "{{ state.diagnostic }}" }}</pre>
+      </details>
+    </div>
+  </section>
+</template>
+
+<script setup lang="ts">
+import { isMediaTaskTerminal, type MediaTask } from '@artisan-cloud/plugin-framework-client';
+
+defineProps<{
+  embedded?: boolean;
+  currentTitle: string;
+  providerLabel: string;
+  modelLabel: string;
+  modality: string;
+  generation: boolean;
+  blockedReason?: string;
+  testing: '' | 'connection' | 'quick';
+  imageTypeOptions: { value: string; label: string }[];
+  state: { text: string; diagnostic: string; task?: MediaTask; attempt?: unknown };
+}>();
+const emit = defineEmits<{ connection: []; quick: []; refresh: []; cancel: []; 'new-attempt': [] }>();
+const prompt = defineModel<string>('prompt', { required: true });
+const image = defineModel<string>('image', { required: true });
+const imageType = defineModel<string>('imageType', { required: true });
+const { t } = useI18n();
+</script>

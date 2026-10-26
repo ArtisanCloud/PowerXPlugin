@@ -1,9 +1,12 @@
 package templates
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestRenderAll_EmbeddedTemplatesParse(t *testing.T) {
-	_, err := RenderAll(t.TempDir(), Data{
+	result, err := RenderAll(t.TempDir(), Data{
 		PluginID:           "com.powerx.template-test",
 		PluginName:         "Template Test",
 		PluginSlug:         "template-test",
@@ -22,6 +25,14 @@ func TestRenderAll_EmbeddedTemplatesParse(t *testing.T) {
 	}, Options{})
 	if err != nil {
 		t.Fatalf("RenderAll() error = %v", err)
+	}
+	for _, name := range result.Files {
+		if strings.Contains(name, "/backend/bin/") {
+			t.Fatal("PRODUCER_BINARY_TEMPLATE_NOT_ALLOWED")
+		}
+		if strings.HasSuffix(name, "_test.go") {
+			t.Fatal("OBSOLETE_PRODUCER_TEST_TEMPLATE_NOT_ALLOWED")
+		}
 	}
 }
 

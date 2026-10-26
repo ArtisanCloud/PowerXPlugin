@@ -25,6 +25,9 @@ type BaseNoTenantModel struct {
 }
 
 const (
+	TableRegressionRuns                  = "regression_runs"
+	TableRegressionCaseExecutions        = "regression_case_executions"
+	TableRegressionEvents                = "regression_events"
 	TablePluginTenantExt                 = "plugin_tenant_ext"
 	TableTemplate                        = "template"
 	TablePluginSkills                    = "plugin_skills"

@@ -1,0 +1,1 @@
+{"usage":"Use regression list, run or report with --api-base and --token-env.","blocked":"The regression run did not pass.","interrupted":"The stream stopped. Resume using the run UUID in the output.","invalid":"Invalid regression request or configuration.","token":"The specified token environment variable is empty."}

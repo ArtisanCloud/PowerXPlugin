@@ -1,0 +1,145 @@
+{
+  "schema": "framework_stable_release_validation.v1",
+  "recorded_at": "2026-10-26T13:41:32.316765+00:00",
+  "versions": {
+    "go": "v0.0.27",
+    "client": "0.0.14",
+    "admin": "0.0.13",
+    "cli": "v1.0.4"
+  },
+  "go": {
+    "status": "published",
+    "tag": "framework/backend/go/v0.0.27",
+    "target_sha": "9fb5fd3da219ceb8a56d7cc06c9aa19f6c033a24",
+    "release": {
+      "isDraft": false,
+      "isPrerelease": false,
+      "tagName": "framework/backend/go/v0.0.27",
+      "targetCommitish": "9fb5fd3da219ceb8a56d7cc06c9aa19f6c033a24",
+      "url": "https://github.com/ArtisanCloud/PowerXPlugin/releases/tag/framework/backend/go/v0.0.27"
+    },
+    "validation": {
+      "Path": "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go",
+      "Version": "v0.0.27",
+      "Sum": "h1:vQ5pzmcBX3OnNjh3IM0hLnAfDJQUhJ7WrWqehIHS31U=",
+      "GoModSum": "h1:Xmb97ZEMwaN9kaz32/7GHXR/oQESdc3ILbiCtOHh+2w=",
+      "recorded_at": "2026-10-26T13:34:24.555103+00:00",
+      "status": "passed",
+      "target_sha": "9fb5fd3da219ceb8a56d7cc06c9aa19f6c033a24",
+      "proxy": "https://proxy.golang.org",
+      "sumdb": "sum.golang.org",
+      "sumdb_bypass": false,
+      "isolated_cache": true,
+      "outside_repository": true,
+      "go_work": "off",
+      "local_replace": false,
+      "files": 510,
+      "consumer_install": "passed",
+      "public_ai_contracts": "passed",
+      "module_verify": "passed",
+      "temporary_consumer_removed": true
+    }
+  },
+  "client": {
+    "status": "packaged_npm_deferred",
+    "git_tagged": false,
+    "npm_published": false
+  },
+  "admin": {
+    "status": "packaged_npm_deferred",
+    "git_tagged": false,
+    "npm_published": false
+  },
+  "cli": {
+    "status": "references_ready_for_pr",
+    "git_tagged": false,
+    "target_tag": "v1.0.4"
+  },
+  "develop_ci": {
+    "status": "success",
+    "id": 40322727448,
+    "sha": "9fb5fd3da219ceb8a56d7cc06c9aa19f6c033a24",
+    "url": "https://github.com/ArtisanCloud/PowerXPlugin/actions/runs/40322727448"
+  },
+  "bundle": "artifacts/framework-release-20261026/bundles/71036c15c29fca5e",
+  "source_sha256": {
+    "go": "bab8f4868c4884159d52598aad34b4efe0e48379f7c32d0dbeb2468219b6d52f",
+    "client": "e25425daa22384267683d9a4702a11e17ca0de1943f1ecf6c1d81474b211f778",
+    "admin": "ade7ca01634e98b0f1a4a6e6991b8a1619359d9b4f23244f7a4e05f3d2d6b77f",
+    "cli": "6ca3df8742e78c1871973204a0a24333932b7c3e29df859390d6ed44ed2d725f",
+    "builder": "70adf9234d0ab1149ce8dab7bea59a777d01e715f1215ef4c27b6182b8d37c9a"
+  },
+  "local_artifact_sha256": {
+    "go-proxy/github.com/!artisan!cloud/!power!x!plugin/framework/backend/go/@v/v0.0.27.zip": "2248b911da513670de6ed725031faa51b00bb8f1b7509b55b93b729ea3244196",
+    "artisan-cloud-plugin-framework-client-0.0.14.tgz": "7327e462cb43a7af32237466b64b7da5b8ee11850a6a58d57d239679287220d7",
+    "artisan-cloud-plugin-framework-admin-0.0.13.tgz": "c93eed9e40c86ec483dbc0d2840fbf5f81c01fe3f54af8cd9335a549a34ec862",
+    "px-plugin": "83934e7c7c2c94fe128f373182f5bd3f754885e550b3d3a984a6649d70cf6f22"
+  },
+  "consumer_validation": {
+    "schema": "framework_dev_validation.v2",
+    "published": false,
+    "versions": {
+      "go": "v0.0.27",
+      "client": "0.0.14",
+      "admin": "0.0.13",
+      "cli": "v1.0.4"
+    },
+    "consumer_outside_repository": true,
+    "go_work": "off",
+    "isolated_go_module_cache": true,
+    "local_replace": false,
+    "source_symlinks": false,
+    "checks": {
+      "generated_plugin_install": "passed",
+      "installed_go_checksums": "passed",
+      "installed_packages_match_tarballs": "passed",
+      "manifest_validation": "passed",
+      "generated_backend_tests": "passed",
+      "packaged_ai_contract_tests": "passed",
+      "generated_backend_build": "passed",
+      "installed_typescript_exports": "passed",
+      "generated_nuxt_production_build": "passed"
+    },
+    "consumer_removed": true,
+    "status": "passed",
+    "public_go_proxy": true,
+    "public_go_checksum_database": true,
+    "installed": {
+      "nuxt": "4.4.2",
+      "@artisan-cloud/plugin-framework-client": "0.0.14",
+      "@artisan-cloud/plugin-framework-admin": "0.0.13"
+    },
+    "toolchain": {
+      "go": "go version go1.26.7 darwin/arm64",
+      "node": "v22.23.2",
+      "npm": "11.6.0"
+    }
+  },
+  "default_generation": {
+    "status": "passed",
+    "go": "v0.0.27",
+    "client": "0.0.14",
+    "admin": "0.0.13",
+    "environment_overrides": false,
+    "temporary_consumer_removed": true
+  },
+  "checks": {
+    "archive_regressions": {
+      "status": "passed",
+      "tests": 5
+    },
+    "cli_go_tests": {
+      "status": "passed",
+      "packages": 21
+    },
+    "template_sync": "passed",
+    "release_guardrails": "passed",
+    "tags_page_contains_stable_go_tag": true
+  },
+  "remaining_release_sequence": "merge version-alignment PR -> latest develop CI success -> CLI and frontend source tags; npm deferred by maintainer",
+  "source_branch": "025-framework-business-regression",
+  "user_services_unchanged": true,
+  "npm_credentials_unchanged": true,
+  "unrelated_worktree_changes_preserved": true,
+  "guide": "docs/releases/framework-20261026.md"
+}

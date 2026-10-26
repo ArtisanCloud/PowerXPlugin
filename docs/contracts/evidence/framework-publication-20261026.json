@@ -41,25 +41,71 @@
     }
   },
   "client": {
-    "status": "packaged_npm_deferred",
-    "git_tagged": false,
-    "npm_published": false
+    "status": "published_and_verified",
+    "git_tagged": true,
+    "tag": "framework/frontend/nuxt/framework-client/v0.0.14",
+    "npm_published": true,
+    "registry": {
+      "package": "@artisan-cloud/plugin-framework-client",
+      "version": "0.0.14",
+      "status": "published_and_verified",
+      "latest": "0.0.14",
+      "registry_git_head": null,
+      "source_sha": "4cbeaf6d823bf5196bb06bec4d89bc6f7b38dbd8",
+      "integrity": "sha512-AyayNCMPvxauQEVmYWjXl2EJc2ohbcN0pyO+5wSF/lMNicwSL0DJTe6nvBJnG3qXJcgxaSyEcONzBxRvhaAaLQ==",
+      "tarball": "https://registry.npmjs.org/@artisan-cloud/plugin-framework-client/-/plugin-framework-client-0.0.14.tgz",
+      "sha256": "7327e462cb43a7af32237466b64b7da5b8ee11850a6a58d57d239679287220d7",
+      "public_files_match_git": true,
+      "files": 18
+    }
   },
   "admin": {
-    "status": "packaged_npm_deferred",
-    "git_tagged": false,
-    "npm_published": false
+    "status": "published_and_verified",
+    "git_tagged": true,
+    "tag": "framework/frontend/nuxt/framework-admin/v0.0.13",
+    "npm_published": true,
+    "registry": {
+      "package": "@artisan-cloud/plugin-framework-admin",
+      "version": "0.0.13",
+      "status": "published_and_verified",
+      "latest": "0.0.13",
+      "registry_git_head": null,
+      "source_sha": "4cbeaf6d823bf5196bb06bec4d89bc6f7b38dbd8",
+      "integrity": "sha512-ynobGdYXJV0+5i3QSPeZCfTI/8cVkiD+k02UgCTClF0VZ+0LdVPnX3sT8rWaXpIbddRiXnroL8ZbpcUX9yfO7w==",
+      "tarball": "https://registry.npmjs.org/@artisan-cloud/plugin-framework-admin/-/plugin-framework-admin-0.0.13.tgz",
+      "sha256": "c93eed9e40c86ec483dbc0d2840fbf5f81c01fe3f54af8cd9335a549a34ec862",
+      "public_files_match_git": true,
+      "files": 19
+    }
   },
   "cli": {
-    "status": "references_ready_for_pr",
-    "git_tagged": false,
-    "target_tag": "v1.0.4"
+    "status": "tagged_and_release_build_passed",
+    "git_tagged": true,
+    "tag": "v1.0.4",
+    "source_sha": "4cbeaf6d823bf5196bb06bec4d89bc6f7b38dbd8",
+    "release_build": {
+      "id": 40342514415,
+      "status": "success",
+      "url": "https://github.com/ArtisanCloud/PowerXPlugin/actions/runs/40342514415"
+    },
+    "local_installation": {
+      "status": "passed",
+      "version": "px-plugin version v1.0.4",
+      "source_tag": "v1.0.4",
+      "source_sha": "4cbeaf6d823bf5196bb06bec4d89bc6f7b38dbd8",
+      "sha256": "bbde574f93e898ca3212b4e22e2490d3c70b969d7198443e59cf74fb8033632d",
+      "clean_git_archive": true,
+      "framework_source": "public_go_module",
+      "global_and_repo_bin_updated": true,
+      "old_binaries_backed_up": true
+    }
   },
   "develop_ci": {
     "status": "success",
-    "id": 40322727448,
-    "sha": "9fb5fd3da219ceb8a56d7cc06c9aa19f6c033a24",
-    "url": "https://github.com/ArtisanCloud/PowerXPlugin/actions/runs/40322727448"
+    "id": 40339672217,
+    "sha": "4cbeaf6d823bf5196bb06bec4d89bc6f7b38dbd8",
+    "checks": 10,
+    "url": "https://github.com/ArtisanCloud/PowerXPlugin/actions/runs/40339672217"
   },
   "bundle": "artifacts/framework-release-20261026/bundles/71036c15c29fca5e",
   "source_sha256": {
@@ -134,12 +180,69 @@
     },
     "template_sync": "passed",
     "release_guardrails": "passed",
-    "tags_page_contains_stable_go_tag": true
+    "tags_page_contains_stable_go_tag": true,
+    "public_npm_integrity": "passed",
+    "public_npm_files_match_source": "passed",
+    "public_npm_latest": "passed",
+    "public_generation_install_test_build": "passed",
+    "local_cli_upgrade": "passed"
   },
-  "remaining_release_sequence": "merge version-alignment PR -> latest develop CI success -> CLI and frontend source tags; npm deferred by maintainer",
+  "remaining_release_sequence": "complete",
   "source_branch": "025-framework-business-regression",
   "user_services_unchanged": true,
   "npm_credentials_unchanged": true,
   "unrelated_worktree_changes_preserved": true,
-  "guide": "docs/releases/framework-20261026.md"
+  "guide": "docs/releases/framework-20261026.md",
+  "updated_at": "2026-10-26T15:12:09.188817+00:00",
+  "status": "published_and_public_consumption_verified",
+  "public_consumer_validation": {
+    "schema": "framework_public_consumer_validation.v1",
+    "published": true,
+    "versions": {
+      "go": "v0.0.27",
+      "client": "0.0.14",
+      "admin": "0.0.13",
+      "cli": "v1.0.4"
+    },
+    "consumer_outside_repository": true,
+    "go_work": "off",
+    "isolated_go_module_cache": true,
+    "local_replace": false,
+    "source_symlinks": false,
+    "checks": {
+      "generated_plugin_install": "passed",
+      "installed_go_checksums": "passed",
+      "installed_packages_match_tarballs": "passed",
+      "manifest_validation": "passed",
+      "generated_backend_tests": "passed",
+      "packaged_ai_contract_tests": "passed",
+      "generated_backend_build": "passed",
+      "installed_typescript_exports": "passed",
+      "generated_nuxt_production_build": "passed",
+      "installed_registry_and_integrity": "passed"
+    },
+    "consumer_removed": true,
+    "status": "passed",
+    "cli": {
+      "version": "px-plugin version v1.0.4",
+      "source_tag": "v1.0.4",
+      "source_sha": "4cbeaf6d823bf5196bb06bec4d89bc6f7b38dbd8",
+      "sha256": "bbde574f93e898ca3212b4e22e2490d3c70b969d7198443e59cf74fb8033632d"
+    },
+    "public_npm_registry": true,
+    "isolated_npm_cache": true,
+    "npm_saved_credentials": false,
+    "public_go_proxy": true,
+    "public_go_checksum_database": true,
+    "installed": {
+      "nuxt": "4.4.2",
+      "@artisan-cloud/plugin-framework-client": "0.0.14",
+      "@artisan-cloud/plugin-framework-admin": "0.0.13"
+    },
+    "toolchain": {
+      "go": "go version go1.26.7 darwin/arm64",
+      "node": "v22.23.2",
+      "npm": "11.6.0"
+    }
+  }
 }

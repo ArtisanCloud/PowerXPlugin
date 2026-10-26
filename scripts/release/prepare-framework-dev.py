@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Package an unpublished Framework/CLI snapshot without source links or publishing."""
+"""Package a Framework/CLI release candidate without source links or publishing."""
 import argparse
 import hashlib
 import json
@@ -30,6 +30,7 @@ def main():
     parser.add_argument("--cli-version", required=True)
     parser.add_argument("--output", default="artifacts/framework-release-dev-20261026-2")
     parser.add_argument("--canonical-revision")
+    parser.add_argument("--stable", action="store_true")
     args = parser.parse_args()
     embedded = ROOT / "tools/cli/internal/templates/data"
     check_embedded_inputs(embedded)
@@ -38,7 +39,9 @@ def main():
     packages = {name: json.loads((ROOT / "framework/frontend/nuxt" / name / "package.json").read_text())
                 for name in ["framework-client", "framework-admin"]}
     for value in [version, args.cli_version, *[p["version"] for p in packages.values()]]:
-        if "-dev." not in value:
+        if args.stable and not re.fullmatch(r"v?\d+\.\d+\.\d+", value):
+            raise SystemExit("FRAMEWORK_STABLE_VERSION_REQUIRED:" + value)
+        if not args.stable and "-dev." not in value:
             raise SystemExit("FRAMEWORK_DEV_VERSION_REQUIRED:" + value)
     client_version = packages["framework-client"]["version"]
     admin_version = packages["framework-admin"]["version"]

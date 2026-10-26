@@ -16,6 +16,7 @@ MODULE = "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go"
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("bundle", type=Path)
+    parser.add_argument("--public-go", action="store_true")
     args = parser.parse_args()
     bundle = args.bundle.resolve()
     refs = json.loads((bundle / "references.json").read_text())
@@ -37,10 +38,15 @@ def main():
                PX_PLUGIN_FRAMEWORK_ADMIN_REF=admin_ref, PX_PLUGIN_FRAMEWORK_CLIENT_REF=client_ref,
                NPM_CONFIG_AUDIT="false", NPM_CONFIG_FUND="false")
     env.pop("POWERXPLUGIN_USE_LOCAL_FRONTEND", None)
+    if args.public_go:
+        env.update(GOENV="off", GOPROXY="https://proxy.golang.org", GOSUMDB="sum.golang.org",
+                   GOPRIVATE="", GONOPROXY="", GONOSUMDB="")
     results = {"schema": "framework_dev_validation.v2", "published": False,
                "versions": versions, "consumer_outside_repository": True,
                "go_work": "off", "isolated_go_module_cache": True, "local_replace": False,
                "source_symlinks": False, "checks": {}, "consumer_removed": False, "status": "failed"}
+    results["public_go_proxy"] = args.public_go
+    results["public_go_checksum_database"] = args.public_go
     try:
         with (bundle / "consumer-validation.log").open("w") as log:
             def run(name, command, cwd):

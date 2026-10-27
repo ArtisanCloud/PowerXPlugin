@@ -190,7 +190,7 @@ func SeedLocalAdmin(ctx context.Context, db *gorm.DB, cfg *config.Config, mode I
 		var rel iamm.MemberRole
 		if err := tx.Where("member_id = ? AND role_id = ?", member.ID, role.ID).First(&rel).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				rel = iamm.MemberRole{UserID: member.ID, RoleID: role.ID}
+				rel = iamm.MemberRole{MemberUUID: member.UUID, RoleUUID: role.UUID, UserID: member.ID, RoleID: role.ID}
 				if err := tx.Create(&rel).Error; err != nil {
 					return err
 				}
@@ -208,7 +208,7 @@ func SeedLocalAdmin(ctx context.Context, db *gorm.DB, cfg *config.Config, mode I
 				return err
 			}
 		}
-		if err := seedDefaultPermissions(tx, role.ID, tenantUUID); err != nil {
+		if err := seedDefaultPermissions(tx, role.ID, role.UUID, tenantUUID); err != nil {
 			return err
 		}
 		return seedDefaultTenantUserRole(tx, tenantUUID)
@@ -303,7 +303,7 @@ func ensureDefaultDepartment(tx *gorm.DB, tenantUUID string) (*uint64, error) {
 	return &dept.ID, nil
 }
 
-func seedDefaultPermissions(tx *gorm.DB, roleID uint64, tenantUUID string) error {
+func seedDefaultPermissions(tx *gorm.DB, roleID uint64, roleUUID string, tenantUUID string) error {
 	tenantUUID = strings.ToLower(strings.TrimSpace(tenantUUID))
 	perms := []struct {
 		Resource string
@@ -329,10 +329,12 @@ func seedDefaultPermissions(tx *gorm.DB, roleID uint64, tenantUUID string) error
 			}
 		}
 		rp := iamm.RolePermission{
-			RoleID:        roleID,
-			PermissionID:  perm.ID,
-			TenantUuid:    tenantUUID,
-			PolicyVersion: defaultPolicyVersion,
+			RoleUUID:       roleUUID,
+			PermissionUUID: perm.UUID,
+			RoleID:         roleID,
+			PermissionID:   perm.ID,
+			TenantUuid:     tenantUUID,
+			PolicyVersion:  defaultPolicyVersion,
 		}
 		if err := tx.Where("role_id = ? AND permission_id = ?", roleID, perm.ID).FirstOrCreate(&rp).Error; err != nil {
 			return err
@@ -401,10 +403,12 @@ func seedDefaultTenantUserRole(tx *gorm.DB, tenantUUID string) error {
 		}
 
 		rp := iamm.RolePermission{
-			RoleID:        role.ID,
-			PermissionID:  perm.ID,
-			TenantUuid:    tenantUUID,
-			PolicyVersion: defaultPolicyVersion,
+			RoleUUID:       role.UUID,
+			PermissionUUID: perm.UUID,
+			RoleID:         role.ID,
+			PermissionID:   perm.ID,
+			TenantUuid:     tenantUUID,
+			PolicyVersion:  defaultPolicyVersion,
 		}
 		if err := tx.Where("role_id = ? AND permission_id = ?", role.ID, perm.ID).FirstOrCreate(&rp).Error; err != nil {
 			return err

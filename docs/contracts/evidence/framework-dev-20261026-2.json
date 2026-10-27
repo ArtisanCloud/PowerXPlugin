@@ -1,0 +1,107 @@
+{
+  "schema": "framework_dev_release_validation.v2",
+  "recorded_at": "2026-10-26T07:39:02.668279+00:00",
+  "status": "checksum_correction_ready_for_pr",
+  "published": false,
+  "git_tagged": false,
+  "versions": {
+    "go": "v0.0.27-dev.20261026.2",
+    "client": "0.0.14-dev.20261026.2",
+    "admin": "0.0.13-dev.20261026.2",
+    "cli": "v1.0.4-dev.20261026.2"
+  },
+  "go_checksums": {
+    "sum": "h1:Yq8XFoEAxn0f+8qezJdn6jmK3IyNPLdU/sY88DBxACU=",
+    "go_mod_sum": "h1:Xmb97ZEMwaN9kaz32/7GHXR/oQESdc3ILbiCtOHh+2w="
+  },
+  "go_canonical_git_revision": "abfc0e871049694a19fee98502f9ef6f237cc02e",
+  "canonical_go_files": 510,
+  "coverage_out_in_archive": false,
+  "tracked_hidden_files_included": true,
+  "public_go_proxy_source": {
+    "Path": "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go",
+    "Version": "v0.0.27-0.20261026061225-abfc0e871049",
+    "Sum": "h1:t7BKyzmWyVcOAu6a8WG1QE6V3vI7vq1x91f1uZo/h/E=",
+    "GoModSum": "h1:Xmb97ZEMwaN9kaz32/7GHXR/oQESdc3ILbiCtOHh+2w="
+  },
+  "public_proxy_file_contents_equal": true,
+  "bundle": "artifacts/framework-release-dev-20261026-2/839e59734cc1c9a3",
+  "source_sha256": {
+    "go": "bab8f4868c4884159d52598aad34b4efe0e48379f7c32d0dbeb2468219b6d52f",
+    "client": "41a1d20ce0cd4b7c9234d93bec44a06ee170d26ec74d62f95f17c9cd9a695afb",
+    "admin": "4bf751beb361e93063407e197c4af507d18f07add9906283ed9106e79b713496",
+    "cli": "58aa59dfad3dc6ce568567149e65b93e8d7309aaebe815bda352b95a67fde625",
+    "builder": "0d31902db72c759d47591b5f272715cc45fa215a07f4cb344a031c93b7ad6797"
+  },
+  "artifact_sha256": {
+    "go-proxy/github.com/!artisan!cloud/!power!x!plugin/framework/backend/go/@v/v0.0.27-dev.20261026.2.zip": "82cae5c85c80deddd09a8026b4c4937cb527efe801c95497aa5027043598a198",
+    "artisan-cloud-plugin-framework-client-0.0.14-dev.20261026.2.tgz": "c0953c106e204d853b2cc6da947931f48caa695d583de4eb2dd007c709ea8f9a",
+    "artisan-cloud-plugin-framework-admin-0.0.13-dev.20261026.2.tgz": "64194c5253533f3214d1187e47ddbd794cd6373354d63808d61bbce1bd371c72",
+    "px-plugin": "bb8ddd442e774460809048ba6c25ced2e4ee31e034c0b6256b366f6489daab48"
+  },
+  "validation": {
+    "schema": "framework_dev_validation.v2",
+    "published": false,
+    "versions": {
+      "go": "v0.0.27-dev.20261026.2",
+      "client": "0.0.14-dev.20261026.2",
+      "admin": "0.0.13-dev.20261026.2",
+      "cli": "v1.0.4-dev.20261026.2"
+    },
+    "consumer_outside_repository": true,
+    "go_work": "off",
+    "isolated_go_module_cache": true,
+    "local_replace": false,
+    "source_symlinks": false,
+    "checks": {
+      "generated_plugin_install": "passed",
+      "installed_go_checksums": "passed",
+      "installed_packages_match_tarballs": "passed",
+      "manifest_validation": "passed",
+      "generated_backend_tests": "passed",
+      "packaged_ai_contract_tests": "passed",
+      "generated_backend_build": "passed",
+      "installed_typescript_exports": "passed",
+      "generated_nuxt_production_build": "passed"
+    },
+    "consumer_removed": true,
+    "status": "passed",
+    "installed": {
+      "nuxt": "4.4.2",
+      "@artisan-cloud/plugin-framework-client": "0.0.14-dev.20261026.2",
+      "@artisan-cloud/plugin-framework-admin": "0.0.13-dev.20261026.2"
+    },
+    "toolchain": {
+      "go": "go version go1.26.7 darwin/arm64",
+      "node": "v22.23.2",
+      "npm": "11.6.0"
+    },
+    "identical_artifacts_validation_source": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-dev-20261026-2/c50930fd9c62a9be"
+  },
+  "checks": {
+    "archive_regressions": {
+      "status": "passed",
+      "tests": 5
+    },
+    "cli_go_tests": {
+      "status": "passed",
+      "packages": 21
+    },
+    "final_payload_identity": "passed",
+    "activation_generation_smoke": "passed",
+    "workflow_yaml": "passed",
+    "template_sync": "passed",
+    "agent_paths": "passed",
+    "diff_check": "passed"
+  },
+  "release_sequence": "PR merge -> latest develop CI success -> Git tags; npm deferred by maintainer",
+  "user_branch": "025-framework-business-regression",
+  "local_environment": {
+    "existing_cli_not_replaced": true,
+    "old_dev1_bundle_preserved": true,
+    "user_services_unchanged": true,
+    "npm_credentials_unchanged": true,
+    "temporary_consumers_removed": true
+  },
+  "guide": "docs/releases/framework-dev-20261026-2.md"
+}

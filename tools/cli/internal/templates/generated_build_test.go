@@ -18,11 +18,11 @@ func TestGeneratedBackendBuild(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	version, proxy := "v0.0.27-dev.20261026.1", ""
+	version, proxy := "v0.0.27", ""
 	if os.Getenv("PX_TEST_FRAMEWORK_SNAPSHOT") == "1" {
 		proxy, version = frameworkSnapshot(t)
 	}
-	_, err = RenderAll(dir, Data{NotificationPresentations: bindings, PluginID: "com.powerx.generated-test", PluginName: "Generated Test", PluginSlug: "generated-test", PluginDBName: "generated_test", Version: "0.1.0", GoVersion: "1.24", BackendModulePath: "example.com/generated/backend", BackendType: BackendGoGin, FrontendType: FrontendNuxt, AppFrontendType: FrontendNuxt, BackendPort: 8078, FrontendPort: 3131, FrameworkVersion: version, FrameworkAdminRef: "0.0.13-dev.20261026.1", FrameworkClientRef: "0.0.14-dev.20261026.1"}, Options{})
+	_, err = RenderAll(dir, Data{NotificationPresentations: bindings, PluginID: "com.powerx.generated-test", PluginName: "Generated Test", PluginSlug: "generated-test", PluginDBName: "generated_test", Version: "0.1.0", GoVersion: "1.24", BackendModulePath: "example.com/generated/backend", BackendType: BackendGoGin, FrontendType: FrontendNuxt, AppFrontendType: FrontendNuxt, BackendPort: 8078, FrontendPort: 3131, FrameworkVersion: version, FrameworkAdminRef: "0.0.13", FrameworkClientRef: "0.0.14"}, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}

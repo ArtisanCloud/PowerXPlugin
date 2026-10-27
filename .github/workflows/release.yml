@@ -7,8 +7,8 @@ on:
       - 'v*'
 
 env:
-  GO_VERSION: '1.21'
-  NODE_VERSION: '20.19.0'
+  GO_VERSION: '1.24'
+  NODE_VERSION: '22.23.2'
 
 jobs:
   release:
@@ -38,32 +38,19 @@ jobs:
           (cd framework/backend/go && go test ./...)
           (cd tools/cli && go test ./...)
 
+      - name: Verify SDK archive inputs and checksums
+        run: python3 -m unittest discover -s scripts/release -p 'test_framework_archive.py'
+
+      - name: Verify generated backend with packaged Framework
+        run: PX_TEST_GENERATED_BUILD=1 PX_TEST_FRAMEWORK_SNAPSHOT=1 go test ./tools/cli/internal/templates -run '^(TestGeneratedBackendBuild|TestIAMBaselineGeneratedPlugin)$' -count=1 -timeout=10m
+
       - name: Build CLI binary
         run: |
           mkdir -p dist
-          go build -o dist/px-plugin ./tools/cli/cmd/px-plugin
-
-      - name: Prepare release workspace
-        run: mkdir -p examples
-
-      - name: Generate release starter snapshot
-        run: go run ../tools/cli/cmd/px-plugin init --force com.powerx.release
-        working-directory: examples
-
-      - name: Run px-plugin package (experimental)
-        run: go run ../../tools/cli/cmd/px-plugin package
-        working-directory: examples/com.powerx.release
-
-      - name: Run px-plugin dist (experimental)
-        run: go run ../../tools/cli/cmd/px-plugin dist
-        working-directory: examples/com.powerx.release
-
-      - name: Run px-plugin publish (experimental)
-        run: go run ../../tools/cli/cmd/px-plugin publish --token="${{ secrets.MARKETPLACE_TOKEN || 'placeholder' }}"
-        working-directory: examples/com.powerx.release
+          go build -ldflags "-X main.version=${GITHUB_REF_NAME}" -o dist/px-plugin ./tools/cli/cmd/px-plugin
 
       - name: Archive CLI binary
-        run: tar -czf dist/px-plugin-${{ github.ref_name }}.tar.gz -C dist px-plugin
+        run: tar -czf "dist/px-plugin-${GITHUB_REF_NAME}.tar.gz" -C dist px-plugin
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -79,7 +66,6 @@ jobs:
           cat <<'EOF' >> $GITHUB_STEP_SUMMARY
           ## Release recap
           - CLI binary built and uploaded.
-          - Starter snapshot generated via `px-plugin init`.
-          - Experimental package/dist/publish commands executed (no-op).
-          - Marketplace token expected via `MARKETPLACE_TOKEN` secret once API is ready.
+          - SDK archive inputs and Go checksums verified.
+          - Generated backend verified with a packaged Framework snapshot.
           EOF

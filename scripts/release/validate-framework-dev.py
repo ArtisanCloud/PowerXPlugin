@@ -16,9 +16,12 @@ MODULE = "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go"
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("bundle", type=Path)
+    parser.add_argument("--public-go", action="store_true")
     args = parser.parse_args()
     bundle = args.bundle.resolve()
     refs = json.loads((bundle / "references.json").read_text())
+    if refs.get("schema") != "framework_dev_bundle.v2":
+        raise SystemExit("FRAMEWORK_DEV_BUNDLE_VERSION_INVALID")
     for name, expected in refs["artifacts"].items():
         if hashlib.sha256((bundle / name).read_bytes()).hexdigest() != expected:
             raise SystemExit("FRAMEWORK_ARTIFACT_CHECKSUM_MISMATCH:" + name)
@@ -35,10 +38,15 @@ def main():
                PX_PLUGIN_FRAMEWORK_ADMIN_REF=admin_ref, PX_PLUGIN_FRAMEWORK_CLIENT_REF=client_ref,
                NPM_CONFIG_AUDIT="false", NPM_CONFIG_FUND="false")
     env.pop("POWERXPLUGIN_USE_LOCAL_FRONTEND", None)
-    results = {"schema": "framework_dev_validation.v1", "published": False,
+    if args.public_go:
+        env.update(GOENV="off", GOPROXY="https://proxy.golang.org", GOSUMDB="sum.golang.org",
+                   GOPRIVATE="", GONOPROXY="", GONOSUMDB="")
+    results = {"schema": "framework_dev_validation.v2", "published": False,
                "versions": versions, "consumer_outside_repository": True,
                "go_work": "off", "isolated_go_module_cache": True, "local_replace": False,
                "source_symlinks": False, "checks": {}, "consumer_removed": False, "status": "failed"}
+    results["public_go_proxy"] = args.public_go
+    results["public_go_checksum_database"] = args.public_go
     try:
         with (bundle / "consumer-validation.log").open("w") as log:
             def run(name, command, cwd):
@@ -58,6 +66,11 @@ def main():
             mod = (backend / "go.mod").read_text()
             if versions["go"] not in mod or "replace " + MODULE in mod:
                 raise RuntimeError("FRAMEWORK_CONSUMER_GO_REFERENCE_INVALID")
+            sums = (backend / "go.sum").read_text().splitlines()
+            for suffix, expected in [("", refs["go_checksums"]["sum"]), ("/go.mod", refs["go_checksums"]["go_mod_sum"])]:
+                if MODULE + " " + versions["go"] + suffix + " " + expected not in sums:
+                    raise RuntimeError("FRAMEWORK_CONSUMER_CHECKSUM_MISMATCH")
+            results["checks"]["installed_go_checksums"] = "passed"
             package = json.loads((frontend / "package.json").read_text())
             for name, expected in [("framework-client", client_ref), ("framework-admin", admin_ref)]:
                 key = "@artisan-cloud/plugin-" + name

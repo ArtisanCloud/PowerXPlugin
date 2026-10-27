@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Package an unpublished Framework/CLI snapshot without source links or publishing."""
+"""Package a Framework/CLI release candidate without source links or publishing."""
 import argparse
 import hashlib
 import json
@@ -7,22 +7,11 @@ from pathlib import Path
 import re
 import shlex
 import subprocess
-import zipfile
+from framework_archive import check_embedded_inputs, check_locked_checksums, committed_files, module_checksums, source_files, write_module_zip
 
 ROOT = Path(__file__).resolve().parents[2]
 MODULE = "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go"
 ESCAPED = "github.com/!artisan!cloud/!power!x!plugin/framework/backend/go"
-EXCLUDED = {"node_modules", "bin", "obj", "vendor", "__pycache__", "test-results"}
-
-
-def source_files(directory):
-    return {p.relative_to(directory).as_posix(): p.read_bytes()
-            for p in sorted(directory.rglob("*"))
-            if p.is_file() and not p.is_symlink()
-            and not any(part in EXCLUDED or part.startswith(".")
-                        for part in p.relative_to(directory).parts[:-1])
-            and (not p.name.startswith(".") or p.name.endswith(".tmpl"))
-            and p.name != "px-plugin"}
 
 
 def digest(files):
@@ -39,19 +28,20 @@ def run(args, **kwargs):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--cli-version", required=True)
-    parser.add_argument("--output", default="artifacts/framework-release-dev-20261026")
+    parser.add_argument("--output", default="artifacts/framework-release-dev-20261026-2")
+    parser.add_argument("--canonical-revision")
+    parser.add_argument("--stable", action="store_true")
     args = parser.parse_args()
     embedded = ROOT / "tools/cli/internal/templates/data"
-    for path in embedded.rglob("*"):
-        if path.is_file() and any(part in {"bin", "node_modules", ".nuxt", ".output"}
-                                  for part in path.relative_to(embedded).parts):
-            raise SystemExit("TEMPLATE_BUILD_ARTIFACT_NOT_ALLOWED:" + str(path))
+    check_embedded_inputs(embedded)
     init = (ROOT / "tools/cli/cmd/init.go").read_text()
     version = re.search(r'defaultFrameworkVersion\s*=\s*"([^"]+)"', init)[1]
     packages = {name: json.loads((ROOT / "framework/frontend/nuxt" / name / "package.json").read_text())
                 for name in ["framework-client", "framework-admin"]}
     for value in [version, args.cli_version, *[p["version"] for p in packages.values()]]:
-        if "-dev." not in value:
+        if args.stable and not re.fullmatch(r"v?\d+\.\d+\.\d+", value):
+            raise SystemExit("FRAMEWORK_STABLE_VERSION_REQUIRED:" + value)
+        if not args.stable and "-dev." not in value:
             raise SystemExit("FRAMEWORK_DEV_VERSION_REQUIRED:" + value)
     client_version = packages["framework-client"]["version"]
     admin_version = packages["framework-admin"]["version"]
@@ -67,7 +57,13 @@ def main():
         "admin": source_files(ROOT / "framework/frontend/nuxt/framework-admin"),
         "cli": source_files(ROOT / "tools/cli"),
     }
-    trees["builder"] = {"prepare-framework-dev.py": Path(__file__).read_bytes()}
+    canonical_revision = None
+    if args.canonical_revision:
+        canonical_revision = run(["git", "rev-parse", args.canonical_revision], cwd=ROOT).strip()
+        if trees["go"] != committed_files(ROOT, canonical_revision, "framework/backend/go"):
+            raise SystemExit("FRAMEWORK_CANONICAL_SOURCE_MISMATCH")
+    trees["builder"] = {name: (ROOT / "scripts/release" / name).read_bytes()
+                        for name in ["prepare-framework-dev.py", "framework_archive.py", "validate-framework-dev.py"]}
     hashes = {name: digest(files) for name, files in trees.items()}
     bundle_id = hashlib.sha256(json.dumps(hashes, sort_keys=True).encode()).hexdigest()[:16]
     bundle = (ROOT / args.output / bundle_id).resolve()
@@ -80,12 +76,9 @@ def main():
     (proxy / (version + ".info")).write_text(json.dumps({"Version": version, "Time": "2026-10-26T00:00:00Z"}))
     (proxy / "list").write_text(version + "\n")
     module_zip = proxy / (version + ".zip")
-    with zipfile.ZipFile(module_zip, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        for name, raw in sorted(trees["go"].items()):
-            info = zipfile.ZipInfo(MODULE + "@" + version + "/" + name, (2026, 10, 26, 0, 0, 0))
-            info.compress_type = zipfile.ZIP_DEFLATED
-            info.external_attr = 0o100644 << 16
-            archive.writestr(info, raw)
+    write_module_zip(module_zip, MODULE, version, trees["go"])
+    checksums = module_checksums(bundle / "go-proxy", MODULE, version)
+    check_locked_checksums(ROOT / "tools/cli/go.sum", MODULE, version, checksums)
 
     tarballs = {}
     for name, package in packages.items():
@@ -114,11 +107,12 @@ def main():
                                     "\nexec " + shlex.quote(str(binary)) + ' init "$@"\n')
     (bundle / "init.sh").chmod(0o755)
     references = {
-        "schema": "framework_dev_bundle.v1", "published": False,
+        "schema": "framework_dev_bundle.v2", "published": False,
         "versions": {"go": version, "client": client_version, "admin": admin_version, "cli": args.cli_version},
         "base_commit": run(["git", "rev-parse", "HEAD"], cwd=ROOT).strip(),
         "source": "current_worktree_including_uncommitted_files", "source_sha256": hashes,
         "go_module": MODULE, "go_proxy": "file://" + str(bundle / "go-proxy"),
+        "go_checksums": checksums, "go_canonical_git_revision": canonical_revision,
         "artifacts": {str(p.relative_to(bundle)): hashlib.sha256(p.read_bytes()).hexdigest()
                       for p in [module_zip, *tarballs.values(), binary]},
         "activation": str(bundle / "activate.sh"), "init": str(bundle / "init.sh"),

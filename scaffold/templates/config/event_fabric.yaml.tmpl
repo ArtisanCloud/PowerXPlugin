@@ -131,3 +131,15 @@ topics:
       - principal_type: plugin
         principal_id: "plugin:{{ .PluginID }}"
         actions: [publish]
+
+  - key: _topic.knowledge.ingestion.progress
+    namespace: _topic.knowledge.ingestion
+    name: progress
+    description: 本地知识入库进度事件
+    acl:
+      - principal_type: member
+        principal_id: "member:system"
+        actions: [publish, subscribe]
+      - principal_type: plugin
+        principal_id: "plugin:{{ .PluginID }}"
+        actions: [publish]

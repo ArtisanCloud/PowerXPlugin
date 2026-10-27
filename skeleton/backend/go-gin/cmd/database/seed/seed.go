@@ -285,6 +285,10 @@ func metadataSeedTenantUUIDs(db *gorm.DB) ([]string, error) {
 		out = append(out, value)
 	}
 	add(defaultTenantUUID)
+	// delegated 模式不迁移本地 IAM 表，租户由宿主维护，此时仅使用默认租户。
+	if !db.Migrator().HasTable(&identitymodel.Tenant{}) {
+		return out, nil
+	}
 	var tenants []identitymodel.Tenant
 	if err := db.Find(&tenants).Error; err != nil {
 		return nil, err

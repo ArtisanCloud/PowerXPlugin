@@ -964,7 +964,11 @@ func (s *WeComSyncTaskService) ensureDefaultMemberRole(tx *gorm.DB, tenantUUID s
 	if role == nil || role.ID == 0 {
 		return nil
 	}
-	rel := model.MemberRole{UserID: memberID, RoleID: role.ID}
+	var member model.Member
+	if err := tx.Select("id", "uuid").Where("id = ?", memberID).First(&member).Error; err != nil {
+		return err
+	}
+	rel := model.MemberRole{MemberUUID: member.UUID, RoleUUID: role.UUID, UserID: memberID, RoleID: role.ID}
 	return tx.Where("member_id = ? AND role_id = ?", memberID, role.ID).FirstOrCreate(&rel).Error
 }
 
@@ -1028,10 +1032,12 @@ func (s *WeComSyncTaskService) ensureTenantUserRole(tx *gorm.DB, tenantUUID stri
 		}
 
 		rp := model.RolePermission{
-			RoleID:        role.ID,
-			PermissionID:  perm.ID,
-			TenantUuid:    strings.ToLower(strings.TrimSpace(tenantUUID)),
-			PolicyVersion: "local.v1",
+			RoleUUID:       role.UUID,
+			PermissionUUID: perm.UUID,
+			RoleID:         role.ID,
+			PermissionID:   perm.ID,
+			TenantUuid:     strings.ToLower(strings.TrimSpace(tenantUUID)),
+			PolicyVersion:  "local.v1",
 		}
 		if err := tx.Where("role_id = ? AND permission_id = ?", role.ID, perm.ID).FirstOrCreate(&rp).Error; err != nil {
 			return nil, err

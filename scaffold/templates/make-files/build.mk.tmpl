@@ -254,6 +254,11 @@ dist: dist-target-check plugin-yaml-check plugin-permission-declaration-check di
 	  mkdir -p $(DIST_DIR)/skills; \
 	  cp -R skills/. $(DIST_DIR)/skills/; \
 	fi
+	@# AI provider catalog：安装态无 config.yaml，后端按 POWERX_PLUGIN_ROOT/可执行文件位置回退到 backend/etc/ai/providers.d
+	@if [ -d "backend/etc/ai/providers.d" ]; then \
+	  mkdir -p $(DIST_DIR)/backend/etc/ai/providers.d; \
+	  cp -R backend/etc/ai/providers.d/. $(DIST_DIR)/backend/etc/ai/providers.d/; \
+	fi
 	@set -e; if [ "$(BACKEND)" = "fastapi" ]; then \
 	  mkdir -p "$(DIST_DIR)/backend"; \
 	  cp -R "$(BACKEND_DIR)/app" "$(DIST_DIR)/backend/"; \

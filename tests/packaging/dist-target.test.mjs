@@ -58,6 +58,8 @@ function fixture(name, sourceTarget = '') {
   )
   fs.mkdirSync(path.join(directory, 'backend/cmd/plugin'), { recursive: true })
   fs.mkdirSync(path.join(directory, 'backend/cmd/database'), { recursive: true })
+  fs.mkdirSync(path.join(directory, 'backend/etc/ai/providers.d'), { recursive: true })
+  fs.writeFileSync(path.join(directory, 'backend/etc/ai/providers.d/fixture.yaml'), 'provider: fixture\n')
   fs.writeFileSync(
     path.join(directory, 'backend/go.mod'),
     'module example.com/distfixture\n\ngo 1.24\n'
@@ -175,6 +177,7 @@ for (const target of [
     const manifest = parse(fs.readFileSync(path.join(artifact, 'plugin.yaml'), 'utf8'))
     assert.deepEqual(manifest.target, { os: target.os, arch: target.arch })
     assert.equal(manifest.version, '2.0.0')
+    assert.equal(fs.readFileSync(path.join(artifact, 'backend/etc/ai/providers.d/fixture.yaml'), 'utf8'), 'provider: fixture\n')
     assert.equal(fs.readFileSync(path.join(directory, 'plugin.yaml'), 'utf8'), original)
     for (const binary of ['plugin', 'migrate'])
       assert.deepEqual(readGoTarget(path.join(artifact, 'backend/bin', binary)), manifest.target)

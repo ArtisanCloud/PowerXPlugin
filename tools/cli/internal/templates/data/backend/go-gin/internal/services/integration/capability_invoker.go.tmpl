@@ -282,7 +282,7 @@ func (h *templatePrepareHandler) Handle(ctx context.Context, envelope *domain.In
 }
 
 func (h *templatePrepareHandler) CapabilityID() string {
-	return "com.powerx.plugins.base.template.prepare"
+	return "{{ .PluginID }}.template.prepare"
 }
 
 type templateReferenceResolution struct {
@@ -445,7 +445,7 @@ func (h *templateListHandler) Handle(ctx context.Context, envelope *domain.Integ
 }
 
 func (h *templateListHandler) CapabilityID() string {
-	return "com.powerx.plugins.base.template.list"
+	return "{{ .PluginID }}.template.list"
 }
 
 type templateReadHandler struct {
@@ -473,7 +473,7 @@ func (h *templateReadHandler) Handle(ctx context.Context, envelope *domain.Integ
 }
 
 func (h *templateReadHandler) CapabilityID() string {
-	return "com.powerx.plugins.base.template.read"
+	return "{{ .PluginID }}.template.read"
 }
 
 type templateCreateHandler struct {
@@ -509,7 +509,7 @@ func (h *templateCreateHandler) Handle(ctx context.Context, envelope *domain.Int
 }
 
 func (h *templateCreateHandler) CapabilityID() string {
-	return "com.powerx.plugins.base.template.create"
+	return "{{ .PluginID }}.template.create"
 }
 
 type templateUpdateHandler struct {
@@ -553,7 +553,7 @@ func (h *templateUpdateHandler) Handle(ctx context.Context, envelope *domain.Int
 }
 
 func (h *templateUpdateHandler) CapabilityID() string {
-	return "com.powerx.plugins.base.template.update"
+	return "{{ .PluginID }}.template.update"
 }
 
 type templateDeleteHandler struct {
@@ -582,7 +582,7 @@ func (h *templateDeleteHandler) Handle(ctx context.Context, envelope *domain.Int
 }
 
 func (h *templateDeleteHandler) CapabilityID() string {
-	return "com.powerx.plugins.base.template.delete"
+	return "{{ .PluginID }}.template.delete"
 }
 
 type templateValidateHandler struct {
@@ -609,7 +609,7 @@ func (h *templateValidateHandler) Handle(ctx context.Context, envelope *domain.I
 }
 
 func (h *templateValidateHandler) CapabilityID() string {
-	return "com.powerx.plugins.base.template.validate"
+	return "{{ .PluginID }}.template.validate"
 }
 
 type templateBatchCloneHandler struct {
@@ -639,7 +639,7 @@ func (h *templateBatchCloneHandler) Handle(ctx context.Context, envelope *domain
 }
 
 func (h *templateBatchCloneHandler) CapabilityID() string {
-	return "com.powerx.plugins.base.template.batch_clone"
+	return "{{ .PluginID }}.template.batch_clone"
 }
 
 type templateReviewHandler struct {
@@ -680,7 +680,7 @@ func (h *templateReviewHandler) Handle(ctx context.Context, envelope *domain.Int
 }
 
 func (h *templateReviewHandler) CapabilityID() string {
-	return "com.powerx.plugins.base.template.review"
+	return "{{ .PluginID }}.template.review"
 }
 
 type templatePublishHandler struct {
@@ -713,7 +713,7 @@ func (h *templatePublishHandler) Handle(ctx context.Context, envelope *domain.In
 }
 
 func (h *templatePublishHandler) CapabilityID() string {
-	return "com.powerx.plugins.base.template.publish"
+	return "{{ .PluginID }}.template.publish"
 }
 
 type templateComposeHandler struct {
@@ -841,7 +841,7 @@ func (h *templateComposeHandler) Handle(ctx context.Context, envelope *domain.In
 }
 
 func (h *templateComposeHandler) CapabilityID() string {
-	return "com.powerx.plugins.base.template.compose"
+	return "{{ .PluginID }}.template.compose"
 }
 
 type templateAuditHandler struct {
@@ -915,7 +915,7 @@ func (h *templateAuditHandler) Handle(ctx context.Context, envelope *domain.Inte
 	return &HostInvocationResult{Status: "accepted", Payload: payloadBytes}, nil
 }
 
-func (h *templateAuditHandler) CapabilityID() string { return "com.powerx.plugins.base.template.audit" }
+func (h *templateAuditHandler) CapabilityID() string { return "{{ .PluginID }}.template.audit" }
 
 type templateQualityHandler struct {
 	svc    *srvtemplates.TemplateService
@@ -1035,7 +1035,7 @@ func (h *templateQualityHandler) Handle(ctx context.Context, envelope *domain.In
 }
 
 func (h *templateQualityHandler) CapabilityID() string {
-	return "com.powerx.plugins.base.template.quality_distribute"
+	return "{{ .PluginID }}.template.quality_distribute"
 }
 
 func emitEvent(broker *stream.Broker, envelope *domain.IntegrationEnvelope, eventType string, payload interface{}) {
@@ -1432,15 +1432,15 @@ func templateCapabilityPayload(action string, state map[string]any) (map[string]
 func templateActionCapabilityID(action string) string {
 	switch strings.ToLower(strings.TrimSpace(action)) {
 	case "create":
-		return "com.powerx.plugins.base.template.create"
+		return "{{ .PluginID }}.template.create"
 	case "update":
-		return "com.powerx.plugins.base.template.update"
+		return "{{ .PluginID }}.template.update"
 	case "get":
-		return "com.powerx.plugins.base.template.read"
+		return "{{ .PluginID }}.template.read"
 	case "delete":
-		return "com.powerx.plugins.base.template.delete"
+		return "{{ .PluginID }}.template.delete"
 	case "list":
-		return "com.powerx.plugins.base.template.list"
+		return "{{ .PluginID }}.template.list"
 	default:
 		return ""
 	}

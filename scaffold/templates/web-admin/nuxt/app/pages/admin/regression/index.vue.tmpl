@@ -9,7 +9,7 @@ import {useRegressionApi} from '~/composables/api/useRegression';
 import {useUserStore} from '~/stores/user';
 import {regressionResultPresentations} from '~/composables/regressionPresentation';
 const user=useUserStore(),client=useRegressionApi(),{t}=useI18n();
-const can=(action:string)=>computed(()=>user.isRoot||(user.context?.permissions||[]).some((code:string)=>code==='*'||code==='regression:'+action));
+const can=(action:string)=>computed(()=>user.isRoot||(user.context?.permissions||[]).some((code:string)=>code==='*'||code==='regression.runs:'+action));
 const read=can('read'),invoke=can('invoke'),manage=can('manage');
 const auth=useAuth(),sessionRevision=ref(0);
 watch(()=>auth.token.value,()=>sessionRevision.value++);

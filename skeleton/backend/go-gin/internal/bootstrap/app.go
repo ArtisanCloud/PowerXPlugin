@@ -2,10 +2,7 @@ package bootstrap
 
 import (
 	"context"
-	"fmt"
 	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
-	"os"
-	"strings"
 	"sync"
 
 	fwiamadapters "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/adapters"
@@ -17,8 +14,6 @@ import (
 	providerLark "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/providers/lark"
 	providerWeCom "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/providers/wecom"
 	federatedRisk "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/risk"
-	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
-	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
@@ -44,37 +39,9 @@ var (
 )
 
 func BootstrapPlugin(ctx context.Context, cfg *config.Config) (*gorm.DB, error) {
-	// 初始化日志
-	logCfg := cfg.Logging
-	if logCfg == nil {
-		logCfg = &config.LoggingConfig{}
+	if err := initializeConfiguredLogging(cfg.Logging); err != nil {
+		return nil, err
 	}
-	policy := runtimelogging.ResolveWithHostMode(runtimelogging.Policy{
-		Mode:   runtimelogging.ModeStandalone,
-		Sinks:  []runtimelogging.SinkType{runtimelogging.SinkType(logCfg.Output)},
-		Format: logCfg.Format,
-		Level:  logCfg.Level,
-		Retry: runtimelogging.RetryPolicy{
-			Enabled:     true,
-			MaxAttempts: 3,
-			BackoffMS:   200,
-		},
-	}, shouldForceHostLogging(cfg))
-	if err := runtimelogging.ValidatePolicy(policy); err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "logging policy validation failed, fallback to default: %v\n", err)
-		policy = runtimelogging.ResolveWithHostMode(runtimelogging.DefaultPolicy(), shouldForceHostLogging(cfg))
-	}
-
-	logger.Init(
-		policy.Level,
-		policy.Format,
-		runtimelogging.PrimaryOutput(policy),
-		logCfg.FilePath,
-		logCfg.MaxSize,
-		logCfg.MaxBackups,
-		logCfg.MaxAge,
-		logCfg.HTTPAccess,
-	)
 	logger.Info("Starting PowerX Plugin...")
 
 	// 初始化 schema
@@ -110,16 +77,6 @@ func BootstrapPlugin(ctx context.Context, cfg *config.Config) (*gorm.DB, error) 
 	initFederatedRuntime(queryDB)
 
 	return queryDB, nil
-}
-
-func shouldForceHostLogging(cfg *config.Config) bool {
-	if strings.TrimSpace(os.Getenv("POWERX_PROXY")) != "1" {
-		return false
-	}
-	if cfg == nil || cfg.Context == nil {
-		return false
-	}
-	return strings.EqualFold(strings.TrimSpace(cfg.Context.ProviderMode), string(fwprovider.ModeDelegated))
 }
 
 func initFederatedRuntime(queryDB *gorm.DB) {

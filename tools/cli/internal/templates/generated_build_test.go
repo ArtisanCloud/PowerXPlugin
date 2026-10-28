@@ -18,7 +18,7 @@ func TestGeneratedBackendBuild(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	version, proxy := "v0.0.27", ""
+	version, proxy := "v0.0.28", ""
 	if os.Getenv("PX_TEST_FRAMEWORK_SNAPSHOT") == "1" {
 		proxy, version = frameworkSnapshot(t)
 	}

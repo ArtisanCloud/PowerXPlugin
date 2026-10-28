@@ -41,6 +41,11 @@ jobs:
       - name: Verify SDK archive inputs and checksums
         run: python3 -m unittest discover -s scripts/release -p 'test_framework_archive.py'
 
+      - name: Verify actual Skeleton permission declarations
+        run: |
+          npm ci --ignore-scripts --workspaces=false
+          node skeleton/scripts/manifest/check-permission-declaration.mjs --manifest skeleton/plugin.yaml
+
       - name: Verify generated backend with packaged Framework
         run: PX_TEST_GENERATED_BUILD=1 PX_TEST_FRAMEWORK_SNAPSHOT=1 go test ./tools/cli/internal/templates -run '^(TestGeneratedBackendBuild|TestIAMBaselineGeneratedPlugin)$' -count=1 -timeout=10m
 

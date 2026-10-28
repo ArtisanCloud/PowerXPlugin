@@ -60,9 +60,9 @@ func fixtureHTTP(t *testing.T) (*gin.Engine, *Regression.Runner, *gorm.DB) {
 			if c.GetHeader("X-Fixture-Tenant") != "" {
 				tenant = c.GetHeader("X-Fixture-Tenant")
 			}
-			permissions := []string{"regression:read", "regression:invoke", "regression:manage"}
+			permissions := []string{"regression.runs:read", "regression.runs:invoke", "regression.runs:manage"}
 			if c.GetHeader("X-Fixture-Permissions") == "read" {
-				permissions = []string{"regression:read"}
+				permissions = []string{"regression.runs:read"}
 			}
 			Middleware.SetTenantContext(c, Middleware.TenantContext{TenantUUID: tenant, UserUUID: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", MemberUUID: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", Permissions: permissions})
 		}

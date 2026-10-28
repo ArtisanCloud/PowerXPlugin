@@ -1,5 +1,7 @@
 github.com/ArtisanCloud/PowerXPlugin/framework/backend/go v0.0.27 h1:vQ5pzmcBX3OnNjh3IM0hLnAfDJQUhJ7WrWqehIHS31U=
 github.com/ArtisanCloud/PowerXPlugin/framework/backend/go v0.0.27/go.mod h1:Xmb97ZEMwaN9kaz32/7GHXR/oQESdc3ILbiCtOHh+2w=
+github.com/ArtisanCloud/PowerXPlugin/framework/backend/go v0.0.28 h1:7GepcxQI5uKsscllwXRgRvCa02/mr7YV7j6OSsqn1X4=
+github.com/ArtisanCloud/PowerXPlugin/framework/backend/go v0.0.28/go.mod h1:Xmb97ZEMwaN9kaz32/7GHXR/oQESdc3ILbiCtOHh+2w=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=

@@ -542,6 +542,11 @@ func loadWithOptions(opts loadOptions) (*Config, error) {
 	if cfg.AICatalog != nil && strings.TrimSpace(cfg.AICatalog.Directory) != "" && configDir != "" && !filepath.IsAbs(cfg.AICatalog.Directory) {
 		cfg.AICatalog.Directory = filepath.Join(configDir, cfg.AICatalog.Directory)
 	}
+	if cfg.AICatalog == nil || strings.TrimSpace(cfg.AICatalog.Directory) == "" {
+		if dir := defaultAICatalogDirectory(); dir != "" {
+			cfg.AICatalog = &AICatalogConfig{Directory: dir}
+		}
+	}
 
 	// 同步向后兼容字段
 	syncBackwardCompatibility(cfg)

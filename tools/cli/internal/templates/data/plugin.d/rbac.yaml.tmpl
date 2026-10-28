@@ -1,4 +1,20 @@
 permissions:
+  - action: read
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows using realtime channels exposed by the plugin.
+      zh-CN: 允许使用插件提供的实时通道。
+    module: runtime
+    permission_code: runtime.realtime:read
+    resource: realtime
+    risk_level: low
+    title_i18n:
+      en: Use realtime channels
+      zh-CN: 使用实时通道
+    type: action
   - permission_code: parcel.volumes:compute
     module: parcel
     resource: volumes

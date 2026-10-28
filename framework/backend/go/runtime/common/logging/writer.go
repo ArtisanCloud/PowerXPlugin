@@ -126,6 +126,15 @@ func NewRotatingFileWriter(opts FileOptions) (io.Writer, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, err
 	}
+	// lumberjack 在首次写入时才打开文件；初始化时先检查，避免服务已启动
+	// 才发现日志路径不可写，且 slog 的写入错误无法返回给启动调用者。
+	probe, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		return nil, err
+	}
+	if err := probe.Close(); err != nil {
+		return nil, err
+	}
 	if opts.Cleanup {
 		if _, err := CleanExpiredLogFiles(path, opts.MaxAgeDays, opts.Clock); err != nil {
 			return nil, err

@@ -455,7 +455,7 @@ const showIAMMenu = computed(() => {
 });
 const userStore = useUserStore();
 const { isRoot, isCurrentTenantAdmin, canReadTemplates, canReadCustomers, isLoggedIn } = storeToRefs(userStore);
-const canReadRegression = computed(() => String(runtimeConfig.public.regressionEnabled) === "true" && (userStore.isRoot || (userStore.context?.permissions || []).some(code => code === "regression:read" || code === "*")));
+const canReadRegression = computed(() => String(runtimeConfig.public.regressionEnabled) === "true" && (userStore.isRoot || (userStore.context?.permissions || []).some(code => code === "regression.runs:read" || code === "*")));
 const canManageIAM = computed(() => Boolean(isRoot.value) || Boolean(isCurrentTenantAdmin.value));
 const showCapabilityLab = computed(() => {
   const envFlag = runtimeConfig.public?.showCapabilityLab;

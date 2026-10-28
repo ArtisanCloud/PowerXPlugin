@@ -2,6 +2,7 @@ package logger
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -39,16 +40,12 @@ const (
 )
 
 // Init initializes unified logging backend and compatibility bridge.
-func Init(level, format, output, filePath string, maxSize, maxBackups, maxAge int, httpAccess bool) {
-	Logger = logrus.New()
-	httpAccessEnabled = httpAccess
-
+func Init(level, format, output, filePath string, maxSize, maxBackups, maxAge int, httpAccess bool) error {
 	// 设置日志级别
 	logLevel, err := logrus.ParseLevel(strings.ToLower(level))
 	if err != nil {
-		logLevel = logrus.InfoLevel
+		return fmt.Errorf("LOGGING_LEVEL_INVALID: %w", err)
 	}
-	Logger.SetLevel(logLevel)
 
 	logFormat := strings.ToLower(strings.TrimSpace(format))
 	if logFormat == "" {
@@ -79,15 +76,11 @@ func Init(level, format, output, filePath string, maxSize, maxBackups, maxAge in
 		CleanupFiles: true,
 	})
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "logger output=%s fallback to stdout: %v\n", output, err)
-		runtime, _ = runtimelogging.Init(runtimelogging.Config{
-			Policy:       runtimelogging.DefaultPolicy(),
-			Stdout:       os.Stdout,
-			Stderr:       os.Stderr,
-			SetDefault:   true,
-			CleanupFiles: false,
-		})
+		return fmt.Errorf("LOGGING_INITIALIZATION_FAILED: %w", err)
 	}
+	Logger = logrus.New()
+	Logger.SetLevel(logLevel)
+	httpAccessEnabled = httpAccess
 	setBackendLogger(runtime.Logger)
 	slog.SetDefault(Slog())
 
@@ -95,7 +88,11 @@ func Init(level, format, output, filePath string, maxSize, maxBackups, maxAge in
 	Logger.SetOutput(io.Discard)
 	Logger.SetFormatter(&logrus.JSONFormatter{})
 	Logger.ReplaceHooks(make(logrus.LevelHooks))
-	Logger.AddHook(&slogForwardHook{backend: Slog()})
+	var fatalTerminal io.Writer
+	if runtimelogging.PrimaryOutput(runtime.Policy) == "file" {
+		fatalTerminal = os.Stderr
+	}
+	Logger.AddHook(&slogForwardHook{backend: Slog(), fatalTerminal: fatalTerminal})
 
 	// 添加调用位置信息（仅在 debug 模式）
 	if logLevel == logrus.DebugLevel || logLevel == logrus.TraceLevel {
@@ -108,7 +105,8 @@ func Init(level, format, output, filePath string, maxSize, maxBackups, maxAge in
 	std.SetOutput(io.Discard)
 	std.SetReportCaller(Logger.ReportCaller)
 	std.ReplaceHooks(make(logrus.LevelHooks))
-	std.AddHook(&slogForwardHook{backend: Slog()})
+	std.AddHook(&slogForwardHook{backend: Slog(), fatalTerminal: fatalTerminal})
+	return nil
 }
 
 func mapLogrusLevel(level logrus.Level) slog.Leveler {
@@ -144,7 +142,8 @@ func mapEntryLevel(level logrus.Level) slog.Level {
 }
 
 type slogForwardHook struct {
-	backend *slog.Logger
+	backend       *slog.Logger
+	fatalTerminal io.Writer
 }
 
 func (h *slogForwardHook) Levels() []logrus.Level {
@@ -170,6 +169,14 @@ func (h *slogForwardHook) Fire(entry *logrus.Entry) error {
 		ctx = context.Background()
 	}
 	logger.LogAttrs(ctx, mapEntryLevel(entry.Level), entry.Message, attrs...)
+	// 文件模式仍需让终止进程的错误在终端可见，避免只剩 exit status 1。
+	if h.fatalTerminal != nil && entry.Level <= logrus.FatalLevel {
+		summary := map[string]any{"level": "ERROR", "event": "plugin.fatal", "message": entry.Message}
+		if err, ok := entry.Data["error"]; ok {
+			summary["error"] = fmt.Sprint(err)
+		}
+		return json.NewEncoder(h.fatalTerminal).Encode(summary)
+	}
 	return nil
 }
 

@@ -102,12 +102,18 @@ func newHostTaskBusProvider(cfg *config.Config, pxc *client.PowerXServiceClient)
 	hostCfg := fwtaskbus.HostProviderConfig{
 		BaseURL:        strings.TrimSpace(gateway.BaseURL),
 		APIPrefix:      strings.TrimSpace(gateway.APIPrefix),
+		AuthScheme:     strings.ToLower(strings.TrimSpace(gateway.AuthScheme)),
+		APIKey:         strings.TrimSpace(gateway.APIKey),
 		UserAgent:      strings.TrimSpace(gateway.UserAgent),
 		Timeout:        gateway.Timeout,
 		SourcePlugin:   strings.TrimSpace(eventCfg.SourcePlugin),
 		PayloadVersion: strings.TrimSpace(eventCfg.PayloadVersion),
 	}
-	if cfg != nil && cfg.Context != nil && strings.EqualFold(strings.TrimSpace(cfg.Context.ProviderMode), "delegated") {
+	switch hostCfg.AuthScheme {
+	case "api_key", "api-key":
+		hostCfg.AuthScheme = "apikey"
+	}
+	if hostCfg.AuthScheme != "apikey" && cfg != nil && cfg.Context != nil && strings.EqualFold(strings.TrimSpace(cfg.Context.ProviderMode), "delegated") {
 		hostCfg.TokenProvider = client.NewPowerXSTSTokenProvider(pxc).TokenFunc()
 	}
 	return fwtaskbus.NewHostProvider(hostCfg)

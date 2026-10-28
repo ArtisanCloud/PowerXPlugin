@@ -3,7 +3,7 @@ module github.com/powerx-plugin/cli
 go 1.24.0
 
 require (
-	github.com/ArtisanCloud/PowerXPlugin/framework/backend/go v0.0.27
+	github.com/ArtisanCloud/PowerXPlugin/framework/backend/go v0.0.28
 	github.com/fatih/color v1.18.0
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/google/uuid v1.6.0

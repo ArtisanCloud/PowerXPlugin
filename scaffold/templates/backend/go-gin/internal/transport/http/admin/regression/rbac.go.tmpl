@@ -9,11 +9,11 @@ func RBACEntries(prefix string) map[string]Middleware.Permission {
 	base := strings.TrimRight(prefix, "/") + "/admin/regression"
 	out := map[string]Middleware.Permission{}
 	for _, p := range []string{"/suites", "/cases", "/profiles", "/runs", "/runs/*", "/runs/*/events", "/runs/*/report"} {
-		out["GET:"+base+p] = Middleware.Permission{Resource: "regression", Action: "read"}
+		out["GET:"+base+p] = Middleware.Permission{Resource: "regression.runs", Action: "read"}
 	}
-	out["POST:"+base+"/runs"] = Middleware.Permission{Resource: "regression", Action: "invoke"}
+	out["POST:"+base+"/runs"] = Middleware.Permission{Resource: "regression.runs", Action: "invoke"}
 	for _, p := range []string{"/runs/*/cancel", "/runs/*/cleanup"} {
-		out["POST:"+base+p] = Middleware.Permission{Resource: "regression", Action: "manage"}
+		out["POST:"+base+p] = Middleware.Permission{Resource: "regression.runs", Action: "manage"}
 	}
 	return out
 }

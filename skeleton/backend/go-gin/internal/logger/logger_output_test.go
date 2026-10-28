@@ -1,7 +1,6 @@
 package logger
 
 import (
-	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,15 +25,9 @@ func TestInitWithFileOutputCreatesParentDirAndWrites(t *testing.T) {
 	}
 }
 
-func TestInitWithFileOutputFallbackToStdoutWhenPathEmpty(t *testing.T) {
-	Init("info", "json", "file", "", 1, 1, 1, true)
-
-	buf := &bytes.Buffer{}
-	SetOutput(buf)
-	Info("stdout-fallback-test")
-
-	if !strings.Contains(buf.String(), "stdout-fallback-test") {
-		t.Fatalf("expected fallback message in stdout buffer, got %s", buf.String())
+func TestInitWithFileOutputRejectsEmptyPath(t *testing.T) {
+	if err := Init("info", "json", "file", "", 1, 1, 1, true); err == nil {
+		t.Fatal("INVALID_FILE_FELL_BACK_TO_CONSOLE")
 	}
 }
 

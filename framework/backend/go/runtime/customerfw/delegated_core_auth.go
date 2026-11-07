@@ -15,6 +15,25 @@ import (
 
 const ShopifyStorefrontChannel = "shopify_storefront"
 
+// WeChatMiniAppCredentialType 是转发给 Core 的一次性 wx.login code；
+// code2session 由 Core 用平台小程序凭证完成。
+const WeChatMiniAppCredentialType = "wechat_miniapp_code"
+
+// supportedDelegatedCredential 列出 Core Customer Auth Host Contract 支持的渠道与凭证类型。
+func supportedDelegatedCredential(channel string, credential CustomerCredential) bool {
+	if strings.TrimSpace(credential.Value) == "" {
+		return false
+	}
+	switch strings.TrimSpace(channel) {
+	case ShopifyStorefrontChannel:
+		return strings.TrimSpace(credential.Type) == "shopify_customer_access_token"
+	case CustomerAuthChannelWeChatMiniApp:
+		return strings.TrimSpace(credential.Type) == WeChatMiniAppCredentialType
+	default:
+		return false
+	}
+}
+
 // DelegatedCoreAuthClient calls the formal Core Customer Auth Host Contract.
 // Tenant comes only from the plugin STS credential; TenantUUID input fields
 // are rejected rather than forwarded.
@@ -78,7 +97,7 @@ func (c *DelegatedCoreAuthClient) issue(ctx context.Context, path, tenant, chann
 	if strings.TrimSpace(tenant) != "" {
 		return nil, NewError(CodeCustomerTenantMismatch, "delegated customer auth does not accept tenant_uuid")
 	}
-	if strings.TrimSpace(channel) != ShopifyStorefrontChannel || strings.TrimSpace(credential.Type) != "shopify_customer_access_token" || strings.TrimSpace(credential.Value) == "" {
+	if !supportedDelegatedCredential(channel, credential) {
 		return nil, NewError(CodeCustomerTokenInvalid, "unsupported delegated customer credential")
 	}
 	var out struct {

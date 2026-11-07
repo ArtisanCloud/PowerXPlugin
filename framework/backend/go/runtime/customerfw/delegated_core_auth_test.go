@@ -75,3 +75,44 @@ func TestDelegatedCoreAuthMapsStableCoreReasons(t *testing.T) {
 		t.Fatalf("error = %#v", err)
 	}
 }
+
+func TestDelegatedCoreAuthForwardsWeChatMiniAppCodeWithoutTenant(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/tenant/customer/auth/register" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		credential, _ := body["credential"].(map[string]any)
+		if body["channel"] != CustomerAuthChannelWeChatMiniApp || credential["type"] != WeChatMiniAppCredentialType || credential["value"] != "wx-code" {
+			t.Fatalf("body = %#v", body)
+		}
+		if _, ok := body["tenant_uuid"]; ok {
+			t.Fatalf("tenant_uuid must not be forwarded: %#v", body)
+		}
+		_, _ = w.Write([]byte(`{"success":true,"data":{"access_token":"customer-jwt","refresh_token":"refresh","expires_in":60,"context":{"tenant_uuid":"tenant-uuid","customer_uuid":"customer-uuid","membership_uuid":"membership-uuid","status":"active","roles":["customer"],"authenticated":true}}}`))
+	}))
+	defer server.Close()
+	client, err := NewDelegatedCoreAuthClient(DelegatedCoreAuthClientConfig{BaseURL: server.URL, ServiceTokens: ServiceTokenProviderFunc(func(context.Context) (string, error) { return "service-sts", nil }), Client: server.Client()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := client.Register(context.Background(), RegisterInput{Channel: CustomerAuthChannelWeChatMiniApp, Credential: CustomerCredential{Type: WeChatMiniAppCredentialType, Value: "wx-code"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Context.CustomerUUID != "customer-uuid" {
+		t.Fatalf("result = %#v", result)
+	}
+	for _, bad := range []RegisterInput{
+		{Channel: CustomerAuthChannelWeChatMiniApp, Credential: CustomerCredential{Type: "shopify_customer_access_token", Value: "wx-code"}},
+		{Channel: CustomerAuthChannelWeChatMiniApp, Credential: CustomerCredential{Type: WeChatMiniAppCredentialType}},
+		{Channel: "unknown", Credential: CustomerCredential{Type: WeChatMiniAppCredentialType, Value: "wx-code"}},
+	} {
+		if _, err := client.Register(context.Background(), bad); err == nil {
+			t.Fatalf("expected rejection for %#v", bad)
+		}
+	}
+}

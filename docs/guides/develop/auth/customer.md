@@ -178,12 +178,16 @@ flowchart LR
 
 ### 微信小程序登录
 
-当前支持边界（2026-09-08）：本节旧 Core 微信委托流程不再适用，不能据此接入。
-Framework 已移除 `/customer/auth/wechat/login` 旧客户端；当前正式 Core Auth adapter
-只接受已实现的 Shopify Storefront 验证通道。微信换码工具只能由插件 local adapter
-显式使用，不能推断 Core 已提供相同 verifier。后续 Core 发布其他正式 channel 后再扩展。
+当前支持边界（2026-11-06）：Core Customer Auth Host Contract 已正式支持
+`channel=wechat_miniapp` + `credential.type=wechat_miniapp_code`。code2session 由 Core
+使用平台小程序凭证（Core 配置 `customer_auth.wechat_miniapp.app_id/app_secret`，或环境变量
+`CORE_X_CUSTOMER_WECHAT_MINIAPP_APP_ID/_APP_SECRET`）完成；插件只转发一次性的 `wx.login` code，
+不能自行声明 openid，也不需要持有 AppSecret。
 
-Shared App 模式下，小程序 AppID/AppSecret 属于平台或共享小程序配置，不属于单个租户。租户识别必须来自合法入口解析结果，例如 `mini_app_entries` 返回的 `tenant_uuid`、`entry_code`、`scene` 或邀请链接上下文。没有 tenant 入口上下文的请求必须拒绝，不允许静默落到默认租户。
+Shared App 模式下，小程序 AppID/AppSecret 属于平台或共享小程序配置，不属于单个租户。委派模式下
+租户只来自插件 STS 凭证（Core 拒绝请求里携带 `tenant_uuid`），因此一个插件安装实例对应一个租户；
+多租户共用一个小程序时，需要先通过合法入口（`mini_app_entries`、`scene`、邀请码）选出对应租户的插件凭证，
+没有入口上下文的请求必须拒绝，不允许静默落到默认租户。
 
 微信小程序登录流程：
 
@@ -192,42 +196,32 @@ sequenceDiagram
   participant MP as 微信小程序
   participant Plugin as 插件 mini-app API
   participant FW as customerfw
-  participant WX as PowerWechat / 微信 code2session
   participant Core as PowerX Core customer auth
+  participant WX as 微信 code2session
 
-  MP->>Plugin: bootstrap/resolve(scene|invite_code)
-  Plugin-->>MP: tenant_uuid + entry context
-  MP->>MP: uni.login(provider=weixin)
-  MP->>Plugin: POST /mini-app/auth/wechat/login(code, tenant_uuid)
-  Plugin->>FW: Login(channel=wechat_miniapp, code, tenant_uuid)
-  FW->>Core: /customer/auth/wechat/login
-  Core->>WX: code2session
-  WX-->>Core: openid / unionid / session_key
-  Core->>Core: upsert customer + identity + membership
+  MP->>MP: wx.login()
+  MP->>Plugin: POST /mini-app/auth/wechat/login(code)
+  Plugin->>FW: Register(channel=wechat_miniapp, credential={wechat_miniapp_code, code})
+  FW->>Core: POST /api/v1/tenant/customer/auth/register（插件 STS，租户来自凭证）
+  Core->>WX: code2session(appid, secret, js_code)
+  WX-->>Core: openid / unionid
+  Core->>Core: subject=wechat:miniapp:<appid>:<openid>，查找或创建 customer + identity + membership
   Core-->>Plugin: customer token + CustomerContext
   Plugin-->>MP: token
 ```
 
-Framework 提供的通用能力：
+要点：
 
-| 能力 | Framework 合同 |
+| 项 | 合同 |
 | --- | --- |
-| 微信换码 | `customerfw.NewPowerWeChatMiniAppExchanger()`，内部使用 PowerWechat `miniProgram.Auth.Session(ctx, code)` |
-| 登录通道 | `customerfw.CustomerAuthChannelWeChatMiniApp` |
-| 委托路径 | `/customer/auth/wechat/login` |
-| customer 来源 | `CustomerAuthSourceWeChat` |
+| 渠道 / 凭证类型 | `customerfw.CustomerAuthChannelWeChatMiniApp` / `customerfw.WeChatMiniAppCredentialType` |
+| 委托路径 | `Register` → `/api/v1/tenant/customer/auth/register`（幂等：已存在客户直接签发 token）；`Login` → `/auth/login`（只登录已存在身份，不存在返回 `CUSTOMER_IDENTITY_NOT_FOUND`） |
+| 身份主键 | `provider=plugin_<插件哈希>`（按插件隔离），`provider_subject=wechat:miniapp:<appid>:<openid>`；有 unionid 时写入 identity metadata `wechat_unionid` |
+| 来源标记 | `customer_tenant_memberships.source=plugin_identity`，identity metadata `provider_plugin_id=<插件 ID>` |
+| 所需能力 | `com.corex.customer.auth.register`、`com.corex.customer.auth.login`、`com.corex.customer.auth.validate`、`com.corex.customer.memberships.delegated_read` |
 
-插件侧只做两件事：
-
-1. 小程序端调用 `uni.login({ provider: "weixin" })` 获取 `code`。
-2. 插件后端从已校验的小程序入口、邀请码或 scene 上下文解析 tenant，并将该受信任上下文交给 `customerfw.LoginInput{Channel: customerfw.CustomerAuthChannelWeChatMiniApp}`；客户端请求不得自行指定 tenant。
-
-PowerX Core adapter 或插件注入的 local adapter 负责：
-
-1. 用 PowerWechat/code2session 换取 `openid`、`unionid`、`session_key`。
-2. 以 `provider=wechat`、`provider_subject=openid` 绑定通用 customer。
-3. 根据入口 `tenant_uuid` 创建或校验 `customer_tenant_memberships`。
-4. 签发 customer token。
+因为 `wx.login` 的 code 只能使用一次，小程序登录/注册建议只调用一次 `Register`，不要先 Login 失败再 Register。
+`customerfw.NewPowerWeChatMiniAppExchanger()` 仅供插件 local adapter（本地模式）自行换码使用。
 
 注意：家长、球员、学员、粉丝等行业身份不是 customer framework 字段。插件拿到 `customer_uuid` 后，再在自己的业务表里创建球员档案、家长关系或训练档案。
 

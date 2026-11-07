@@ -27,7 +27,8 @@ type LoginInput struct {
 
 // CustomerCredential is verified by Core for delegated authentication. Its
 // value is opaque to Framework and must never be logged or persisted by a
-// plugin. Current Core contract supports shopify_customer_access_token.
+// plugin. Current Core contract supports shopify_customer_access_token
+// (channel shopify_storefront) and wechat_miniapp_code (channel wechat_miniapp).
 type CustomerCredential struct {
 	Type  string `json:"type,omitempty"`
 	Value string `json:"value,omitempty"`

@@ -82,7 +82,7 @@ jobs:
         with:
           repository: ${{ github.repository }}
           token: ${{ secrets.CI_CHECKOUT_TOKEN || github.token }}
-          fetch-tags: true
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22.23.2'

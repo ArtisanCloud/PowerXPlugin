@@ -100,3 +100,10 @@ func TestCleanExpiredLogFilesRemovesRotatedFilesOnly(t *testing.T) {
 		}
 	}
 }
+
+func TestRotatingWriterRejectsUnwritableTargetAtInitialization(t *testing.T) {
+	// 使用目录作为目标，可在具备较高权限的测试进程中稳定触发打开失败。
+	if _, err := NewRotatingFileWriter(FileOptions{Path: t.TempDir()}); err == nil {
+		t.Fatal("LOG_FILE_OPEN_FAILURE_DEFERRED_UNTIL_FIRST_WRITE")
+	}
+}

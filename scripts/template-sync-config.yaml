@@ -269,6 +269,9 @@ mappings:
       - globs: ["internal/middleware/common.go", "internal/transport/http/middleware/request_trace.go"]
         literal: 'return "com.powerx.plugins.base"'
         replace: 'return "{{ .PluginID }}"'
+      - globs: ["**/*.go"]
+        literal: "com.powerx.plugins.base"
+        replace: "{{ .PluginID }}"
   - name: backend-fastapi
     source: skeleton/backend/python-fastapi
     prune:
@@ -411,6 +414,24 @@ mappings:
       - globs: ["config/event_fabric.yaml"]
         literal: "{{member_uuid}}"
         replace: '{{"{{"}}member_uuid{{"}}"}}'
+  - name: plugin-skills
+    source: skeleton/skills
+    prune:
+      - "**/*.md"
+      - "**/*.json"
+    targets:
+      - path: scaffold/templates/skills
+        suffix: .tmpl
+      - path: tools/cli/internal/templates/data/skills
+        suffix: .tmpl
+    include:
+      - "**/*"
+    exclude:
+      - "**/.DS_Store"
+    replacements:
+      - globs: ["**/*"]
+        literal: "com.powerx.plugins.base"
+        replace: "{{ .PluginID }}"
   - name: root-agents
     source: .
     include:

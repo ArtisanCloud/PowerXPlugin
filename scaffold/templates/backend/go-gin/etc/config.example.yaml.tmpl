@@ -138,8 +138,8 @@ runtime:
       enabled: true
       path: "/healthz"
   logging:
-    # POWERX_PROXY=1 的宿主链路语义会强制 stdout + json。
-    # POWERX_PROVIDER_MODE=delegated + POWERX_PROXY=0 仍按本配置输出。
+    # 日志输出按本配置执行，独立于 Proxy／Provider 模式。
+    # 需要宿主采集时显式配置 stdout；本地调试可使用 file。
     level: "debug"
     format: "json"
     output: "stdout"

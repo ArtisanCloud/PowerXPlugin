@@ -1,0 +1,37 @@
+package bootstrap
+
+import (
+	"errors"
+	"fmt"
+
+	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
+)
+
+// 日志输出由显式配置决定，独立于 AI、IAM 等业务 Provider 的归属。
+// 文件轮转、清理由 Framework writer 统一提供。
+func configuredLoggingPolicy(cfg *config.LoggingConfig) (runtimelogging.Policy, error) {
+	if cfg == nil {
+		return runtimelogging.Policy{}, errors.New("LOGGING_CONFIG_REQUIRED")
+	}
+	policy := runtimelogging.ResolvePolicy(runtimelogging.Policy{
+		Mode:   runtimelogging.ModeStandalone,
+		Sinks:  []runtimelogging.SinkType{runtimelogging.SinkType(cfg.Output)},
+		Format: cfg.Format,
+		Level:  cfg.Level,
+		Retry:  runtimelogging.DefaultPolicy().Retry,
+	})
+	if err := runtimelogging.ValidatePolicy(policy); err != nil {
+		return policy, fmt.Errorf("LOGGING_POLICY_INVALID: %w", err)
+	}
+	return policy, nil
+}
+
+func initializeConfiguredLogging(cfg *config.LoggingConfig) error {
+	policy, err := configuredLoggingPolicy(cfg)
+	if err != nil {
+		return err
+	}
+	return logger.Init(policy.Level, policy.Format, runtimelogging.PrimaryOutput(policy), cfg.FilePath, cfg.MaxSize, cfg.MaxBackups, cfg.MaxAge, cfg.HTTPAccess)
+}

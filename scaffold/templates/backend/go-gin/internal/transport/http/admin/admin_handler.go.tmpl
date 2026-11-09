@@ -45,7 +45,7 @@ func (h *AdminHandler) GetManifest(c *gin.Context) {
 
 	manifest := &contracts.PluginManifest{
 		NotificationPresentations: notificationPresentations,
-		ID:                        "com.powerx.plugins.base",
+		ID:                        "{{ .PluginID }}",
 		Name:                      "PowerX Base Plugin",
 		Version:                   runtimePluginVersion(),
 		Description:               "A starter plugin that showcases template management capabilities for PowerX",

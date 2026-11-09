@@ -16,7 +16,7 @@ async function identity(page: Page, readOnly = false) {
     is_root: !readOnly,
     user: { user_uuid: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', display_name: zh.regression.fixtures.name, status: 1 },
     current_tenant_uuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', current_member_id: 1,
-    members: [], roles: [], permissions: readOnly ? ['regression:read'] : ['regression:read', 'regression:invoke', 'regression:manage'],
+    members: [], roles: [], permissions: readOnly ? ['regression.runs:read'] : ['regression.runs:read', 'regression.runs:invoke', 'regression.runs:manage'],
   } } }));
   return headers;
 }

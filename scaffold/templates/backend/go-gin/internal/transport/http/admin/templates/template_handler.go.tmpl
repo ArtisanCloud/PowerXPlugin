@@ -36,7 +36,7 @@ func NewTemplateHandler(deps *app.Deps) *TemplateHandler {
 }
 
 func (h *TemplateHandler) GetTemplates(c *gin.Context) {
-	// capability: com.powerx.plugins.base.template.list
+	// capability: {{ .PluginID }}.template.list
 	var q TemplateListRequest
 	if err := c.ShouldBindQuery(&q); err != nil {
 		contracts.ResponseBadRequest(c, "invalid query: "+err.Error())
@@ -58,7 +58,7 @@ func (h *TemplateHandler) GetTemplates(c *gin.Context) {
 }
 
 func (h *TemplateHandler) GetTemplate(c *gin.Context) {
-	// capability: com.powerx.plugins.base.template.read
+	// capability: {{ .PluginID }}.template.read
 	id, err := parseTemplateUUID(c.Param("uuid"))
 	if err != nil {
 		respondTemplateValidationError(c, newInvalidTemplateUUIDError())
@@ -78,7 +78,7 @@ func (h *TemplateHandler) GetTemplate(c *gin.Context) {
 }
 
 func (h *TemplateHandler) CreateTemplate(c *gin.Context) {
-	// capability: com.powerx.plugins.base.template.create
+	// capability: {{ .PluginID }}.template.create
 	var req CreateTemplateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
@@ -99,7 +99,7 @@ func (h *TemplateHandler) CreateTemplate(c *gin.Context) {
 }
 
 func (h *TemplateHandler) UpdateTemplate(c *gin.Context) {
-	// capability: com.powerx.plugins.base.template.update
+	// capability: {{ .PluginID }}.template.update
 	id, err := parseTemplateUUID(c.Param("uuid"))
 	if err != nil {
 		respondTemplateValidationError(c, newInvalidTemplateUUIDError())
@@ -125,7 +125,7 @@ func (h *TemplateHandler) UpdateTemplate(c *gin.Context) {
 }
 
 func (h *TemplateHandler) DeleteTemplate(c *gin.Context) {
-	// capability: com.powerx.plugins.base.template.delete
+	// capability: {{ .PluginID }}.template.delete
 	id, err := parseTemplateUUID(c.Param("uuid"))
 	if err != nil {
 		respondTemplateValidationError(c, newInvalidTemplateUUIDError())
@@ -139,7 +139,7 @@ func (h *TemplateHandler) DeleteTemplate(c *gin.Context) {
 }
 
 func (h *TemplateHandler) BatchCloneTemplates(c *gin.Context) {
-	// capability: com.powerx.plugins.base.template.batch_clone
+	// capability: {{ .PluginID }}.template.batch_clone
 	if h == nil || h.TemplateService == nil {
 		contracts.ResponseServiceUnavailable(c, "template service not available", nil)
 		return
@@ -171,7 +171,7 @@ func (h *TemplateHandler) BatchCloneTemplates(c *gin.Context) {
 }
 
 func (h *TemplateHandler) ValidateTemplateCapability(c *gin.Context) {
-	// capability: com.powerx.plugins.base.template.validate
+	// capability: {{ .PluginID }}.template.validate
 	if h == nil || h.TemplateService == nil {
 		contracts.ResponseServiceUnavailable(c, "template service not available", nil)
 		return

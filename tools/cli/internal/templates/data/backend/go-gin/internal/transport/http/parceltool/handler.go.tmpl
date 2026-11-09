@@ -13,7 +13,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const CapabilityID = "com.powerx.plugins.base.parcel.volume"
+const CapabilityID = "{{ .PluginID }}.parcel.volume"
 const RelativePath = "/internal/tools/parcel-volumes"
 
 // Register 仅供 Core 已授权工具调用，不能靠 public-route 标记或浏览器 JWT 代替内部通道凭据。

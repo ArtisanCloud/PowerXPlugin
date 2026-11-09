@@ -20,7 +20,7 @@ import (
 
 const (
 	defaultTenantUUID = "00000000-0000-0000-0000-000000000001"
-	pluginID          = "com.powerx.plugins.base"
+	pluginID          = "{{ .PluginID }}"
 )
 
 func SeedPluginData(ctx context.Context, db *gorm.DB) error {

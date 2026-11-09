@@ -178,14 +178,36 @@ flowchart LR
 
 ### 微信小程序登录
 
-当前支持边界（2026-11-06）：Core Customer Auth Host Contract 已正式支持
-`channel=wechat_miniapp` + `credential.type=wechat_miniapp_code`。code2session 由 Core
-使用平台小程序凭证（Core 配置 `customer_auth.wechat_miniapp.app_id/app_secret`，或环境变量
-`CORE_X_CUSTOMER_WECHAT_MINIAPP_APP_ID/_APP_SECRET`）完成；插件只转发一次性的 `wx.login` code，
+当前支持边界（2026-11-09）：Core Customer Auth Host Contract 已正式支持
+`channel=wechat_miniapp` + `credential.type=wechat_miniapp_code`，并要求同时传 `app_id`。
+小程序凭证由 Core 的**客户端应用注册表**持有：插件只转发一次性的 `wx.login` code 与 `app_id`，
 不能自行声明 openid，也不需要持有 AppSecret。
 
-Shared App 模式下，小程序 AppID/AppSecret 属于平台或共享小程序配置，不属于单个租户。委派模式下
-租户只来自插件 STS 凭证（Core 拒绝请求里携带 `tenant_uuid`），因此一个插件安装实例对应一个租户；
+Core 配置示例（`customer_auth.client_apps`）：
+
+```yaml
+customer_auth:
+  client_apps:
+    - platform: wechat_miniapp        # wechat_miniapp；alipay_miniapp / douyin_miniapp 为预留平台
+      app_id: wx0000000000000000
+      name: 示例小程序
+      app_secret_env: CORE_X_EXAMPLE_WECHAT_SECRET   # 或 app_secret（二选一），生产推荐环境变量
+      plugin_ids: [com.powerx.plugins.example]       # 必填：允许使用该应用的插件
+      tenant_uuids: []                               # 可选：为空表示不限租户
+```
+
+Core 收到登录请求后按 `(channel, app_id)` 查找应用，校验调用插件（及租户）是否被授权，
+再用该应用自己的密钥调用 code2session。因此多个插件、多个小程序可以共存，互不串用凭证。
+
+| 错误码 | 含义 |
+| --- | --- |
+| `CUSTOMER_CLIENT_APP_NOT_FOUND`（400） | `app_id` 未在 Core 登记 |
+| `CUSTOMER_CLIENT_APP_FORBIDDEN`（403） | 当前插件或租户无权使用该应用 |
+| `CUSTOMER_CLIENT_PLATFORM_UNSUPPORTED`（400） | 平台已预留但 Core 尚未实现校验（支付宝、抖音） |
+| `CUSTOMER_CLIENT_APP_NOT_CONFIGURED`（503） | 应用已登记但密钥未配置 |
+| `CUSTOMER_CREDENTIAL_INVALID`（401） | code 无效、已使用、过期，或不属于该小程序 |
+
+委派模式下租户只来自插件 STS 凭证（Core 拒绝请求里携带 `tenant_uuid`），因此一个插件安装实例对应一个租户；
 多租户共用一个小程序时，需要先通过合法入口（`mini_app_entries`、`scene`、邀请码）选出对应租户的插件凭证，
 没有入口上下文的请求必须拒绝，不允许静默落到默认租户。
 
@@ -201,9 +223,10 @@ sequenceDiagram
 
   MP->>MP: wx.login()
   MP->>Plugin: POST /mini-app/auth/wechat/login(code)
-  Plugin->>FW: Register(channel=wechat_miniapp, credential={wechat_miniapp_code, code})
+  Plugin->>FW: Register(channel=wechat_miniapp, app_id, credential={wechat_miniapp_code, code})
   FW->>Core: POST /api/v1/tenant/customer/auth/register（插件 STS，租户来自凭证）
-  Core->>WX: code2session(appid, secret, js_code)
+  Core->>Core: client_apps 查 (wechat_miniapp, app_id)，校验插件 / 租户授权
+  Core->>WX: code2session(appid, 该应用 secret, js_code)
   WX-->>Core: openid / unionid
   Core->>Core: subject=wechat:miniapp:<appid>:<openid>，查找或创建 customer + identity + membership
   Core-->>Plugin: customer token + CustomerContext
@@ -214,9 +237,10 @@ sequenceDiagram
 
 | 项 | 合同 |
 | --- | --- |
-| 渠道 / 凭证类型 | `customerfw.CustomerAuthChannelWeChatMiniApp` / `customerfw.WeChatMiniAppCredentialType` |
+| 渠道 / 凭证类型 | `customerfw.CustomerAuthChannelWeChatMiniApp` / `customerfw.WeChatMiniAppCredentialType`；预留 `CustomerAuthChannelAlipayMiniApp` / `CustomerAuthChannelDouyinMiniApp` |
+| 应用 | `RegisterInput.AppID` / `LoginInput.AppID` 必填（小程序渠道），缺少时 Framework 直接返回 `CUSTOMER_INVALID_ARGUMENT`，不调用 Core |
 | 委托路径 | `Register` → `/api/v1/tenant/customer/auth/register`（幂等：已存在客户直接签发 token）；`Login` → `/auth/login`（只登录已存在身份，不存在返回 `CUSTOMER_IDENTITY_NOT_FOUND`） |
-| 身份主键 | `provider=plugin_<插件哈希>`（按插件隔离），`provider_subject=wechat:miniapp:<appid>:<openid>`；有 unionid 时写入 identity metadata `wechat_unionid` |
+| 身份主键 | `provider=plugin_<插件哈希>`（按插件隔离），`provider_subject=wechat:miniapp:<appid>:<openid>`；identity metadata 记录 `client_platform`、`client_app_id`，有 unionid 时写入 `wechat_unionid` |
 | 来源标记 | `customer_tenant_memberships.source=plugin_identity`，identity metadata `provider_plugin_id=<插件 ID>` |
 | 所需能力 | `com.corex.customer.auth.register`、`com.corex.customer.auth.login`、`com.corex.customer.auth.validate`、`com.corex.customer.memberships.delegated_read` |
 

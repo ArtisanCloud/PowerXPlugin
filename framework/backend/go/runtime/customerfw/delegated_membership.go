@@ -163,6 +163,14 @@ func mapDelegatedMembershipError(status int, raw []byte) (mapped error) {
 		return NewError(CodeCustomerMembershipRequired, "customer membership not found")
 	case "CUSTOMER_MEMBERSHIP_INACTIVE":
 		return NewError(CodeCustomerMembershipDisabled, "customer membership inactive")
+	case "CUSTOMER_CLIENT_APP_NOT_FOUND":
+		return NewError(CodeCustomerClientAppNotFound, "client app not registered in Core")
+	case "CUSTOMER_CLIENT_APP_FORBIDDEN":
+		return NewError(CodeCustomerClientAppForbidden, "plugin is not allowed to use the client app")
+	case "CUSTOMER_CLIENT_PLATFORM_UNSUPPORTED":
+		return NewError(CodeCustomerClientPlatformUnsupported, "client platform not supported by Core yet")
+	case "CUSTOMER_CLIENT_APP_NOT_CONFIGURED":
+		return NewError(CodeCustomerClientAppNotConfigured, "client app credentials not configured in Core")
 	case "CUSTOMER_UPSTREAM_DEPENDENCY":
 		return NewError(CodeCustomerDelegateUnavailable, "customer membership dependency unavailable")
 	}

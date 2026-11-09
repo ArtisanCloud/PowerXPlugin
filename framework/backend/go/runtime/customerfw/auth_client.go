@@ -44,6 +44,8 @@ type AuthResult struct {
 	RefreshToken string           `json:"refresh_token,omitempty"`
 	Context      *CustomerContext `json:"context"`
 	ExpiresIn    int64            `json:"expires_in,omitempty"`
+	// PhoneVerified 表示客户是否已完成 Core 手机号认证（委派模式由 Core 返回），插件据此引导认证。
+	PhoneVerified bool `json:"phone_verified"`
 }
 
 type CustomerAuthClient interface {

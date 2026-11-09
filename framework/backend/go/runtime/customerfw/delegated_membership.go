@@ -169,6 +169,10 @@ func mapDelegatedMembershipError(status int, raw []byte) (mapped error) {
 		return NewError(CodeCustomerClientAppForbidden, "plugin is not allowed to use the client app")
 	case "CUSTOMER_CLIENT_PLATFORM_UNSUPPORTED":
 		return NewError(CodeCustomerClientPlatformUnsupported, "client platform not supported by Core yet")
+	case "CUSTOMER_PHONE_CODE_INVALID":
+		return NewError(CodeCustomerPhoneCodeInvalid, "phone code rejected by Core")
+	case "CUSTOMER_PHONE_CONFLICT":
+		return NewError(CodeCustomerPhoneConflict, "phone already verified by another customer")
 	case "CUSTOMER_CLIENT_APP_NOT_CONFIGURED":
 		return NewError(CodeCustomerClientAppNotConfigured, "client app credentials not configured in Core")
 	case "CUSTOMER_UPSTREAM_DEPENDENCY":

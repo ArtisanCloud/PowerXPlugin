@@ -106,10 +106,11 @@ func (c *DelegatedCoreAuthClient) issue(ctx context.Context, path, tenant, chann
 		body["app_id"] = strings.TrimSpace(appID)
 	}
 	var out struct {
-		AccessToken  string              `json:"access_token"`
-		RefreshToken string              `json:"refresh_token"`
-		ExpiresIn    int64               `json:"expires_in"`
-		Context      customerContextWire `json:"context"`
+		AccessToken   string              `json:"access_token"`
+		RefreshToken  string              `json:"refresh_token"`
+		ExpiresIn     int64               `json:"expires_in"`
+		PhoneVerified bool                `json:"phone_verified"`
+		Context       customerContextWire `json:"context"`
 	}
 	if err := c.call(ctx, http.MethodPost, path, body, &out, false); err != nil {
 		return nil, err
@@ -121,7 +122,7 @@ func (c *DelegatedCoreAuthClient) issue(ctx context.Context, path, tenant, chann
 	if out.Context.Status != "active" {
 		return nil, NewError(CodeCustomerMembershipDisabled, "customer.membership.inactive")
 	}
-	return &AuthResult{AccessToken: out.AccessToken, RefreshToken: out.RefreshToken, ExpiresIn: out.ExpiresIn, Context: NormalizeContext(&context)}, nil
+	return &AuthResult{AccessToken: out.AccessToken, RefreshToken: out.RefreshToken, ExpiresIn: out.ExpiresIn, PhoneVerified: out.PhoneVerified, Context: NormalizeContext(&context)}, nil
 }
 
 type customerContextWire struct {

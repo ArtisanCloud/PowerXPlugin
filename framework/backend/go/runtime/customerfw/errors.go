@@ -29,6 +29,10 @@ const (
 	CodeCustomerClientAppForbidden        ErrorCode = "CUSTOMER_CLIENT_APP_FORBIDDEN"
 	CodeCustomerClientPlatformUnsupported ErrorCode = "CUSTOMER_CLIENT_PLATFORM_UNSUPPORTED"
 	CodeCustomerClientAppNotConfigured    ErrorCode = "CUSTOMER_CLIENT_APP_NOT_CONFIGURED"
+
+	// 手机号认证相关。
+	CodeCustomerPhoneCodeInvalid ErrorCode = "CUSTOMER_PHONE_CODE_INVALID"
+	CodeCustomerPhoneConflict    ErrorCode = "CUSTOMER_PHONE_CONFLICT"
 )
 
 type Error struct {
@@ -100,7 +104,7 @@ func CodeOf(err error) ErrorCode {
 
 func HTTPStatusForCode(code ErrorCode) int {
 	switch code {
-	case CodeCustomerTokenMissing, CodeCustomerTokenInvalid, CodeCustomerUnauthenticated, CodeCustomerContextMissing, CodeCustomerCredentialInvalid:
+	case CodeCustomerTokenMissing, CodeCustomerTokenInvalid, CodeCustomerUnauthenticated, CodeCustomerContextMissing, CodeCustomerCredentialInvalid, CodeCustomerPhoneCodeInvalid:
 		return http.StatusUnauthorized
 	case CodeCustomerTenantMismatch, CodeCustomerMembershipRequired, CodeCustomerMembershipDisabled, CodeCustomerForbidden, CodeCustomerIdentitySourceBlocked, CodeCustomerClientAppForbidden:
 		return http.StatusForbidden
@@ -108,6 +112,8 @@ func HTTPStatusForCode(code ErrorCode) int {
 		return http.StatusBadRequest
 	case CodeCustomerIdentityNotFound:
 		return http.StatusNotFound
+	case CodeCustomerPhoneConflict:
+		return http.StatusConflict
 	case CodeCustomerDelegateUnavailable, CodeCustomerClientAppNotConfigured:
 		return http.StatusServiceUnavailable
 	default:

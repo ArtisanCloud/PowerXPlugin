@@ -247,6 +247,32 @@ sequenceDiagram
 因为 `wx.login` 的 code 只能使用一次，小程序登录/注册建议只调用一次 `Register`，不要先 Login 失败再 Register。
 `customerfw.NewPowerWeChatMiniAppExchanger()` 仅供插件 local adapter（本地模式）自行换码使用。
 
+### 小程序手机号认证
+
+已登录客户可以用小程序「手机号快捷验证」按钮（`open-type="getPhoneNumber"`）返回的一次性 code 完成手机号认证。
+与登录相同，换号由 Core 用客户端应用注册表（`customer_auth.client_apps`）中该应用的凭证完成，插件只转发 code 与 `app_id`，
+**只拿到脱敏号码**，原始号码只保存在 Core 客户资料中。
+
+```go
+verifier, err := runtime.PhoneVerifier() // 委派模式可用；本地模式返回 CUSTOMER_DELEGATE_UNAVAILABLE
+out, err := verifier.VerifyPhone(c.Request.Context(), customerfw.VerifyPhoneInput{
+    Channel:    customerfw.CustomerAuthChannelWeChatMiniApp,
+    AppID:      appID,
+    Credential: customerfw.CustomerCredential{Type: customerfw.WeChatMiniAppPhoneCredentialType, Value: code},
+})
+// out.PhoneMasked == "138****1234"
+```
+
+| 项 | 合同 |
+| --- | --- |
+| Core 接口 | `POST /api/v1/tenant/customer/phone:verify`（插件 STS + `X-PowerX-Customer-Authorization`），能力 `com.corex.customer.phone.verify` |
+| 结果 | 账户 `primary_phone` 写 E.164（如 `+8613800001234`），metadata 记 `phone_verified_at` / `phone_verified_via`，同步主联系人手机号并写审计 |
+| 登录引导 | `Register` / `Login` 结果的 `AuthResult.PhoneVerified` 表示是否已认证，插件可据此引导新用户认证 |
+| 错误码 | `CUSTOMER_PHONE_CODE_INVALID`（401，code 无效 / 已使用 / 过期）、`CUSTOMER_PHONE_CONFLICT`（409，同租户他人已认证该号码）、`CUSTOMER_CLIENT_APP_*` |
+| 预留 | `alipay_miniapp_phone_code`、`douyin_miniapp_phone_code`（Core 暂返回 `CUSTOMER_CLIENT_PLATFORM_UNSUPPORTED`） |
+
+微信侧前提：小程序为非个人主体且已认证，手机号快速验证组件有可用额度。
+
 注意：家长、球员、学员、粉丝等行业身份不是 customer framework 字段。插件拿到 `customer_uuid` 后，再在自己的业务表里创建球员档案、家长关系或训练档案。
 
 ### 接口调用步骤

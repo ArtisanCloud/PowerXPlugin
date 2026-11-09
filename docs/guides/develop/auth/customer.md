@@ -178,12 +178,38 @@ flowchart LR
 
 ### 微信小程序登录
 
-当前支持边界（2026-09-08）：本节旧 Core 微信委托流程不再适用，不能据此接入。
-Framework 已移除 `/customer/auth/wechat/login` 旧客户端；当前正式 Core Auth adapter
-只接受已实现的 Shopify Storefront 验证通道。微信换码工具只能由插件 local adapter
-显式使用，不能推断 Core 已提供相同 verifier。后续 Core 发布其他正式 channel 后再扩展。
+当前支持边界（2026-11-09）：Core Customer Auth Host Contract 已正式支持
+`channel=wechat_miniapp` + `credential.type=wechat_miniapp_code`，并要求同时传 `app_id`。
+小程序凭证由 Core 的**客户端应用注册表**持有：插件只转发一次性的 `wx.login` code 与 `app_id`，
+不能自行声明 openid，也不需要持有 AppSecret。
 
-Shared App 模式下，小程序 AppID/AppSecret 属于平台或共享小程序配置，不属于单个租户。租户识别必须来自合法入口解析结果，例如 `mini_app_entries` 返回的 `tenant_uuid`、`entry_code`、`scene` 或邀请链接上下文。没有 tenant 入口上下文的请求必须拒绝，不允许静默落到默认租户。
+Core 配置示例（`customer_auth.client_apps`）：
+
+```yaml
+customer_auth:
+  client_apps:
+    - platform: wechat_miniapp        # wechat_miniapp；alipay_miniapp / douyin_miniapp 为预留平台
+      app_id: wx0000000000000000
+      name: 示例小程序
+      app_secret_env: CORE_X_EXAMPLE_WECHAT_SECRET   # 或 app_secret（二选一），生产推荐环境变量
+      plugin_ids: [com.powerx.plugins.example]       # 必填：允许使用该应用的插件
+      tenant_uuids: []                               # 可选：为空表示不限租户
+```
+
+Core 收到登录请求后按 `(channel, app_id)` 查找应用，校验调用插件（及租户）是否被授权，
+再用该应用自己的密钥调用 code2session。因此多个插件、多个小程序可以共存，互不串用凭证。
+
+| 错误码 | 含义 |
+| --- | --- |
+| `CUSTOMER_CLIENT_APP_NOT_FOUND`（400） | `app_id` 未在 Core 登记 |
+| `CUSTOMER_CLIENT_APP_FORBIDDEN`（403） | 当前插件或租户无权使用该应用 |
+| `CUSTOMER_CLIENT_PLATFORM_UNSUPPORTED`（400） | 平台已预留但 Core 尚未实现校验（支付宝、抖音） |
+| `CUSTOMER_CLIENT_APP_NOT_CONFIGURED`（503） | 应用已登记但密钥未配置 |
+| `CUSTOMER_CREDENTIAL_INVALID`（401） | code 无效、已使用、过期，或不属于该小程序 |
+
+委派模式下租户只来自插件 STS 凭证（Core 拒绝请求里携带 `tenant_uuid`），因此一个插件安装实例对应一个租户；
+多租户共用一个小程序时，需要先通过合法入口（`mini_app_entries`、`scene`、邀请码）选出对应租户的插件凭证，
+没有入口上下文的请求必须拒绝，不允许静默落到默认租户。
 
 微信小程序登录流程：
 
@@ -192,42 +218,60 @@ sequenceDiagram
   participant MP as 微信小程序
   participant Plugin as 插件 mini-app API
   participant FW as customerfw
-  participant WX as PowerWechat / 微信 code2session
   participant Core as PowerX Core customer auth
+  participant WX as 微信 code2session
 
-  MP->>Plugin: bootstrap/resolve(scene|invite_code)
-  Plugin-->>MP: tenant_uuid + entry context
-  MP->>MP: uni.login(provider=weixin)
-  MP->>Plugin: POST /mini-app/auth/wechat/login(code, tenant_uuid)
-  Plugin->>FW: Login(channel=wechat_miniapp, code, tenant_uuid)
-  FW->>Core: /customer/auth/wechat/login
-  Core->>WX: code2session
-  WX-->>Core: openid / unionid / session_key
-  Core->>Core: upsert customer + identity + membership
+  MP->>MP: wx.login()
+  MP->>Plugin: POST /mini-app/auth/wechat/login(code)
+  Plugin->>FW: Register(channel=wechat_miniapp, app_id, credential={wechat_miniapp_code, code})
+  FW->>Core: POST /api/v1/tenant/customer/auth/register（插件 STS，租户来自凭证）
+  Core->>Core: client_apps 查 (wechat_miniapp, app_id)，校验插件 / 租户授权
+  Core->>WX: code2session(appid, 该应用 secret, js_code)
+  WX-->>Core: openid / unionid
+  Core->>Core: subject=wechat:miniapp:<appid>:<openid>，查找或创建 customer + identity + membership
   Core-->>Plugin: customer token + CustomerContext
   Plugin-->>MP: token
 ```
 
-Framework 提供的通用能力：
+要点：
 
-| 能力 | Framework 合同 |
+| 项 | 合同 |
 | --- | --- |
-| 微信换码 | `customerfw.NewPowerWeChatMiniAppExchanger()`，内部使用 PowerWechat `miniProgram.Auth.Session(ctx, code)` |
-| 登录通道 | `customerfw.CustomerAuthChannelWeChatMiniApp` |
-| 委托路径 | `/customer/auth/wechat/login` |
-| customer 来源 | `CustomerAuthSourceWeChat` |
+| 渠道 / 凭证类型 | `customerfw.CustomerAuthChannelWeChatMiniApp` / `customerfw.WeChatMiniAppCredentialType`；预留 `CustomerAuthChannelAlipayMiniApp` / `CustomerAuthChannelDouyinMiniApp` |
+| 应用 | `RegisterInput.AppID` / `LoginInput.AppID` 必填（小程序渠道），缺少时 Framework 直接返回 `CUSTOMER_INVALID_ARGUMENT`，不调用 Core |
+| 委托路径 | `Register` → `/api/v1/tenant/customer/auth/register`（幂等：已存在客户直接签发 token）；`Login` → `/auth/login`（只登录已存在身份，不存在返回 `CUSTOMER_IDENTITY_NOT_FOUND`） |
+| 身份主键 | `provider=plugin_<插件哈希>`（按插件隔离），`provider_subject=wechat:miniapp:<appid>:<openid>`；identity metadata 记录 `client_platform`、`client_app_id`，有 unionid 时写入 `wechat_unionid` |
+| 来源标记 | `customer_tenant_memberships.source=plugin_identity`，identity metadata `provider_plugin_id=<插件 ID>` |
+| 所需能力 | `com.corex.customer.auth.register`、`com.corex.customer.auth.login`、`com.corex.customer.auth.validate`、`com.corex.customer.memberships.delegated_read` |
 
-插件侧只做两件事：
+因为 `wx.login` 的 code 只能使用一次，小程序登录/注册建议只调用一次 `Register`，不要先 Login 失败再 Register。
+`customerfw.NewPowerWeChatMiniAppExchanger()` 仅供插件 local adapter（本地模式）自行换码使用。
 
-1. 小程序端调用 `uni.login({ provider: "weixin" })` 获取 `code`。
-2. 插件后端从已校验的小程序入口、邀请码或 scene 上下文解析 tenant，并将该受信任上下文交给 `customerfw.LoginInput{Channel: customerfw.CustomerAuthChannelWeChatMiniApp}`；客户端请求不得自行指定 tenant。
+### 小程序手机号认证
 
-PowerX Core adapter 或插件注入的 local adapter 负责：
+已登录客户可以用小程序「手机号快捷验证」按钮（`open-type="getPhoneNumber"`）返回的一次性 code 完成手机号认证。
+与登录相同，换号由 Core 用客户端应用注册表（`customer_auth.client_apps`）中该应用的凭证完成，插件只转发 code 与 `app_id`，
+**只拿到脱敏号码**，原始号码只保存在 Core 客户资料中。
 
-1. 用 PowerWechat/code2session 换取 `openid`、`unionid`、`session_key`。
-2. 以 `provider=wechat`、`provider_subject=openid` 绑定通用 customer。
-3. 根据入口 `tenant_uuid` 创建或校验 `customer_tenant_memberships`。
-4. 签发 customer token。
+```go
+verifier, err := runtime.PhoneVerifier() // 委派模式可用；本地模式返回 CUSTOMER_DELEGATE_UNAVAILABLE
+out, err := verifier.VerifyPhone(c.Request.Context(), customerfw.VerifyPhoneInput{
+    Channel:    customerfw.CustomerAuthChannelWeChatMiniApp,
+    AppID:      appID,
+    Credential: customerfw.CustomerCredential{Type: customerfw.WeChatMiniAppPhoneCredentialType, Value: code},
+})
+// out.PhoneMasked == "138****1234"
+```
+
+| 项 | 合同 |
+| --- | --- |
+| Core 接口 | `POST /api/v1/tenant/customer/phone:verify`（插件 STS + `X-PowerX-Customer-Authorization`），能力 `com.corex.customer.phone.verify` |
+| 结果 | 账户 `primary_phone` 写 E.164（如 `+8613800001234`），metadata 记 `phone_verified_at` / `phone_verified_via`，同步主联系人手机号并写审计 |
+| 登录引导 | `Register` / `Login` 结果的 `AuthResult.PhoneVerified` 表示是否已认证，插件可据此引导新用户认证 |
+| 错误码 | `CUSTOMER_PHONE_CODE_INVALID`（401，code 无效 / 已使用 / 过期）、`CUSTOMER_PHONE_CONFLICT`（409，同租户他人已认证该号码）、`CUSTOMER_CLIENT_APP_*` |
+| 预留 | `alipay_miniapp_phone_code`、`douyin_miniapp_phone_code`（Core 暂返回 `CUSTOMER_CLIENT_PLATFORM_UNSUPPORTED`） |
+
+微信侧前提：小程序为非个人主体且已认证，手机号快速验证组件有可用额度。
 
 注意：家长、球员、学员、粉丝等行业身份不是 customer framework 字段。插件拿到 `customer_uuid` 后，再在自己的业务表里创建球员档案、家长关系或训练档案。
 

@@ -10,6 +10,27 @@ permissions:
   contents: read
 
 jobs:
+  customer-auth-dotnet:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout authoritative Core protobuf contract
+        uses: actions/checkout@v4
+        with:
+          repository: ArtisanCloud/PowerX
+          ref: f99333ccd80eb3c2467fe6cc9009917340556424
+          path: .ci-core
+          sparse-checkout: backend/api/grpc/contracts/powerx/event_fabric/v1
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Verify customer authentication contracts
+        run: >-
+          dotnet test framework/backend/dotnet/tests/PowerXPlugin.Framework.Tests/PowerXPlugin.Framework.Tests.csproj
+          --configuration Release
+          --filter FullyQualifiedName~Runtime.Customer
+          -p:PowerXCoreGrpcContractsRoot="$GITHUB_WORKSPACE/.ci-core/backend/api/grpc/contracts"
+
   dist-target:
     runs-on: ubuntu-latest
     steps:
@@ -61,6 +82,7 @@ jobs:
         with:
           repository: ${{ github.repository }}
           token: ${{ secrets.CI_CHECKOUT_TOKEN || github.token }}
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22.23.2'

@@ -110,3 +110,19 @@ func TestRuntimePhoneVerifierOnlyInDelegatedMode(t *testing.T) {
 		t.Fatalf("delegated mode => %v", err)
 	}
 }
+
+type localPhoneVerifierStore struct{ runtimeStore }
+
+func (localPhoneVerifierStore) VerifyPhone(context.Context, VerifyPhoneInput) (*PhoneVerification, error) {
+	panic("CUSTOMER_LOCAL_PHONE_VERIFIER_CALLED")
+}
+
+func TestRuntimeRejectsPhoneVerifierProvidedByLocalAdapter(t *testing.T) {
+	runtime, err := NewRuntime(provider.ModeLocal, AdaptersFromLocalStore(localPhoneVerifierStore{}), RuntimeAdapters{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if verifier, err := runtime.PhoneVerifier(); verifier != nil || CodeOf(err) != CodeCustomerDelegateUnavailable {
+		t.Fatalf("verifier = %T, code = %s", verifier, CodeOf(err))
+	}
+}

@@ -1,0 +1,195 @@
+{
+  "schema": "framework_publication.v1",
+  "recorded_at": "2026-11-10T02:53:44.758991+00:00",
+  "status": "all_versions_published_and_verified",
+  "release_commit": "ebbf423af65de561a4f1dd7776558551bad01f9b",
+  "candidate_source_commit": "5683e4293d89b276ee3669448ceefd9de06a75a7",
+  "sdk_directories_match_candidate": true,
+  "pull_request": "https://github.com/ArtisanCloud/PowerXPlugin/pull/96",
+  "ci": {
+    "pr_run": 42739204986,
+    "develop_run": 42741485256,
+    "develop_attempt": 2,
+    "head_sha": "ebbf423af65de561a4f1dd7776558551bad01f9b",
+    "conclusion": "success",
+    "jobs": [
+      {
+        "name": "frontend",
+        "conclusion": "success"
+      },
+      {
+        "name": "regression",
+        "conclusion": "success"
+      },
+      {
+        "name": "session-termination-contract",
+        "conclusion": "success"
+      },
+      {
+        "name": "backend",
+        "conclusion": "success"
+      },
+      {
+        "name": "smoke",
+        "conclusion": "success"
+      },
+      {
+        "name": "event-fabric-contract",
+        "conclusion": "success"
+      },
+      {
+        "name": "delegated-contract-guard",
+        "conclusion": "success"
+      },
+      {
+        "name": "template-sync",
+        "conclusion": "success"
+      },
+      {
+        "name": "cli",
+        "conclusion": "success"
+      },
+      {
+        "name": "contracts",
+        "conclusion": "success"
+      },
+      {
+        "name": "customer-auth-dotnet",
+        "conclusion": "success"
+      },
+      {
+        "name": "business-regression",
+        "conclusion": "success"
+      },
+      {
+        "name": "dist-target",
+        "conclusion": "success"
+      },
+      {
+        "name": "plugin-id-contract",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "go": {
+    "module": "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go",
+    "version": "v0.0.29",
+    "sum": "h1:kj/Jeusufluapv6fSdHlkStUPIW/MVoKpE8osBHJUWQ=",
+    "go_mod_sum": "h1:Xmb97ZEMwaN9kaz32/7GHXR/oQESdc3ILbiCtOHh+2w=",
+    "origin": {
+      "VCS": "git",
+      "URL": "https://github.com/ArtisanCloud/PowerXPlugin",
+      "Subdir": "framework/backend/go",
+      "Hash": "ebbf423af65de561a4f1dd7776558551bad01f9b",
+      "Ref": "refs/tags/framework/backend/go/v0.0.29"
+    },
+    "public_proxy": "https://proxy.golang.org",
+    "checksum_service": "sum.golang.org",
+    "published": true,
+    "source_files": 568,
+    "source_matches_release_commit": true,
+    "zip_sha256": "a8384709debf97c8634a208e8111ba87c2b7edc69d0bbb3905c33ac48486d5e0"
+  },
+  "npm": {
+    "client": {
+      "package": "@artisan-cloud/plugin-framework-client",
+      "version": "0.0.15",
+      "published": true,
+      "published_at": "2026-11-10T02:43:56.058Z",
+      "latest": "0.0.15",
+      "integrity": "sha512-YpqpFHe3+84Fve57JFcKcKUx9JjmTr12a5myWh3/kFyjifCp/TyNAKJg+c/6lGIcoUQnh2wIxaYD/myDq1Ekbg==",
+      "tarball": "https://registry.npmjs.org/@artisan-cloud/plugin-framework-client/-/plugin-framework-client-0.0.15.tgz",
+      "peer_dependencies": {
+        "nuxt": "^4.2.0"
+      },
+      "git_tag": "framework/frontend/nuxt/framework-client/v0.0.15",
+      "source_files": 20,
+      "source_matches_release_commit": true,
+      "tarball_matches_candidate": true,
+      "tarball_sha256": "423d02223ec0b6a41b725e3c88ca96d4f0892c0502968cfac7a0ff6c1e208e6f"
+    },
+    "admin": {
+      "package": "@artisan-cloud/plugin-framework-admin",
+      "version": "0.0.14",
+      "published": true,
+      "published_at": "2026-11-10T02:47:02.657Z",
+      "latest": "0.0.14",
+      "integrity": "sha512-HLe8TZRQVmmHf/74KkOlSudqXzYNSN29eH6XJb/jO0GMQbyFhQm826H4jSDmicByZYMnL3ZcqJ2aRJ8h5Y5LaA==",
+      "tarball": "https://registry.npmjs.org/@artisan-cloud/plugin-framework-admin/-/plugin-framework-admin-0.0.14.tgz",
+      "peer_dependencies": {
+        "nuxt": "^4.2.0",
+        "valibot": "^1.2.0",
+        "@types/node": "^22.18.0",
+        "@artisan-cloud/plugin-framework-client": "0.0.15"
+      },
+      "git_tag": "framework/frontend/nuxt/framework-admin/v0.0.14",
+      "source_files": 19,
+      "source_matches_release_commit": true,
+      "tarball_matches_candidate": true,
+      "tarball_sha256": "35056d3603ecb15a056e6f5afafcb95b6a55f5d8c59489c782877f47cdc326e8"
+    }
+  },
+  "official_consumer": {
+    "consumer_outside_repository": true,
+    "go_work": "off",
+    "isolated_go_module_cache": true,
+    "local_replace": false,
+    "source_symlinks": false,
+    "checks": {
+      "generated_plugin_install": "passed",
+      "installed_go_checksums": "passed",
+      "installed_packages_match_tarballs": "passed",
+      "manifest_validation": "passed",
+      "generated_backend_tests": "passed",
+      "packaged_ai_contract_tests": "passed",
+      "generated_backend_build": "passed",
+      "installed_typescript_exports": "passed",
+      "generated_nuxt_production_build": "passed"
+    },
+    "consumer_removed": true,
+    "status": "passed",
+    "public_go_proxy": true,
+    "public_go_checksum_database": true,
+    "public_npm_registry": true,
+    "installed": {
+      "nuxt": "4.4.2",
+      "@artisan-cloud/plugin-framework-client": "0.0.15",
+      "@artisan-cloud/plugin-framework-admin": "0.0.14"
+    },
+    "toolchain": {
+      "go": "go version go1.26.5 darwin/arm64",
+      "node": "v22.13.0",
+      "npm": "11.6.0"
+    }
+  },
+  "defaults_validation": {
+    "template_sync": "passed",
+    "init_framework_references": "passed",
+    "isolated_source_archive": true,
+    "temporary_source_removed": true
+  },
+  "boundaries": {
+    "cli_binary_published": false,
+    "dotnet_nuget_published": false,
+    "core_modified": false,
+    "business_database_modified": false,
+    "user_services_restarted": false,
+    "parallel_publisher_worktree_changes_preserved": true,
+    "production_business_acceptance_claimed": false
+  },
+  "initial_public_consumer_retry": {
+    "stage": "generated_plugin_install",
+    "cause": "Admin version metadata had not propagated after npm accepted publication",
+    "resolution": "Waited for public metadata and reran with fresh isolated Go and npm caches"
+  },
+  "verification_logs": {
+    "consumer-validation.log": {
+      "path": "artifacts/framework-release-20261110/5683e4293d89b276ee3669448ceefd9de06a75a7/consumer-validation.log",
+      "sha256": "6a85e8762ea857c7942e7358535b7c08b0c719900091121c40fb785f77058142"
+    },
+    "prepublication-consumer-validation.log": {
+      "path": "artifacts/framework-release-20261110/5683e4293d89b276ee3669448ceefd9de06a75a7/prepublication-consumer-validation.log",
+      "sha256": "6f2944d2ff40aba16008f5c2c0f6639cfb6aa9542523613ded280bfa6c189237"
+    }
+  }
+}

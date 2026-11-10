@@ -2,6 +2,7 @@ package eventbridge
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -102,6 +103,9 @@ func (f *Factory) NewEmitter() (Emitter, error) {
 
 	taskbus, err := f.taskBusProvider()
 	if err != nil {
+		if hostManaged || errors.Is(err, ErrReliableHostRequired) {
+			return nil, err
+		}
 		if f.cfg.FallbackToLocal {
 			slog.Warn("eventbridge factory fallback local",
 				"reason", "taskbus_provider_error",
@@ -116,6 +120,9 @@ func (f *Factory) NewEmitter() (Emitter, error) {
 		return nil, err
 	}
 
+	if host, ok := taskbus.(interface{ ReliableHost() bool }); ok && host.ReliableHost() && (f.cfg.Mode != "taskbus" || f.cfg.FallbackToLocal) {
+		return nil, ErrReliableHostRequired
+	}
 	if f.cfg.Mode == "dual" {
 		slog.Info("eventbridge factory chose dual",
 			"taskbus_type", typeName(taskbus),

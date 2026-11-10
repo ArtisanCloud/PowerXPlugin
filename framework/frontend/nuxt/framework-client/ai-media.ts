@@ -16,6 +16,9 @@ export interface MediaModelOperation {
   driver: string;
   input_types: string[];
   max_images: number;
+  max_image_bytes?: number;
+  max_total_image_bytes?: number;
+  max_image_pixels?: number;
   max_videos: number;
   parameters: Record<string, MediaParameterSchema>;
   parameter_schema: MediaParameterSchema;

@@ -99,6 +99,7 @@ const (
 	TableIAMAuditLogs                    = "iam_audit_logs"
 	TableIAMChannelSyncTasks             = "iam_channel_sync_tasks"
 	TableLocalAISettings                 = "local_ai_settings"
+	TableLocalAIOnlineCatalogs           = "local_ai_online_catalogs"
 	TablePluginSystemConfigs             = "plugin_system_configs"
 	TableLocalKnowledgeSpaces            = "local_knowledge_spaces"
 	TableLocalKnowledgeDocuments         = "local_knowledge_documents"

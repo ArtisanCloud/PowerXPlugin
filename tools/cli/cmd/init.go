@@ -9,10 +9,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
+	fwmanifest "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
 	"github.com/powerx-plugin/cli/internal/contracts"
 	"github.com/powerx-plugin/cli/internal/templates"
 )
@@ -25,8 +25,6 @@ const (
 	defaultAdminVersion     = "0.0.13"
 	defaultClientVersion    = "0.0.14"
 )
-
-var pluginIDPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$`)
 
 func runInit(args []string) error {
 	// Go stdlib flag parsing stops at the first non-flag argument.
@@ -66,6 +64,10 @@ func runInit(args []string) error {
 		return errors.New("plugin id is required")
 	}
 	pluginID := fs.Arg(0)
+	// Reject before the interactive guide and before touching the target directory.
+	if err := fwmanifest.ValidatePluginID(pluginID); err != nil {
+		return pluginIDDiagnostic(err)
+	}
 
 	if shouldRunInitGuide(fs) {
 		if err := runInitGuide(&pluginID, module, backend, adminFrontend, appFrontend, backendPort, frontendPort, directory, installDeps, initConfig, gitInit); err != nil {
@@ -78,8 +80,8 @@ func runInit(args []string) error {
 		*appFrontend = *adminFrontend // Default to same as admin if not specified
 	}
 
-	if !pluginIDPattern.MatchString(pluginID) {
-		return fmt.Errorf("invalid plugin id %q: must match %s", pluginID, pluginIDPattern.String())
+	if err := fwmanifest.ValidatePluginID(pluginID); err != nil {
+		return pluginIDDiagnostic(err)
 	}
 
 	if err := templates.ValidateTemplateTypes(*backend, *adminFrontend); err != nil {
@@ -286,26 +288,16 @@ func runInitGuide(
 	fmt.Fprintln(os.Stdout, "Entering init guide (interactive mode).")
 
 	candidateID := *pluginID
-	if !pluginIDPattern.MatchString(candidateID) {
-		if suggested := sanitizePluginID(candidateID); suggested != "" && pluginIDPattern.MatchString(suggested) {
-			fmt.Fprintf(os.Stdout, "Plugin ID %q is invalid, suggested: %q\n", candidateID, suggested)
-			candidateID = suggested
-		}
-	}
 	for {
 		value, err := promptString("Plugin ID", candidateID)
 		if err != nil {
 			return err
 		}
-		if pluginIDPattern.MatchString(value) {
+		if err := fwmanifest.ValidatePluginID(value); err == nil {
 			*pluginID = value
 			break
 		}
-		fmt.Fprintf(os.Stdout, "Invalid plugin id %q, expected pattern: %s\n", value, pluginIDPattern.String())
-		if suggested := sanitizePluginID(value); suggested != "" && pluginIDPattern.MatchString(suggested) {
-			fmt.Fprintf(os.Stdout, "Try: %s\n", suggested)
-			candidateID = suggested
-		}
+		fmt.Fprintln(os.Stdout, pluginIDDiagnostic(fwmanifest.ValidatePluginID(value)))
 	}
 
 	selectedBackend, err := promptSelect("Backend", templates.SupportedBackends(), *backend)
@@ -512,20 +504,6 @@ func validatePort(port int, label string) error {
 		return fmt.Errorf("invalid %s %d: expected 1-65535", label, port)
 	}
 	return nil
-}
-
-func sanitizePluginID(input string) string {
-	value := strings.ToLower(strings.TrimSpace(input))
-	replacer := strings.NewReplacer("_", "-", " ", "-", "/", "-", ":", "-", "@", "-")
-	value = replacer.Replace(value)
-	value = strings.Trim(value, ".-")
-	for strings.Contains(value, "--") {
-		value = strings.ReplaceAll(value, "--", "-")
-	}
-	for strings.Contains(value, "..") {
-		value = strings.ReplaceAll(value, "..", ".")
-	}
-	return value
 }
 
 func normalizeModuleRoot(input, pluginID string) string {

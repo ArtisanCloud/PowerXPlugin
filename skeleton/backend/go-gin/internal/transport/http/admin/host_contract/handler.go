@@ -14,6 +14,7 @@ import (
 	"time"
 
 	fwiamcontracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
+	fwiamdelegated "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/delegated"
 	fwiamerrors "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/errors"
 	fwagent "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/agent"
 	fwai "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/ai"
@@ -144,7 +145,7 @@ func (h *Handler) Probe(c *gin.Context) {
 		}
 		if err := h.probeIAM(c, tenantUUID, request.Input, &result); err != nil {
 			status, reason := mapIAMError(err)
-			respondProbeError(c, result, status, reason)
+			respondProbeError(c, result, status, reason, err)
 			return
 		}
 	case hostcontract.ModuleKnowledge:
@@ -918,7 +919,7 @@ func (h *Handler) probeIAM(c *gin.Context, tenantUUID string, input map[string]a
 		if h.authorizer == nil {
 			return &hostcontract.Error{Reason: hostcontract.ReasonUpstreamDependency}
 		}
-		if err := ensureInputKeys(input, "member_uuid", "user_uuid", "resource", "action"); err != nil {
+		if err := ensureInputKeys(input, "member_uuid", "user_uuid", "plugin_id", "permission_code", "resource", "action"); err != nil {
 			return err
 		}
 		memberUUID, err := inputOptionalUUID(input, "member_uuid")
@@ -929,15 +930,29 @@ func (h *Handler) probeIAM(c *gin.Context, tenantUUID string, input map[string]a
 		if err != nil {
 			return err
 		}
-		resource, err := inputRequiredString(input, "resource")
+		pluginID, err := inputOptionalString(input, "plugin_id")
 		if err != nil {
 			return err
 		}
-		action, err := inputRequiredString(input, "action")
+		permissionCode, err := inputOptionalString(input, "permission_code")
 		if err != nil {
 			return err
 		}
-		decision, err := h.authorizer.Authorize(c.Request.Context(), fwiamcontracts.AuthorizationRequest{TenantUUID: tenantUUID, MemberUUID: memberUUID, UserUUID: userUUID, Resource: resource, Action: action, TraceID: strings.TrimSpace(c.GetString("request_id"))})
+		if (pluginID == "") != (permissionCode == "") {
+			return &hostcontract.Error{Reason: hostcontract.ReasonInvalidArgument}
+		}
+		resource, err := inputOptionalString(input, "resource")
+		if err != nil {
+			return err
+		}
+		action, err := inputOptionalString(input, "action")
+		if err != nil {
+			return err
+		}
+		if pluginID == "" && (resource == "" || action == "") || pluginID != "" && (memberUUID == "" || userUUID == "") {
+			return &hostcontract.Error{Reason: hostcontract.ReasonInvalidArgument}
+		}
+		decision, err := h.authorizer.Authorize(c.Request.Context(), fwiamcontracts.AuthorizationRequest{TenantUUID: tenantUUID, MemberUUID: memberUUID, UserUUID: userUUID, PluginID: pluginID, PermissionCode: permissionCode, Resource: resource, Action: action, TraceID: strings.TrimSpace(c.GetString("request_id"))})
 		if err != nil {
 			return err
 		}
@@ -986,6 +1001,20 @@ func respondProbeError(c *gin.Context, result hostcontract.ProbeResult, status i
 	result.ReasonCode = reason
 	envelope := hostcontract.ErrorEnvelope{ErrorCode: string(reason), ReasonCode: reason, TraceID: result.TraceID}
 	if len(causes) > 0 {
+		var capabilityError *powerxcapability.HTTPError
+		if errors.As(causes[0], &capabilityError) {
+			envelope.ErrorCode = firstNonEmpty(capabilityError.ErrorCode, capabilityError.ReasonCode)
+			envelope.HTTPStatus, envelope.RequestID, envelope.Details = capabilityError.StatusCode, capabilityError.RequestID, capabilityError.Details.Map()
+			envelope.TraceID = firstNonEmpty(capabilityError.TraceID, envelope.TraceID)
+			result.TraceID = envelope.TraceID
+		}
+		var authorizationError *fwiamdelegated.AuthorizationRequestError
+		if errors.As(causes[0], &authorizationError) {
+			envelope.ErrorCode = firstNonEmpty(authorizationError.Code, authorizationError.ReasonCode)
+			envelope.HTTPStatus, envelope.RequestID = authorizationError.Status, authorizationError.RequestID
+			envelope.TraceID = firstNonEmpty(authorizationError.TraceID, envelope.TraceID)
+			result.TraceID = envelope.TraceID
+		}
 		var upstream *powerxnotifications.HTTPError
 		if errors.As(causes[0], &upstream) {
 			envelope.ErrorCode = firstNonEmpty(upstream.ErrorCode, upstream.ReasonCode)
@@ -1016,6 +1045,10 @@ func decodeNotificationInput(input map[string]any, out any) error {
 func mapIAMError(err error) (int, hostcontract.ReasonCode) {
 	if code := fwiamerrors.CodeOf(err); code != "" {
 		return fwiamerrors.StatusCode(err), hostcontract.ReasonCode(code)
+	}
+	var inputError *hostcontract.Error
+	if errors.As(err, &inputError) {
+		return http.StatusBadRequest, inputError.Reason
 	}
 	return http.StatusFailedDependency, hostcontract.ReasonUpstreamDependency
 }
@@ -1065,7 +1098,7 @@ func mapTypedClientError(err error) (int, hostcontract.ReasonCode, string) {
 	}
 	var capabilityError *powerxcapability.HTTPError
 	if errors.As(err, &capabilityError) && capabilityError != nil {
-		return mapHTTPStatus(capabilityError.StatusCode), reasonForHTTPStatus(capabilityError.StatusCode), ""
+		return capabilityError.StatusCode, hostcontract.ReasonCode(firstNonEmpty(capabilityError.ReasonCode, capabilityError.ErrorCode, "CAPABILITY_UPSTREAM_DEPENDENCY")), capabilityError.TraceID
 	}
 	var aiError *powerxai.HTTPError
 	if errors.As(err, &aiError) && aiError != nil {

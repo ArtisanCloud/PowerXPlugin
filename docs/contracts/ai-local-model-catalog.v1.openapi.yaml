@@ -1,0 +1,82 @@
+openapi: 3.0.3
+info:
+  title: Framework local online model catalog
+  version: 1.0.0
+paths:
+  /admin/ai-settings/catalog/local-online:
+    post:
+      operationId: syncLocalOnlineModelCatalog
+      description: Tenant administrator metadata operation; no inference, download or active profile write.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SyncInput'}
+      responses:
+        '200':
+          description: Catalog saved and read back from the plugin database.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success: {type: boolean, enum: [true]}
+                  data: {$ref: '#/components/schemas/Catalog'}
+        '400': {description: Invalid or unknown request fields}
+        '403': {description: Tenant administrator required}
+        '409': {description: Unavailable credentials, changed connection or stale revision}
+        '422': {description: Unsupported provider, invalid classification or upstream authentication rejection}
+        '502': {description: Upstream failure, invalid response or incomplete pagination}
+        '503': {description: Local catalog migration required or storage unavailable}
+        '504': {description: Discovery deadline exceeded}
+components:
+  schemas:
+    SyncInput:
+      type: object
+      additionalProperties: false
+      required: [environment, modality, provider, action]
+      properties:
+        environment: {type: string, enum: [development, production]}
+        modality: {type: string, enum: [llm, vlm, embedding, image, video, audio_tts, audio_asr, model3d, rerank]}
+        provider: {type: string, minLength: 1, maxLength: 64}
+        app: {type: string, maxLength: 128, default: ''}
+        endpoint: {type: string, description: Current plugin-local endpoint; empty uses the provider catalog default.}
+        credential_ref: {type: string, description: Server-configured reference scoped to tenant/environment/provider/endpoint; never an API key.}
+        action: {type: string, enum: [refresh, assign]}
+        revision: {type: string, format: uuid, description: Required for assign; forbidden for refresh.}
+        models:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          uniqueItems: true
+          description: Required for assign; forbidden for refresh. Assign is restricted to llm and embedding.
+          items: {type: string, minLength: 1, maxLength: 512}
+    Model:
+      type: object
+      additionalProperties: false
+      required: [id, label, modalities, match, manual_modalities]
+      properties:
+        id: {type: string, minLength: 1, maxLength: 512, description: Exact provider-native identifier}
+        label: {type: string, minLength: 1}
+        modalities: {type: array, items: {type: string}}
+        match: {type: string, enum: [unmatched, local_catalog, provider_declared, manual]}
+        manual_modalities: {type: array, items: {type: string, enum: [llm, embedding]}}
+    Catalog:
+      type: object
+      additionalProperties: false
+      required: [contract_version, uuid, environment, provider, app, revision, protocol, source, updated_at, models]
+      properties:
+        contract_version: {type: integer, enum: [1]}
+        uuid: {type: string, format: uuid, description: Stable plugin-owned snapshot UUID}
+        environment: {type: string, enum: [development, production]}
+        provider: {type: string}
+        app: {type: string}
+        revision: {type: string, format: uuid, description: Opaque compare-and-swap revision; never a model count}
+        protocol: {type: string, enum: [openai, dashscope, anthropic, gemini, ollama]}
+        source: {type: string, format: uri, description: Actual catalog endpoint; no credentials or connection fingerprint}
+        updated_at: {type: string, format: date-time}
+        models:
+          type: array
+          maxItems: 10000
+          items: {$ref: '#/components/schemas/Model'}

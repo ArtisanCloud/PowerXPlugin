@@ -1,5 +1,6 @@
 import { useRuntimeConfig } from '#imports'
 import { ofetch, type OFetch, type FetchResponse } from 'ofetch'
+import { createPowerXApiFetchClient, isPowerXEmbedded } from '@artisan-cloud/plugin-framework-client'
 
 const DEFAULT_ENDPOINT = '/integration/capabilities/invoke'
 
@@ -48,6 +49,8 @@ interface PowerXCapabilityBridge {
 }
 
 interface BridgeOptions {
+  pluginId?: string
+  insidePowerX?: boolean
   apiBase?: string
   endpoint?: string
   fetcher?: OFetch
@@ -106,8 +109,12 @@ const pickData = (payload: Record<string, any>) => {
   return null
 }
 
-const createBridge = (options: BridgeOptions): PowerXCapabilityBridge => {
-  const fetcher = options.fetcher ?? ofetch
+export const createPowerXCapabilityBridge = (options: BridgeOptions): PowerXCapabilityBridge => {
+  const transport = options.fetcher ?? ofetch
+  const embedded = isPowerXEmbedded(options.insidePowerX)
+  if (embedded && !options.pluginId) throw new Error('PLUGIN_ID_REQUIRED')
+  const apiBase = options.apiBase || (embedded ? `/_p/${options.pluginId}/api/v1` : '')
+  const fetcher = embedded ? createPowerXApiFetchClient({ pluginId: options.pluginId!, insidePowerX: true, baseURL: apiBase, fetcher: transport }).client : transport
   const endpoint = options.endpoint || DEFAULT_ENDPOINT
   return {
     async invoke(request) {
@@ -119,7 +126,8 @@ const createBridge = (options: BridgeOptions): PowerXCapabilityBridge => {
       if (!action) {
         throw createCapabilityBridgeError('action is required')
       }
-      const url = combineURL(request.apiBase ?? options.apiBase, request.endpoint ?? endpoint)
+      const target = combineURL(request.apiBase ?? apiBase, request.endpoint ?? endpoint)
+      const url = embedded ? new URL(target, window.location.origin).toString() : target
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         ...request.headers
@@ -127,30 +135,23 @@ const createBridge = (options: BridgeOptions): PowerXCapabilityBridge => {
       if (request.requestId && !headers['X-Request-ID']) {
         headers['X-Request-ID'] = request.requestId
       }
-      let response: FetchResponse<Record<string, any>>
-      try {
-        const body: Record<string, any> = {
-          capabilityId,
-          action,
-          payload: request.payload ?? {}
-        }
-        if (request.preferredProtocol) {
-          body.preferredProtocol = request.preferredProtocol
-        }
-        if (request.metadata) {
-          body.metadata = request.metadata
-        }
-        response = await fetcher.raw(url, {
-          method: 'POST',
-          headers,
-          body,
-          signal: request.signal
-        })
-      } catch (error) {
-        throw createCapabilityBridgeError(
-          error instanceof Error ? error.message : 'capability invoke failed'
-        )
+      const body: Record<string, any> = {
+        capabilityId,
+        action,
+        payload: request.payload ?? {}
       }
+      if (request.preferredProtocol) {
+        body.preferredProtocol = request.preferredProtocol
+      }
+      if (request.metadata) {
+        body.metadata = request.metadata
+      }
+      const response: FetchResponse<Record<string, any>> = await fetcher.raw(url, {
+        method: 'POST',
+        headers,
+        body,
+        signal: request.signal
+      })
 
       const payload = response._data ?? {}
       const traceId = payload.traceId || response.headers.get('x-trace-id') || undefined
@@ -181,7 +182,9 @@ export default defineNuxtPlugin((nuxtApp) => {
   const publicConfig = runtimeConfig?.public as Record<string, any> | undefined
   const powerxConfig = (publicConfig?.powerx ?? {}) as Record<string, any>
 
-  const bridge = createBridge({
+  const bridge = createPowerXCapabilityBridge({
+    pluginId: publicConfig?.powerxPluginId || powerxConfig.pluginId,
+    insidePowerX: publicConfig?.insidePowerX,
     apiBase: (powerxConfig.apiBase as string | undefined) ?? '',
     endpoint: (powerxConfig.capabilityEndpoint as string | undefined) ?? DEFAULT_ENDPOINT,
     fetcher: nuxtApp.$fetch

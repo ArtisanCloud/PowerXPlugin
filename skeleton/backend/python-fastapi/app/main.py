@@ -1,8 +1,10 @@
 import logging
+import os
 
 from fastapi import FastAPI
 
 from app.config.settings import get_settings
+from app.manifestx.identity import PLUGIN_ID, validate_plugin_identity
 from app.entity.repository.db import DatabaseConfig, init_db
 from app.middleware.auth_guard import build_jwt_config, auth_guard_middleware
 from app.middleware.cors import cors_middleware
@@ -20,6 +22,7 @@ from app.transport.ws_bus import register_ws_routes
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    validate_plugin_identity(PLUGIN_ID, os.getenv("POWERX_PLUGIN_ID", ""), os.getenv("POWERX_SECURITY_JWT_AUDIENCE", ""))
     init_db(DatabaseConfig(url=settings.database_url, echo=settings.db_echo))
     app = FastAPI(title=settings.app_name)
     app.state.settings = settings

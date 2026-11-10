@@ -645,6 +645,11 @@ components:
       - required:
         - operation
     CatalogOperation:
+      oneOf:
+      - $ref: '#/components/schemas/MediaCatalogOperation'
+      - $ref: '#/components/schemas/SettingsProvidersOperation'
+      - $ref: '#/components/schemas/SettingsModelsOperation'
+    MediaCatalogOperation:
       type: object
       additionalProperties: false
       required:
@@ -665,6 +670,96 @@ components:
           - video_generation
           - speech_synthesis
           - image_understanding
+    SettingsProvidersOperation:
+      type: object
+      additionalProperties: false
+      required: [operation, modality]
+      properties:
+        operation:
+          type: string
+          enum: [list_settings_providers]
+        modality:
+          type: string
+          enum: [llm]
+    SettingsModelsOperation:
+      type: object
+      additionalProperties: false
+      required: [operation, modality, provider]
+      properties:
+        operation:
+          type: string
+          enum: [list_settings_models]
+        modality:
+          type: string
+          enum: [llm]
+        provider:
+          type: string
+          minLength: 1
+          description: Exact id returned by list_settings_providers.
+        app:
+          type: string
+          description: Required for providers with apps; otherwise empty or omitted. Never split an Ollama tag on colon.
+    SettingsCatalogApp:
+      type: object
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id: {type: string, minLength: 1}
+        name: {type: string, minLength: 1}
+    SettingsCatalogProvider:
+      type: object
+      additionalProperties: false
+      required: [id, name, apps]
+      properties:
+        id: {type: string, minLength: 1}
+        name:
+          type: string
+          minLength: 1
+          description: Core-owned provider display name, never inferred from model names.
+        apps:
+          type: array
+          items:
+            $ref: '#/components/schemas/SettingsCatalogApp'
+    SettingsProviderCatalog:
+      type: object
+      additionalProperties: false
+      required: [contract_version, catalog_kind, env, modality, providers]
+      properties:
+        contract_version: {type: integer, enum: [1]}
+        catalog_kind: {type: string, enum: [ai_settings]}
+        env: {type: string, minLength: 1}
+        modality: {type: string, enum: [llm]}
+        providers:
+          type: array
+          items:
+            $ref: '#/components/schemas/SettingsCatalogProvider'
+    SettingsCatalogModel:
+      type: object
+      additionalProperties: false
+      required: [model_key, provider, model, label]
+      properties:
+        model_key:
+          type: string
+          minLength: 1
+          description: Opaque provider/model or provider/app:model key; preserve the complete native model tag.
+        provider: {type: string, minLength: 1}
+        model: {type: string, minLength: 1}
+        label: {type: string, minLength: 1}
+    SettingsModelCatalog:
+      type: object
+      additionalProperties: false
+      required: [contract_version, catalog_kind, env, modality, provider, app, items]
+      properties:
+        contract_version: {type: integer, enum: [1]}
+        catalog_kind: {type: string, enum: [ai_settings]}
+        env: {type: string, minLength: 1}
+        modality: {type: string, enum: [llm]}
+        provider: {type: string, minLength: 1}
+        app: {type: string}
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SettingsCatalogModel'
     TaskOperation:
       type: object
       additionalProperties: false
@@ -719,6 +814,18 @@ components:
           items: *id001
         max_images:
           type: integer
+        max_image_bytes:
+          type: integer
+          format: int64
+          description: 单张参考图解码后的字节上限；省略时未声明。
+        max_total_image_bytes:
+          type: integer
+          format: int64
+          description: 所有参考图解码后的字节总量上限；省略时未声明。
+        max_image_pixels:
+          type: integer
+          format: int64
+          description: 单张参考图的像素数上限；省略时未声明。
         max_videos:
           type: integer
         parameters:

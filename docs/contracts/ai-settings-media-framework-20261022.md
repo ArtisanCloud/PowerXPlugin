@@ -1,5 +1,7 @@
 # Framework AI 设置页与旧注册对齐交付（2026-10-22；错误合同补齐 2026-10-23）
 
+> 以下保留 10 月 22／23 日交付历史。2026-10-29 已将 TestConnection 改为独立的只读连接探测，旧的生成请求格式不再适用于该接口；QuickCall 保留实际模型调用。当前接口、SDK 开发包和联调步骤见 [连接探测交付说明](ai-connection-test-framework.md)。
+
 本轮修复设置页 TestConnection／QuickCall 对所有模态调用 LLM 的问题。目录与生成 SDK 继续提交 typed body，endpoint、method 由 Core 注册决定。运行通道在启动时绑定，模型目录来源不改变执行通道。
 
 ## 已实现

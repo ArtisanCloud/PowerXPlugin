@@ -1,0 +1,295 @@
+package ai_settings
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"net/url"
+	"os"
+	"regexp"
+	"slices"
+	"strings"
+	"time"
+
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/ai/modeldiscovery"
+	powerxai "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/ai"
+	"{{ .BackendModulePath }}/internal/entity/models"
+	"github.com/google/uuid"
+	"gorm.io/datatypes"
+)
+
+type OnlineCatalogInput struct {
+	Environment   string `json:"environment"`
+	Modality      string `json:"modality"`
+	Provider      string `json:"provider"`
+	App           string `json:"app"`
+	Endpoint      string `json:"endpoint"`
+	CredentialRef string `json:"credential_ref"`
+}
+type OnlineCatalogModel struct {
+	modeldiscovery.Model
+	Match            string   `json:"match"`
+	ManualModalities []string `json:"manual_modalities"`
+}
+type OnlineCatalogResult struct {
+	ContractVersion int                  `json:"contract_version"`
+	UUID            string               `json:"uuid"`
+	Environment     string               `json:"environment"`
+	Provider        string               `json:"provider"`
+	App             string               `json:"app"`
+	Revision        string               `json:"revision"`
+	Protocol        string               `json:"protocol"`
+	Source          string               `json:"source"`
+	UpdatedAt       string               `json:"updated_at"`
+	Models          []OnlineCatalogModel `json:"models"`
+}
+
+func onlineError(status int, code string) error {
+	return &powerxai.HTTPError{StatusCode: status, ErrorCode: code, ReasonCode: code}
+}
+
+func validEndpoint(value string) bool {
+	u, err := url.Parse(value)
+	return err == nil && u.Host != "" && (u.Scheme == "http" || u.Scheme == "https") && u.User == nil && u.RawQuery == "" && !u.ForceQuery && u.Fragment == ""
+}
+func (s *LocalSettingsService) validateCredentials() error {
+	seen := map[string]bool{}
+	envName := regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+	for _, b := range s.credentials {
+		_, refErr := uuid.Parse(b.Reference)
+		_, tenantErr := uuid.Parse(b.TenantUUID)
+		if refErr != nil || tenantErr != nil || seen[b.Reference] || !validEndpoint(b.Endpoint) || !validEnvironment(b.Environment) || b.Provider == "" || !envName.MatchString(b.APIKeyEnv) || (b.OrganizationEnv != "" && !envName.MatchString(b.OrganizationEnv)) || strings.ContainsAny(b.AnthropicVersion, "\r\n") {
+			return onlineError(422, "AI_CREDENTIAL_BINDING_INVALID")
+		}
+		seen[b.Reference] = true
+	}
+	if s.catalogTimeoutSeconds < 0 || s.catalogTimeoutSeconds > 120 {
+		return onlineError(422, "AI_MODEL_DISCOVERY_CONFIG_INVALID")
+	}
+	return nil
+}
+func validEnvironment(value string) bool { return value == "development" || value == "production" }
+func (s *LocalSettingsService) catalogConnection(tenant string, in OnlineCatalogInput, requireKey bool) (modeldiscovery.Input, string, error) {
+	if _, err := uuid.Parse(tenant); err != nil || !validEnvironment(in.Environment) {
+		return modeldiscovery.Input{}, "", onlineError(400, "AI_REQUEST_INVALID")
+	}
+	if s.Catalog == nil {
+		return modeldiscovery.Input{}, "", onlineError(503, "AI_DEPENDENCY_UNAVAILABLE")
+	}
+	p, ok := s.Catalog.providers[in.Provider]
+	if !ok {
+		return modeldiscovery.Input{}, "", onlineError(422, "AI_SETTINGS_PROVIDER_INVALID")
+	}
+	if _, ok := p.Modalities[in.Modality]; !ok && !(in.Provider == "ollama" && in.Modality == "vlm") {
+		return modeldiscovery.Input{}, "", onlineError(422, "AI_MODEL_CAPABILITY_UNSUPPORTED")
+	}
+	if in.App != "" {
+		if _, ok := p.Apps[in.App]; !ok {
+			return modeldiscovery.Input{}, "", onlineError(422, "AI_SETTINGS_APP_INVALID")
+		}
+	}
+	spec, supported := modeldiscovery.ProviderSpec(in.Provider)
+	if !supported {
+		if requireKey {
+			return modeldiscovery.Input{}, "", onlineError(422, "AI_MODEL_SYNC_UNSUPPORTED")
+		}
+		// Providers without an online adapter retain their declared static
+		// configuration; this path never attempts discovery or resolves a key.
+		return modeldiscovery.Input{Provider: in.Provider}, "", nil
+	}
+	endpoint := strings.TrimRight(strings.TrimSpace(in.Endpoint), "/")
+	if endpoint == "" {
+		endpoint = p.Defaults["base_url"]
+		if endpoint == "" {
+			endpoint = p.Auth.Defaults["base_url"]
+		}
+	}
+	if !validEndpoint(endpoint) {
+		return modeldiscovery.Input{}, "", onlineError(422, "AI_MODEL_DISCOVERY_CONFIG_INVALID")
+	}
+	connection := modeldiscovery.Input{Provider: in.Provider, Endpoint: endpoint, Timeout: time.Duration(s.catalogTimeoutSeconds) * time.Second}
+	if in.CredentialRef != "" {
+		found := false
+		for _, b := range s.credentials {
+			if b.Reference != in.CredentialRef {
+				continue
+			}
+			if b.TenantUUID != tenant || b.Environment != in.Environment || b.Provider != in.Provider || strings.TrimRight(b.Endpoint, "/") != endpoint {
+				return connection, "", onlineError(409, "AI_CREDENTIAL_SCOPE_MISMATCH")
+			}
+			connection.APIKey = os.Getenv(b.APIKeyEnv)
+			if b.OrganizationEnv != "" {
+				connection.Organization = os.Getenv(b.OrganizationEnv)
+			}
+			connection.AnthropicVersion = b.AnthropicVersion
+			found = true
+			break
+		}
+		if !found || strings.TrimSpace(connection.APIKey) == "" {
+			return connection, "", onlineError(409, "AI_CREDENTIAL_UNAVAILABLE")
+		}
+	}
+	if requireKey && !spec.OptionalKey && connection.APIKey == "" {
+		return connection, "", onlineError(409, "AI_CREDENTIAL_REQUIRED")
+	}
+	identity, _ := json.Marshal([]string{in.Provider, endpoint, connection.APIKey, connection.Organization, connection.AnthropicVersion})
+	hash := sha256.Sum256(identity)
+	return connection, hex.EncodeToString(hash[:]), nil
+}
+func decodeOnline(row *models.LocalAIOnlineCatalog) (*OnlineCatalogResult, error) {
+	var items []OnlineCatalogModel
+	if json.Unmarshal(row.Models, &items) != nil || items == nil {
+		return nil, onlineError(502, "AI_MODEL_CATALOG_RESPONSE_INVALID")
+	}
+	return &OnlineCatalogResult{ContractVersion: 1, UUID: row.UUID, Environment: row.Environment, Provider: row.Provider, App: row.App, Revision: row.Revision, Protocol: row.Protocol, Source: row.Source, UpdatedAt: row.UpdatedAt.UTC().Format(time.RFC3339Nano), Models: items}, nil
+}
+func (s *LocalSettingsService) ListLocalCatalog(ctx context.Context, tenant string, in OnlineCatalogInput) ([]map[string]string, error) {
+	_, fingerprint, err := s.catalogConnection(tenant, in, false)
+	if err != nil {
+		return nil, err
+	}
+	items := s.Catalog.Models(in.Modality, in.Provider, in.App)
+	if _, supported := modeldiscovery.ProviderSpec(in.Provider); !supported {
+		return items, nil
+	}
+	row, err := s.Repository.OnlineCatalog(ctx, tenant, in.Environment, in.Provider, in.App)
+	if err != nil {
+		return nil, err
+	}
+	if row == nil || row.Fingerprint != fingerprint {
+		return items, nil
+	}
+	snapshot, err := decodeOnline(row)
+	if err != nil {
+		return nil, err
+	}
+	// Ollama's refreshed candidates must reflect this instance, including removals.
+	if in.Provider == "ollama" {
+		items = []map[string]string{}
+	}
+	seen := map[string]bool{}
+	for _, item := range items {
+		seen[item["id"]] = true
+	}
+	for _, item := range snapshot.Models {
+		if !slices.Contains(item.Modalities, in.Modality) && !slices.Contains(item.ManualModalities, in.Modality) && !(item.Match == "local_catalog" && s.Catalog.HasModel(in.Modality, in.Provider, in.App, item.ID)) {
+			continue
+		}
+		if !seen[item.ID] {
+			items = append(items, map[string]string{"id": item.ID, "label": item.Label})
+			seen[item.ID] = true
+		}
+	}
+	return items, nil
+}
+func (s *LocalSettingsService) SyncOnlineCatalog(ctx context.Context, tenant string, in OnlineCatalogInput, action, revision string, ids []string) (*OnlineCatalogResult, error) {
+	connection, fingerprint, err := s.catalogConnection(tenant, in, true)
+	if err != nil {
+		return nil, err
+	}
+	old, err := s.Repository.OnlineCatalog(ctx, tenant, in.Environment, in.Provider, in.App)
+	if err != nil {
+		return nil, err
+	}
+	expected := ""
+	if old != nil {
+		expected = old.Revision
+	}
+	items := []OnlineCatalogModel{}
+	protocol, source := "", ""
+	switch action {
+	case "refresh":
+		if revision != "" || len(ids) != 0 {
+			return nil, onlineError(400, "AI_REQUEST_INVALID")
+		}
+		remote, err := modeldiscovery.Fetch(ctx, connection)
+		if err != nil {
+			return nil, err
+		}
+		protocol, source = remote.Protocol, remote.Source
+		previous := map[string][]string{}
+		if old != nil && old.Fingerprint == fingerprint {
+			snapshot, e := decodeOnline(old)
+			if e != nil {
+				return nil, e
+			}
+			for _, m := range snapshot.Models {
+				previous[m.ID] = m.ManualModalities
+			}
+		}
+		for _, m := range remote.Models {
+			match := "unmatched"
+			for modality := range s.Catalog.providers[in.Provider].Modalities {
+				if s.Catalog.HasModel(modality, in.Provider, in.App, m.ID) {
+					match = "local_catalog"
+					break
+				}
+			}
+			if match == "unmatched" && len(m.Modalities) > 0 {
+				match = "provider_declared"
+			}
+			manual := previous[m.ID]
+			if manual == nil {
+				manual = []string{}
+			}
+			if len(manual) > 0 {
+				match = "manual"
+			}
+			items = append(items, OnlineCatalogModel{Model: m, Match: match, ManualModalities: manual})
+		}
+	case "assign":
+		if in.Modality != "llm" && in.Modality != "embedding" {
+			return nil, onlineError(422, "AI_MODEL_SYNC_ASSIGNMENT_INVALID")
+		}
+		if old == nil || old.Fingerprint != fingerprint {
+			return nil, onlineError(409, "AI_MODEL_SYNC_CONNECTION_CHANGED")
+		}
+		if revision == "" || revision != old.Revision {
+			return nil, onlineError(409, "AI_MODEL_SYNC_STALE")
+		}
+		if len(ids) == 0 || len(ids) > 1000 {
+			return nil, onlineError(422, "AI_MODEL_SYNC_ASSIGNMENT_INVALID")
+		}
+		snapshot, e := decodeOnline(old)
+		if e != nil {
+			return nil, e
+		}
+		items = snapshot.Models
+		protocol, source = old.Protocol, old.Source
+		indices := map[string]int{}
+		for n, m := range items {
+			indices[m.ID] = n
+		}
+		seen := map[string]bool{}
+		for _, id := range ids {
+			n, found := indices[id]
+			if !found || seen[id] {
+				return nil, onlineError(422, "AI_MODEL_SYNC_ASSIGNMENT_INVALID")
+			}
+			seen[id] = true
+			if !slices.Contains(items[n].ManualModalities, in.Modality) {
+				items[n].ManualModalities = append(items[n].ManualModalities, in.Modality)
+			}
+			items[n].Match = "manual"
+		}
+	default:
+		return nil, onlineError(400, "AI_REQUEST_INVALID")
+	}
+	_, currentFingerprint, err := s.catalogConnection(tenant, in, true)
+	if err != nil {
+		return nil, err
+	}
+	if currentFingerprint != fingerprint {
+		return nil, onlineError(409, "AI_MODEL_SYNC_CONNECTION_CHANGED")
+	}
+	raw, err := json.Marshal(items)
+	if err != nil {
+		return nil, err
+	}
+	row, err := s.Repository.ReplaceOnlineCatalog(ctx, &models.LocalAIOnlineCatalog{TenantUUID: tenant, Environment: in.Environment, Provider: in.Provider, App: in.App, Fingerprint: fingerprint, Revision: uuid.NewString(), Protocol: protocol, Source: source, Models: datatypes.JSON(raw)}, expected)
+	if err != nil {
+		return nil, err
+	}
+	return decodeOnline(row)
+}

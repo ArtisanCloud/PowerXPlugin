@@ -23,6 +23,7 @@ tools/cli/.gocache
 tools/cli/.gomodcache
 .gocache
 .gomodcache
+.px-plugin/
 
 # Dependency locks generated per workspace
 

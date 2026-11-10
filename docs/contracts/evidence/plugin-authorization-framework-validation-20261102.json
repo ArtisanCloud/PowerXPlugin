@@ -1,0 +1,140 @@
+{
+  "status": "pass",
+  "scope": "go_framework_plugin_authorization_query",
+  "verified_at": "2026-11-01T17:05:27.703524+00:00",
+  "framework_base_commit": "32aaf0bd33ecda9860384484b55aa1d092ad27fc",
+  "core_source": {
+    "contract": "plugin-service-authorization.v1",
+    "source_repo": "../../PowerX",
+    "source_commit": "97ae4d43e0d0e48516d8ffe46bbd7bc388aab0ad",
+    "source_worktree_uncommitted": true,
+    "synced_at": "2026-11-01T16:57:14.838663+00:00",
+    "sha256": {
+      "plugin-service-authorization.md": "c29016b8c935019e68f661f8be82f03c28e970b867d3278f1953d42edc0d43ef",
+      "plugin-service-authorization.openapi.yaml": "38c9eb80109400e184c9ec36893e753b1194e007c04714233c03015337b1b9f5"
+    },
+    "framework_fixture": {
+      "owner": "Framework",
+      "file": "fixtures/plugin-authorization.v1.json",
+      "sha256": "42d0194df0529660b9a221b24ac3f0d024723baacc6ae38fafcea46032ef9038"
+    }
+  },
+  "checks": {
+    "go-race": {
+      "cwd": "framework/backend/go",
+      "command": "go test -race ./iam/... -timeout=180s",
+      "result": "pass",
+      "log_sha256": "714d4c527b44c7e7d9ce4c1a6ee279480621d95b5f37000a43000c5e7dacc70d",
+      "packages_passed": 9
+    },
+    "go-vet": {
+      "cwd": "framework/backend/go",
+      "command": "go vet ./iam/...",
+      "result": "pass",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "packages_passed": 0
+    },
+    "skeleton-race": {
+      "cwd": "skeleton/backend/go-gin",
+      "command": "go test -race ./internal/bootstrap ./internal/services/authproxy ./internal/services/iam/adapters/... ./internal/transport/http/admin/host_contract -timeout=180s",
+      "result": "pass",
+      "log_sha256": "7a0a09afa51b3ce324d23e351a0ac9081323b801b8ac324e0d95abe2c5110145",
+      "packages_passed": 6
+    },
+    "skeleton-vet": {
+      "cwd": "skeleton/backend/go-gin",
+      "command": "go vet ./internal/bootstrap ./internal/services/authproxy ./internal/services/iam/adapters/... ./internal/transport/http/admin/host_contract",
+      "result": "pass",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "packages_passed": 0
+    },
+    "cli": {
+      "cwd": ".",
+      "command": "go test ./tools/cli/cmd ./tools/cli/internal/contracts ./tools/cli/internal/templates -run 'TestInitExportsPluginAuthorizationContract|TestFilesExports|TestRenderAll_EmbeddedTemplatesParse' -count=1 -timeout=120s",
+      "result": "pass",
+      "log_sha256": "6b93c0e2db0819877ef6b45939860eac48a7fe4c8277cb81765b50a1c840f400",
+      "packages_passed": 3
+    },
+    "generated": {
+      "cwd": ".",
+      "command": "PX_TEST_GENERATED_BUILD=1 PX_TEST_FRAMEWORK_SNAPSHOT=1 go test ./tools/cli/internal/templates -run '^TestGeneratedBackendBuild$' -count=1 -timeout=180s",
+      "result": "pass",
+      "log_sha256": "0c0e0ad3d263da7c887d3803458654a49261ddb017fb439b5cdf704c27c008e8",
+      "packages_passed": 1
+    },
+    "contracts": {
+      "cwd": ".",
+      "command": "npm test",
+      "result": "pass",
+      "log_sha256": "94f076d9755167aa755cbb55d03dc22ee0038fd31a6de87cb0841ccd7e83845d",
+      "packages_passed": 6
+    }
+  },
+  "additional_checks": {
+    "template_sync": "pass",
+    "iam_directory_boundary": "pass",
+    "git_diff_check": "pass",
+    "unrelated_dirty_files_preserved": 82,
+    "prior_user_edits_in_shared_package_and_export_files_preserved": true
+  },
+  "covered_behaviors": [
+    "explicit_plugin_and_permission_request_fields",
+    "credential_tenant_never_serialized",
+    "allowed_and_denied_decisions",
+    "api_key_and_sts_separate_controlled_transports",
+    "same_startup_selected_client_used_through_production_registry",
+    "required_uuid_identity_pair",
+    "tenant_member_user_plugin_permission_response_matching",
+    "required_allowed_and_reason_presence",
+    "missing_malformed_and_oversized_responses",
+    "optional_resource_and_action_matching",
+    "official_iam_member_read_query_retained",
+    "unregistered_permission_distinct_from_missing_member",
+    "http_status_machine_codes_trace_and_request_ids_preserved",
+    "no_sensitive_upstream_body_or_message_retained",
+    "no_automatic_retry_redirect_or_credential_switch",
+    "cancellation_and_timeout",
+    "local_plugin_query_explicitly_unsupported",
+    "host_operation_input_allowlist_and_diagnostics",
+    "actual_cli_init_exports_contract_and_fixture",
+    "generated_consumer_build_without_local_framework_replace"
+  ],
+  "delivery": {
+    "go_sdk_source": "implemented_unreleased",
+    "skeleton_and_cli_templates": "synced",
+    "nuxt": "no_protocol_or_ui_change_required",
+    "dotnet": "not_changed_not_claimed_complete",
+    "sdk_method": "AuthzService.Authorize",
+    "core_query_transport": "POST /tenant/iam/authorization:check",
+    "fixture_owner": "Framework",
+    "generated_consumer_framework": "isolated module proxy snapshot, GOWORK=off"
+  },
+  "boundaries": {
+    "source_changes_committed": false,
+    "sdk_published": false,
+    "core_files_changed": false,
+    "scrm_files_changed": false,
+    "database_or_grants_changed": false,
+    "user_services_restarted": false,
+    "installed_core_or_real_credentials_validated": false,
+    "scrm_real_messaging_validated": false,
+    "core_error_propagation_fix": "requires Core owner",
+    "scrm_plugin_permission_and_worker_user_uuid_inputs": "requires SCRM owner"
+  },
+  "source_sha256": {
+    "framework/backend/go/iam/contracts/types.go": "75ed0eb9d9214343ac9e48bc9e6a0f09b3a43ba08f3e1cc6065a5c41ff70b79d",
+    "framework/backend/go/iam/contracts/authorization.go": "d6dd7e30da57f1a46a882e95f3164f4f61f0b428224eee8db117d3ade0011b98",
+    "framework/backend/go/iam/delegated/core_authorization.go": "0ebb3cf409a6486732904683f9da9e84e3fa4a05dd001a07bda0210281e56bc5",
+    "framework/backend/go/iam/delegated/core_authorization_test.go": "a45afde69620e2025f81831ab9b4c7cce1de9161a2ffc8050b6d8ac6aa40862b",
+    "framework/backend/go/iam/delegated/testdata/plugin-authorization.v1.json": "42d0194df0529660b9a221b24ac3f0d024723baacc6ae38fafcea46032ef9038",
+    "framework/backend/go/iam/errors/errors.go": "67e0f661b4dcb2238628795c8353d9b485789b66608714166d3c3267d2b1ebb1",
+    "skeleton/backend/go-gin/internal/bootstrap/plugin_authorization_test.go": "46aa3a3f812becbefd3163d2c7b2248b7781d6c94897918b4a9f35b16a425412",
+    "skeleton/backend/go-gin/internal/services/authproxy/delegated_client.go": "e4b8daefd02ff801090d5d1a148e5f528be4255a787ca3024f5f7bcb90665fcd",
+    "skeleton/backend/go-gin/internal/services/iam/adapters/delegated/adapter.go": "05079230ac9dfe75bc37a3b5eb8b72849b3ac8882c05fd62c913444b11c08c06",
+    "skeleton/backend/go-gin/internal/services/iam/adapters/local/adapter.go": "6116dd5d930e28267cb26d01902ebe3234419c13a4b122ab867743684560dab2",
+    "skeleton/backend/go-gin/internal/transport/http/admin/host_contract/handler.go": "3775a3d8c0d4cc0fdd07b0461ee3e181f4f073c5d601fc892269eedcd8f28418",
+    "tools/cli/internal/contracts/embed.go": "ea9815322b5b6fc2ebfe3c9c64e2fbbfe15f275c92644fd447fbffa4b575d183",
+    "tools/cli/cmd/init_framework_test.go": "1f7436e6dedc1b2bb3b509cd830ca34288467fcd152eb1769cad5ad4eb2895dc",
+    "scripts/contracts/validate-plugin-authorization.mjs": "ef6c03d18a8b4b38275c41578b1b4196ff70f4f03328fedec438923220feb268"
+  }
+}

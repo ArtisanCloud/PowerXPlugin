@@ -26,7 +26,8 @@ type TokenProviderFunc func(context.Context) (string, error)
 func (f TokenProviderFunc) Token(ctx context.Context) (string, error) { return f(ctx) }
 
 type Config struct {
-	BaseURL string
+	BaseURL   string
+	APIPrefix string
 	// AuthScheme is either "bearer" (the default) or "apikey".  API-key
 	// authentication is required by local PowerX gateway deployments.
 	AuthScheme      string
@@ -40,6 +41,8 @@ type Config struct {
 
 type Client struct {
 	baseURL       string
+	apiPrefix     string
+	streamTimeout time.Duration
 	http          *http.Client
 	authorization authorizationProvider
 }
@@ -56,7 +59,7 @@ func NewClient(cfg Config, httpClient *http.Client) (*Client, error) {
 	if strings.TrimSpace(cfg.BaseURL) == "" {
 		return nil, errors.New("powerx ai base_url is required")
 	}
-	client := &Client{baseURL: strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/")}
+	client := &Client{baseURL: strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/"), apiPrefix: cfg.APIPrefix, streamTimeout: cfg.Timeout}
 	if httpClient != nil {
 		client.http = httpClient
 	} else {
@@ -97,7 +100,7 @@ func NewClientWithTokenProvider(cfg Config, provider TokenProvider, httpClient *
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: timeout}
 	}
-	return &Client{baseURL: strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/"), http: httpClient, authorization: bearerTokenProvider{provider: provider}}, nil
+	return &Client{baseURL: strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/"), apiPrefix: cfg.APIPrefix, streamTimeout: cfg.Timeout, http: httpClient, authorization: bearerTokenProvider{provider: provider}}, nil
 }
 
 func (c *Client) LLMInvoke(ctx context.Context, input LLMInvokeInput) (*LLMInvokeOutput, error) {

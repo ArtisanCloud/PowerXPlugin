@@ -1,0 +1,41 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import assert from 'node:assert/strict';
+import { fileURLToPath } from 'node:url';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const contracts = path.join(root, 'docs/contracts');
+const source = JSON.parse(fs.readFileSync(path.join(contracts, 'plugin-authorization-source.json')));
+const hash = raw => crypto.createHash('sha256').update(raw).digest('hex');
+assert.deepEqual(Object.keys(source.sha256).sort(), ['plugin-service-authorization.md', 'plugin-service-authorization.openapi.yaml']);
+for (const [file, digest] of Object.entries(source.sha256)) assert.equal(hash(fs.readFileSync(path.join(contracts, file))), digest, file);
+assert.equal(source.framework_fixture.owner, 'Framework');
+const fixture = fs.readFileSync(path.join(contracts, source.framework_fixture.file));
+assert.equal(hash(fixture), source.framework_fixture.sha256);
+assert.deepEqual(fs.readFileSync(path.join(root, 'framework/backend/go/iam/delegated/testdata/plugin-authorization.v1.json')), fixture);
+for (const file of [...Object.keys(source.sha256), 'plugin-authorization-source.json', 'plugin-authorization-framework.md', source.framework_fixture.file]) {
+  assert.deepEqual(fs.readFileSync(path.join(root, 'tools/cli/internal/contracts/data/media-contracts', file)), fs.readFileSync(path.join(contracts, file)), file);
+}
+const sample = JSON.parse(fixture);
+assert.equal(sample.fixture_owner, 'Framework');
+assert.equal(sample.wire_request.tenant_uuid, undefined);
+assert.equal(sample.wire_request.plugin_id, sample.response.data.plugin_id);
+assert.equal(sample.wire_request.permission_code, sample.response.data.permission_code);
+assert.equal(sample.denied_response.data.allowed, false);
+assert.equal(sample.denied_response.data.reason_code, 'IAM_PERMISSION_DENIED');
+assert(sample.errors.some(error => error.status === 404 && error.body.error_code === 'IAM_PLUGIN_PERMISSION_NOT_REGISTERED'));
+const serviceFixture = source.framework_service_fixture;
+assert.equal(serviceFixture.owner, 'Framework');
+const serviceRaw = fs.readFileSync(path.join(contracts, serviceFixture.file));
+assert.equal(hash(serviceRaw), serviceFixture.sha256);
+assert.deepEqual(serviceRaw, fs.readFileSync(path.join(root, 'framework/backend/go/runtime/powerx/hostcontract/testdata/plugin-service-errors-stream.v1.json')));
+assert.deepEqual(serviceRaw, fs.readFileSync(path.join(root, 'tools/cli/internal/contracts/data/media-contracts', serviceFixture.file)));
+const service = JSON.parse(serviceRaw);
+assert.equal(service.fixture_owner, 'Framework');
+assert(service.cases.some(item => item.status === 409 && item.body.error_code === 'MESSAGING_IDEMPOTENCY_CONFLICT'));
+assert(service.cases.some(item => item.status === 503 && item.body.details.retryable === true));
+assert(service.cases.some(item => item.body.details.expected_provider_version && item.body.details.actual_provider_version));
+assert.equal(service.stream_request.preferred_protocol, 'rest');
+assert.deepEqual(Object.keys(service.stream_request.payload).sort(), ['body', 'query']);
+console.log('PLUGIN_AUTHORIZATION_CONTRACT_VALID');

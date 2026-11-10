@@ -1,3 +1,4 @@
+import { classifyPowerXApiAuthError, isPowerXSessionInvalidFrame, readPowerXApiErrorCode } from './api-errors';
 export class PluginSSEHTTPError extends Error {
   readonly errorCode: string;
   readonly reasonCode: string;
@@ -8,7 +9,7 @@ export class PluginSSEHTTPError extends Error {
     try { data = JSON.parse(body); } catch { /* An intermediary may return a non-JSON error body; retain it for diagnostics. */ }
     this.details = data.details || {};
     this.errorCode = data.error_code || '';
-    this.reasonCode = data.reason_code || this.details.reason_code || this.errorCode || '';
+    this.reasonCode = readPowerXApiErrorCode({ _data: data }) || '';
     this.traceID = traceID || data.trace_id || '';
     this.requestID = requestID || data.request_id || '';
   }
@@ -23,6 +24,7 @@ export interface PluginSSEOptions {
   token?: string;
   tenantUuid?: string;
   withCredentials?: boolean;
+  onSessionError?: (error: unknown) => void;
 }
 
 export interface PluginSSEConnectOptions {
@@ -142,6 +144,7 @@ export function createPluginSSEClient(
   };
 
   const connect = (connectOptions: PluginSSEConnectOptions) => {
+    const snapshot = hostSession?.getReadySnapshot();
     const url = buildURL(connectOptions.path, connectOptions.params, {
       token: connectOptions.token,
       tenantUuid: connectOptions.tenantUuid,
@@ -150,12 +153,23 @@ export function createPluginSSEClient(
       withCredentials:
         connectOptions.withCredentials ?? options.withCredentials ?? true,
     });
-    const snapshot = hostSession?.getReadySnapshot();
     const guard = <T extends Event>(handler?: (event: T) => void) => (event: T) => { if (!snapshot || hostSession!.isCurrent(snapshot)) handler?.(event); };
     if (hostSession && snapshot) {
       const close = source.close.bind(source);
-      const unsubscribe = hostSession.subscribe(() => { if (!hostSession.isCurrent(snapshot)) source.close(); });
-      source.close = () => { unsubscribe(); close(); };
+      let unsubscribe = () => {};
+      let closed = false;
+      source.close = () => { closed = true; unsubscribe(); close(); };
+      unsubscribe = hostSession.subscribe(() => { if (!hostSession.isCurrent(snapshot)) source.close(); });
+      if (closed) unsubscribe();
+      source.addEventListener('error', (event: Event) => {
+        if (!hostSession.isCurrent(snapshot) || !(event as MessageEvent).data) return;
+        let data: unknown;
+        try { data = JSON.parse(String((event as MessageEvent).data)); } catch { return; }
+        if (!isPowerXSessionInvalidFrame(data)) return;
+        event.stopImmediatePropagation?.();
+        try { hostSession.reportSessionInvalid(snapshot, 'IAM_CONTEXT_USER_SESSION_INVALID'); }
+        catch (error) { options.onSessionError?.(error); }
+      });
     }
     if (connectOptions.onOpen) source.onopen = guard(connectOptions.onOpen);
     if (connectOptions.onError) source.onerror = guard(connectOptions.onError);
@@ -179,54 +193,84 @@ export function createPluginSSEClient(
   };
 
   const stream = async (streamOptions: PluginSSEStreamOptions) => {
-    const snapshot = hostSession?.getReadySnapshot();
+    let snapshot = hostSession?.getReadySnapshot();
     if (hostSession && !snapshot) throw new PowerXHostSessionError('PLUGIN_AUTH_REQUIRED');
     const controller = new AbortController();
     const abort = () => controller.abort();
     if (streamOptions.signal?.aborted) abort();
     streamOptions.signal?.addEventListener('abort', abort, { once: true });
-    const unsubscribe = hostSession?.subscribe(() => { if (!hostSession.isCurrent(snapshot!)) abort(); });
+    const bindSnapshot = () => {
+      const bound = snapshot;
+      return hostSession?.subscribe(() => { if (!hostSession.isCurrent(bound!)) abort(); });
+    };
+    let unsubscribe = bindSnapshot();
+    let terminalFailure: Error | null = null;
+    const rejectInvalid = (error: Error): never => {
+      if (!hostSession!.isCurrent(snapshot!) || streamOptions.signal?.aborted) throw new PowerXHostSessionError('AUTH_SESSION_CHANGED');
+      try { hostSession!.reportSessionInvalid(snapshot!, 'IAM_CONTEXT_USER_SESSION_INVALID'); }
+      catch (failure) { terminalFailure = failure as Error; throw failure; }
+      terminalFailure = error; streamOptions.onError?.(error); throw error;
+    };
     try {
-      const url = buildURL(streamOptions.path, streamOptions.params, {
-        tenantUuid: streamOptions.tenantUuid,
-        headerAuth: true,
-      });
-      const headers: Record<string, string> = {
-        Accept: "text/event-stream",
-        "Cache-Control": "no-cache",
-        ...(streamOptions.headers || {}),
-      };
-      const token = normalizeBearer(
-        String(snapshot?.accessToken || streamOptions.token || options.token || ""),
-      );
-      if (token) {
-        headers.Authorization = token;
-      }
-      const tenantUuid = String(
-        hostSession ? snapshot?.identity?.tenantUuid || '' : streamOptions.tenantUuid || options.tenantUuid || '',
-      ).trim();
-      if (tenantUuid) {
-        headers.tenant_uuid = tenantUuid;
-      }
-      const response = await fetch(url, {
-        method: "GET",
-        headers,
-        signal: controller.signal,
-        credentials: options.withCredentials === false ? "same-origin" : "include",
-      });
-      if (!response.ok) {
-        throw new PluginSSEHTTPError(response.status, await response.text(), response.headers.get("X-Trace-ID") || "", response.headers.get("X-Request-ID") || "");
+      let response!: Response;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const url = buildURL(streamOptions.path, streamOptions.params, {
+          tenantUuid: streamOptions.tenantUuid,
+          headerAuth: true,
+        });
+        const headers: Record<string, string> = {
+          Accept: "text/event-stream",
+          "Cache-Control": "no-cache",
+          ...(streamOptions.headers || {}),
+        };
+        const token = normalizeBearer(
+          String(snapshot?.accessToken || streamOptions.token || options.token || ""),
+        );
+        if (token) {
+          headers.Authorization = token;
+        }
+        const tenantUuid = String(
+          hostSession ? snapshot?.identity?.tenantUuid || '' : streamOptions.tenantUuid || options.tenantUuid || '',
+        ).trim();
+        if (tenantUuid) {
+          headers.tenant_uuid = tenantUuid;
+        }
+        response = await fetch(url, {
+          method: "GET",
+          headers,
+          signal: controller.signal,
+          credentials: options.withCredentials === false ? "same-origin" : "include",
+        });
+        if (!response.ok) {
+          const body = await response.text();
+          const error = new PluginSSEHTTPError(response.status, body, response.headers.get("X-Trace-ID") || "", response.headers.get("X-Request-ID") || "");
+          if (snapshot && !hostSession!.isCurrent(snapshot)) throw new PowerXHostSessionError('AUTH_SESSION_CHANGED');
+          if (snapshot && attempt === 0 && !streamOptions.signal?.aborted && classifyPowerXApiAuthError({ status: response.status, _data: { code: error.reasonCode } }).kind === 'user-session-expired') {
+            unsubscribe?.();
+            const previous = snapshot;
+            snapshot = await hostSession!.ensureSnapshot({ force: true, expected: previous, signal: streamOptions.signal });
+            if (!hostSession!.isSameSession(previous)) throw new PowerXHostSessionError('AUTH_SESSION_CHANGED');
+            unsubscribe = bindSnapshot();
+            continue;
+          }
+          throw error;
+        }
+        break;
       }
       if (!response.body) {
         throw new Error("SSE_RESPONSE_BODY_REQUIRED");
       }
       await readSSEStream(response.body, event => {
         if (controller.signal.aborted || (snapshot && !hostSession!.isCurrent(snapshot))) throw new PowerXHostSessionError('AUTH_SESSION_CHANGED');
+        if (snapshot && event.event === 'error' && isPowerXSessionInvalidFrame(event.payload)) rejectInvalid(Object.assign(new Error('IAM_CONTEXT_USER_SESSION_INVALID'), { code: 'IAM_CONTEXT_USER_SESSION_INVALID', status: 401, cause: event }));
         streamOptions.onEvent?.(event);
       }, controller.signal);
     } catch (cause) {
       const error = cause instanceof Error ? cause : new Error(String(cause));
-      if (!snapshot || hostSession!.isCurrent(snapshot)) streamOptions.onError?.(error);
+      if (terminalFailure === error) throw error;
+      if (snapshot && !hostSession!.isCurrent(snapshot)) throw new PowerXHostSessionError('AUTH_SESSION_CHANGED');
+      if (snapshot && !streamOptions.signal?.aborted && error instanceof PluginSSEHTTPError && error.status === 401 && error.reasonCode === 'IAM_CONTEXT_USER_SESSION_INVALID') rejectInvalid(error);
+      streamOptions.onError?.(error);
       throw error;
     } finally { unsubscribe?.(); streamOptions.signal?.removeEventListener('abort', abort); }
   };

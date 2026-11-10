@@ -21,7 +21,7 @@ type LocalAISetting struct {
 	Source        string         `gorm:"column:source;type:varchar(16);not null;default:local;uniqueIndex:uk_local_ai_settings_tenant_env_modality_source,priority:4" json:"source"`
 	Provider      string         `gorm:"column:provider;type:varchar(64);not null" json:"provider"`
 	App           string         `gorm:"column:app;type:varchar(64)" json:"app,omitempty"`
-	ModelKey      string         `gorm:"column:model_key;type:varchar(128);not null" json:"model_key"`
+	ModelKey      string         `gorm:"column:model_key;type:varchar(512);not null" json:"model_key"`
 	Endpoint      string         `gorm:"column:endpoint;type:text" json:"endpoint,omitempty"`
 	CredentialRef string         `gorm:"column:credential_ref;type:text" json:"credential_ref,omitempty"`
 	Parameters    datatypes.JSON `gorm:"column:parameters;type:jsonb;not null" json:"parameters"`

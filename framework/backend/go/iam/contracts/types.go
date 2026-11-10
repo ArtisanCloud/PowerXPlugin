@@ -105,26 +105,30 @@ type Permission struct {
 
 // AuthorizationRequest 描述授权判定输入。
 type AuthorizationRequest struct {
-	TenantUUID  string `json:"tenant_uuid"`
-	UserUUID    string `json:"user_uuid,omitempty"`
-	MemberUUID  string `json:"member_uuid,omitempty"`
-	Resource    string `json:"resource"`
-	Action      string `json:"action"`
-	TraceID     string `json:"trace_id,omitempty"`
-	PolicyToken string `json:"policy_token,omitempty"`
+	TenantUUID     string `json:"tenant_uuid"`
+	UserUUID       string `json:"user_uuid,omitempty"`
+	MemberUUID     string `json:"member_uuid,omitempty"`
+	PluginID       string `json:"plugin_id,omitempty"`
+	PermissionCode string `json:"permission_code,omitempty"`
+	Resource       string `json:"resource,omitempty"`
+	Action         string `json:"action,omitempty"`
+	TraceID        string `json:"trace_id,omitempty"`
+	PolicyToken    string `json:"policy_token,omitempty"`
 }
 
 // AuthorizationDecision 描述授权判定输出。
 type AuthorizationDecision struct {
-	Allowed    bool   `json:"allowed"`
-	ReasonCode string `json:"reason_code,omitempty"`
-	Resource   string `json:"resource"`
-	Action     string `json:"action"`
-	TenantUUID string `json:"tenant_uuid,omitempty"`
-	UserUUID   string `json:"user_uuid,omitempty"`
-	MemberUUID string `json:"member_uuid,omitempty"`
-	Mode       string `json:"mode,omitempty"`
-	TraceID    string `json:"trace_id,omitempty"`
+	Allowed        bool   `json:"allowed"`
+	ReasonCode     string `json:"reason_code,omitempty"`
+	PluginID       string `json:"plugin_id,omitempty"`
+	PermissionCode string `json:"permission_code,omitempty"`
+	Resource       string `json:"resource"`
+	Action         string `json:"action"`
+	TenantUUID     string `json:"tenant_uuid,omitempty"`
+	UserUUID       string `json:"user_uuid,omitempty"`
+	MemberUUID     string `json:"member_uuid,omitempty"`
+	Mode           string `json:"mode,omitempty"`
+	TraceID        string `json:"trace_id,omitempty"`
 }
 
 // IdentityContext 为统一身份上下文载体。

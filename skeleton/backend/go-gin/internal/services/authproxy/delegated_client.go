@@ -189,6 +189,16 @@ func (c *DelegatedClient) AuthorizationBaselineProvider() fwiamcontracts.Authori
 	provider, _ := c.identityClient.(fwiamcontracts.AuthorizationBaselineService)
 	return provider
 }
+
+// AuthorizationProvider exposes the same startup-selected Framework client;
+// authorization must not pass through the legacy proxy response projection.
+func (c *DelegatedClient) AuthorizationProvider() fwiamcontracts.AuthzService {
+	if c == nil {
+		return nil
+	}
+	provider, _ := c.identityClient.(fwiamcontracts.AuthzService)
+	return provider
+}
 func (c *DelegatedClient) IdentityResolverReady() bool {
 	if c == nil || c.identityClient == nil {
 		return false

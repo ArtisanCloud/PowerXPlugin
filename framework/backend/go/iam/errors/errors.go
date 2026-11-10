@@ -3,30 +3,35 @@ package iamerrors
 import "errors"
 
 const (
-	CodeBaselineInvalidArgument   = "IAM_BASELINE_INVALID_ARGUMENT"
-	CodeBaselineResponseInvalid   = "IAM_BASELINE_RESPONSE_INVALID"
-	CodeBaselineUnavailable       = "IAM_BASELINE_DEPENDENCY_UNAVAILABLE"
-	CodeIdentityMigrationRequired = "IAM_IDENTITY_MIGRATION_REQUIRED"
-	CodeIdentityResponseInvalid   = "IAM_CONTEXT_RESPONSE_INVALID"
-	CodeContextInvalidArgument    = "IAM_CONTEXT_INVALID_ARGUMENT"
-	CodeProofRequired             = "IAM_CONTEXT_PROOF_REQUIRED"
-	CodeProofInvalid              = "IAM_CONTEXT_PROOF_INVALID"
-	CodeProofExpired              = "IAM_CONTEXT_PROOF_EXPIRED"
-	CodeUserSessionInvalid        = "IAM_CONTEXT_USER_SESSION_INVALID"
-	CodeUserSessionExpired        = "IAM_CONTEXT_USER_SESSION_EXPIRED"
-	CodeServiceCredentialInvalid  = "IAM_CONTEXT_SERVICE_CREDENTIAL_INVALID"
-	CodeServiceCredentialExpired  = "IAM_CONTEXT_SERVICE_CREDENTIAL_EXPIRED"
-	CodeContextUnavailable        = "IAM_CONTEXT_UNAVAILABLE"
-	CodeContextRequestForbidden   = "IAM_CONTEXT_REQUEST_FORBIDDEN"
-	CodeModeInvalid               = "PROVIDER_MODE_INVALID"
-	CodeInvalidArgument           = "IAM_INVALID_ARGUMENT"
-	CodeModeConflict              = "PROVIDER_MODE_CONFLICT"
-	CodeAdapterNotBound           = "IAM_ADAPTER_NOT_BOUND"
-	CodeAdapterAlreadyBind        = "IAM_ADAPTER_ALREADY_BOUND"
-	CodeUnauthorized              = "IAM_UNAUTHORIZED"
-	CodeForbidden                 = "IAM_FORBIDDEN"
-	CodeUpstreamDependency        = "IAM_UPSTREAM_DEPENDENCY"
-	CodeMemberNotFound            = "IAM_MEMBER_NOT_FOUND"
+	CodeAuthorizationResponseInvalid  = "IAM_AUTHORIZATION_RESPONSE_INVALID"
+	CodeAuthorizationUnsupported      = "IAM_AUTHORIZATION_UNSUPPORTED"
+	CodePluginPermissionNotRegistered = "IAM_PLUGIN_PERMISSION_NOT_REGISTERED"
+	CodeSubjectMismatch               = "IAM_SUBJECT_MISMATCH"
+	CodePermissionDenied              = "IAM_PERMISSION_DENIED"
+	CodeBaselineInvalidArgument       = "IAM_BASELINE_INVALID_ARGUMENT"
+	CodeBaselineResponseInvalid       = "IAM_BASELINE_RESPONSE_INVALID"
+	CodeBaselineUnavailable           = "IAM_BASELINE_DEPENDENCY_UNAVAILABLE"
+	CodeIdentityMigrationRequired     = "IAM_IDENTITY_MIGRATION_REQUIRED"
+	CodeIdentityResponseInvalid       = "IAM_CONTEXT_RESPONSE_INVALID"
+	CodeContextInvalidArgument        = "IAM_CONTEXT_INVALID_ARGUMENT"
+	CodeProofRequired                 = "IAM_CONTEXT_PROOF_REQUIRED"
+	CodeProofInvalid                  = "IAM_CONTEXT_PROOF_INVALID"
+	CodeProofExpired                  = "IAM_CONTEXT_PROOF_EXPIRED"
+	CodeUserSessionInvalid            = "IAM_CONTEXT_USER_SESSION_INVALID"
+	CodeUserSessionExpired            = "IAM_CONTEXT_USER_SESSION_EXPIRED"
+	CodeServiceCredentialInvalid      = "IAM_CONTEXT_SERVICE_CREDENTIAL_INVALID"
+	CodeServiceCredentialExpired      = "IAM_CONTEXT_SERVICE_CREDENTIAL_EXPIRED"
+	CodeContextUnavailable            = "IAM_CONTEXT_UNAVAILABLE"
+	CodeContextRequestForbidden       = "IAM_CONTEXT_REQUEST_FORBIDDEN"
+	CodeModeInvalid                   = "PROVIDER_MODE_INVALID"
+	CodeInvalidArgument               = "IAM_INVALID_ARGUMENT"
+	CodeModeConflict                  = "PROVIDER_MODE_CONFLICT"
+	CodeAdapterNotBound               = "IAM_ADAPTER_NOT_BOUND"
+	CodeAdapterAlreadyBind            = "IAM_ADAPTER_ALREADY_BOUND"
+	CodeUnauthorized                  = "IAM_UNAUTHORIZED"
+	CodeForbidden                     = "IAM_FORBIDDEN"
+	CodeUpstreamDependency            = "IAM_UPSTREAM_DEPENDENCY"
+	CodeMemberNotFound                = "IAM_MEMBER_NOT_FOUND"
 )
 
 // Error 表示 IAM 域内的统一错误对象。
@@ -94,6 +99,14 @@ func StatusCode(err error) int {
 		return status.HTTPStatus()
 	}
 	switch CodeOf(err) {
+	case CodeAuthorizationResponseInvalid:
+		return 502
+	case CodeAuthorizationUnsupported:
+		return 501
+	case CodePluginPermissionNotRegistered:
+		return 404
+	case CodeSubjectMismatch:
+		return 400
 	case CodeBaselineInvalidArgument, "IAM_BASELINE_REQUIREMENTS_INVALID":
 		return 400
 	case CodeBaselineResponseInvalid:
@@ -122,7 +135,7 @@ func StatusCode(err error) int {
 		return 502
 	case CodeUnauthorized:
 		return 401
-	case CodeForbidden:
+	case CodeForbidden, CodePermissionDenied:
 		return 403
 	case CodeMemberNotFound:
 		return 404

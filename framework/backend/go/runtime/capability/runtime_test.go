@@ -3,6 +3,7 @@ package capability
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -70,6 +71,40 @@ func TestLocalRuntimeDoesNotUseCoreDebugRegistry(t *testing.T) {
 	var moduleErr *module.Error
 	if registry != nil || !errors.As(err, &moduleErr) || moduleErr.Code != "FRAMEWORK_MODULE_ADAPTER_UNAVAILABLE" {
 		t.Fatalf("registry=%T err=%v", registry, err)
+	}
+}
+
+func TestRuntimeStreamUsesSelectedRegistryAndNeverFallsBack(t *testing.T) {
+	core := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/tenant/invocations/stream" || r.Header.Get("Authorization") != "ApiKey selected-key" {
+			t.Error("SELECTED_STREAM_CHANNEL_CHANGED")
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = fmt.Fprint(w, "event: end\ndata: {}\n\n")
+	}))
+	defer core.Close()
+	client, err := powerxcapability.NewClient(powerxcapability.Config{BaseURL: core.URL, AuthScheme: "apikey", APIKey: "selected-key"}, core.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime, err := NewRuntime(provider.ModeDelegated, registryStub{}, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream, err := runtime.Streamer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	events := 0
+	if err := stream.InvokeStream(context.Background(), powerxcapability.StreamInput{CapabilityID: "com.corex.ai.llm.stream", Body: map[string]any{}}, func(powerxcapability.StreamEvent) error { events++; return nil }); err != nil || events != 1 {
+		t.Fatal("SELECTED_STREAM_UNAVAILABLE", err, events)
+	}
+	local, err := NewRuntime(provider.ModeLocal, registryStub{}, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stream, err := local.Streamer(); stream != nil || err == nil {
+		t.Fatal("LOCAL_STREAM_FELL_BACK_TO_CORE")
 	}
 }
 

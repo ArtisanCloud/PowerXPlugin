@@ -1,0 +1,29 @@
+{
+  "valid": [
+    "com.powerx.plugins.demo",
+    "com.powerx.plugins.ai-craft",
+    "com.example.demo",
+    "org.acme.weather-v2",
+    "my-plugin",
+    "demo",
+    "1",
+    "com.example.my--plugin"
+  ],
+  "invalid": [
+    "",
+    "com.powerx.plugin.demo",
+    "com.powerx.plugin",
+    "com.powerx.plugins",
+    "com.powerx.plugins.",
+    "Com.example.demo",
+    "com.example.ai_craft",
+    "com..example",
+    ".com.example",
+    "com.example.",
+    "com.-example",
+    "com.example-",
+    "com.example/demo",
+    " com.example.demo",
+    "com.example.demo\n"
+  ]
+}

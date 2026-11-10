@@ -1,0 +1,90 @@
+{
+  "schema": "powerx.plugin-publisher-local-validation/v1",
+  "validated_at": "2026-11-09T14:42:50.500817+00:00",
+  "scope": "Framework F02 local release-plan and tool-session foundation",
+  "source_commit": "32aaf0bd33ecda9860384484b55aa1d092ad27fc",
+  "branch": "025-framework-business-regression",
+  "worktree_uncommitted": true,
+  "published": false,
+  "go_version": "go version go1.26.7 darwin/arm64",
+  "framework_dependency_source": "current go.work workspace; not independently published SDK consumption",
+  "runtime_source_sha256": {
+    ".gitignore": "52787e4f9fb45fe5c96f1e1dd0bdc9c7c071697755a4553b8923ff26fd2ea98b",
+    "tools/cli/cmd/root.go": "a4f35bc6ba085b73d73fa8fc05d3a76378fc417214499ecdd893f272ccc187be",
+    "tools/cli/cmd/publisher.go": "d530384c4c2850390d238a18b00b00856cad3dab6684dabee30c2dce89ba28e9",
+    "tools/cli/cmd/publisher_test.go": "0f3cb3f01c8f704dc8d3183c4aa3b1b1401d823d2f9145534686564bf4516eca",
+    "tools/cli/internal/publisher/engine.go": "2ef67f5522b6df60b1a30ed115c28735ad4b516f196bdff4bd6c9492461c8016",
+    "tools/cli/internal/publisher/engine_test.go": "6396c3692898e217bdb27bf3888c5f746d371e0f92bc7058a4909c7edb7c7506",
+    "tools/cli/internal/publisher/errors.go": "e8f2b8e6894d3f64e1b7dbd7672497bfe6f3b30a8debb90971b8072569628b76",
+    "tools/cli/internal/publisher/fs_other.go": "fb23e8cff19844b794683c74a01a9137639d84464835472c51df5fdee8528ec6",
+    "tools/cli/internal/publisher/fs_unix.go": "8eb917337fd7dfda0f85ebd1ae0637c969f14683745eba4ccbb78606e54f87a6",
+    "tools/cli/internal/publisher/locale.go": "ada9f5c91141c81c035bd8c2c0bd10c11818aa2c253d23dff912ec30bdac4924",
+    "tools/cli/internal/publisher/locales.json": "9c7200ca1bdbcff49be313df2f28c7455471bc75c94de924d40b1215d0cbda2e",
+    "tools/cli/internal/publisher/model.go": "9fa9150f55cdfed6c833e0321a5caf9dc8c9a955778491419f702b32c8d16356",
+    "tools/cli/internal/publisher/server.go": "f363dfef62067193aa2c719a631f1276913762aa55e3b173bf2cd785ba52c8be",
+    "tools/cli/internal/publisher/server_test.go": "fb94eac4ad27260cc34247d1341bd204f07c338092089a7f3b25fb5be07ffc2a"
+  },
+  "checks": {
+    "race": {
+      "passed": true,
+      "top_level_tests": 17,
+      "pass_records": 52,
+      "command": "go test -race -json ./tools/cli/internal/publisher ./tools/cli/cmd -run 'Test(Plans|ConcurrentPlans|InvalidInputs|CorruptRecords|StateCannot|IdentityAndSource|StrictJSON|LocaleCatalog|LocalService|SessionAndBootstrap|ServiceShutdown|EndpointConfiguration|PublisherCLI)' -count=1"
+    },
+    "vet": {
+      "passed": true,
+      "command": "go vet ./tools/cli/internal/publisher ./tools/cli/cmd"
+    },
+    "linux_amd64_cli_compile": {
+      "passed": true,
+      "runtime_executed": false,
+      "sha256": "8931bb2df90decebf0d82e7ea59d158bc1f25706092b786a70e3e245e74b86e7"
+    },
+    "local_contract": {
+      "openapi_paths": 4,
+      "schema_references_checked": 21,
+      "paired_documents_aligned": true,
+      "local_links_checked": 101,
+      "main_acceptance_rows": 21,
+      "main_decision_rows": 12
+    }
+  },
+  "generated_cli_smoke": {
+    "kind": "controlled-generated-cli-consumer",
+    "published": false,
+    "market_contacted": false,
+    "plugin_business_service_started": false,
+    "cli_sha256": "5d9f990bbe8b009bbee06702add4c4d89c722d0114c8bee9b00575c55fc04515",
+    "service_pid": 98081,
+    "parent_pid": 98075,
+    "port": 51730,
+    "commands": [
+      "px-plugin init --git-init=false --install-deps=false --init-config=false",
+      "px-plugin publisher plan create",
+      "px-plugin publisher serve --origin http://localhost:3131"
+    ],
+    "http_cli_shared_plans": true,
+    "records_before_restart": 2,
+    "bootstrap_file_permissions": "0600",
+    "source_manifest_unchanged": true,
+    "service_exit_code": 0,
+    "port_released": true,
+    "bootstrap_file_removed": true,
+    "remaining_child_pids": [],
+    "plans_preserved_after_shutdown": true,
+    "generated_consumer_removed": true
+  },
+  "boundaries": {
+    "market_contacted": false,
+    "market_functional_code_modified_by_this_task": false,
+    "core_modified": false,
+    "database_mutated": false,
+    "business_services_started_or_restarted": false,
+    "nuxt_page_or_proxy_implemented": false,
+    "build_or_package_engine_implemented": false,
+    "market_client_implemented": false,
+    "M1_complete": false,
+    "F07_full_sdk_consumption_complete": false
+  },
+  "next": "F03 isolated build/task/immutable artifact implementation; F05 page/proxy consumption and market P01 remain separate"
+}

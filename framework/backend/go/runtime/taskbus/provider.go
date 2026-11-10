@@ -15,32 +15,51 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/event"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
 	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/eventfabric"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 	"github.com/redis/go-redis/v9"
 )
 
 type HostProviderConfig struct {
-	BaseURL        string
-	APIPrefix      string
-	AuthScheme     string
-	APIKey         string
-	Token          string
-	TokenProvider  wsbus.TokenProvider
-	TenantUUID     string
-	UserAgent      string
-	PublishPath    string
-	RegisterPath   string
-	Timeout        time.Duration
-	PayloadVersion string
-	SourcePlugin   string
+	TopicBindings    map[string]string
+	PublishTopicKeys []string
+	ConsumeTopicKeys []string
+	BaseURL          string
+	APIPrefix        string
+	AuthScheme       string
+	APIKey           string
+	Token            string
+	TokenProvider    wsbus.TokenProvider
+	TenantUUID       string
+	UserAgent        string
+	PublishPath      string
+	RegisterPath     string
+	Timeout          time.Duration
+	PayloadVersion   string
+	SourcePlugin     string
 }
 
 type HostProvider struct {
 	cfg HostProviderConfig
 }
 
+func (*HostProvider) RequiresReliableHost() bool { return true }
+
 func NewHostProvider(cfg HostProviderConfig) *HostProvider {
 	return &HostProvider{cfg: cfg}
+}
+
+// WithTopicBindings returns a startup copy with explicit business-to-Core topics.
+func (p *HostProvider) WithTopicBindings(topics map[string]string) *HostProvider {
+	if p == nil {
+		return nil
+	}
+	copyCfg := p.cfg
+	copyCfg.TopicBindings = map[string]string{}
+	for topic, full := range topics {
+		copyCfg.TopicBindings[topic] = full
+	}
+	return NewHostProvider(copyCfg)
 }
 
 func NewHostProviderFromApp(app *bootstrap.App, sourcePlugin, payloadVersion string) *HostProvider {
@@ -69,140 +88,38 @@ func NewHostProviderFromApp(app *bootstrap.App, sourcePlugin, payloadVersion str
 	})
 }
 
+// NewEmitter constructs the durable Core service channel. Old free-form WSBus
+// paths are rejected instead of being silently used for business events.
 func (p *HostProvider) NewEmitter() (eventbridge.Emitter, error) {
-	if p == nil {
-		return nil, errors.New("taskbus host provider is nil")
+	if p == nil || p.cfg.PublishPath != "" || p.cfg.RegisterPath != "" {
+		return nil, &eventfabric.HTTPError{StatusCode: 400, ReasonCode: "EVENT_FABRIC_RUNTIME_CONFIG_INVALID"}
 	}
-
-	client, err := wsbus.NewHostClient(wsbus.HostClientConfig{
-		BaseURL:       p.cfg.BaseURL,
-		APIPrefix:     p.cfg.APIPrefix,
-		AuthScheme:    p.cfg.AuthScheme,
-		APIKey:        p.cfg.APIKey,
-		Token:         p.cfg.Token,
-		TokenProvider: p.cfg.TokenProvider,
-		TenantUUID:    p.cfg.TenantUUID,
-		UserAgent:     p.cfg.UserAgent,
-		PublishPath:   p.cfg.PublishPath,
-		RegisterPath:  p.cfg.RegisterPath,
-		Timeout:       p.cfg.Timeout,
-	})
-	if err != nil {
-		return nil, err
+	if len(p.cfg.PublishTopicKeys) > 0 || len(p.cfg.ConsumeTopicKeys) > 0 {
+		return p.NewResolvedRuntime(context.Background())
 	}
-
-	metaBuilder := event.NewMetaBuilder(p.cfg.SourcePlugin, p.cfg.PayloadVersion)
-	return &hostEmitter{
-		publisher:   wsbus.NewAdapter(client, p.cfg.TenantUUID, nil),
-		metaBuilder: metaBuilder,
-		logger:      runtimelogging.NewSlogAdapter(slog.Default()),
-	}, nil
+	cfg := eventfabric.Config{BaseURL: p.cfg.BaseURL, APIPrefix: p.cfg.APIPrefix, AuthScheme: p.cfg.AuthScheme, APIKey: p.cfg.APIKey, BearerToken: p.cfg.Token, Timeout: p.cfg.Timeout, StreamTimeout: 40 * time.Second}
+	var tokens eventfabric.TokenProvider
+	if p.cfg.TokenProvider != nil {
+		tokens = eventfabric.TokenProviderFunc(p.cfg.TokenProvider)
+	}
+	return eventfabric.NewHostRuntime(cfg, tokens, p.cfg.SourcePlugin, p.cfg.TenantUUID, p.cfg.TopicBindings, nil)
 }
 
-type hostEmitter struct {
-	publisher   wsbus.Publisher
-	metaBuilder event.MetaBuilder
-	logger      runtimelogging.Logger
-}
-
-func (e *hostEmitter) Emit(ctx context.Context, ev event.Event) error {
-	if e == nil || e.publisher == nil {
-		return errors.New("taskbus host emitter is not configured")
+// NewResolvedRuntime is scoped to this provider's tenant and service credential.
+// Construct a separate provider for each tenant; never substitute a tenant UUID
+// into a System provider and never mix its static mappings with resolved keys.
+func (p *HostProvider) NewResolvedRuntime(ctx context.Context) (*eventfabric.Runtime, error) {
+	if p == nil || p.cfg.PublishPath != "" || p.cfg.RegisterPath != "" || len(p.cfg.TopicBindings) > 0 {
+		return nil, &eventfabric.HTTPError{StatusCode: 400, ReasonCode: "EVENT_FABRIC_RUNTIME_CONFIG_INVALID"}
 	}
-
-	topic := strings.TrimSpace(string(ev.Topic))
-	if topic == "" {
-		return errors.New("event topic is required")
+	var tokens eventfabric.TokenProvider
+	if p.cfg.TokenProvider != nil {
+		tokens = eventfabric.TokenProviderFunc(p.cfg.TokenProvider)
 	}
-
-	meta, err := e.ensureMeta(ev.Meta)
-	if err != nil {
-		return err
-	}
-
-	payload, err := decodePayload(ev.Payload)
-	if err != nil {
-		return err
-	}
-
-	result := e.publisher.Publish(ctx, topic, payload, wsbus.PublishOptions{
-		TenantUUID: meta.TenantUUID,
-		TraceID:    firstNonEmpty(meta.TraceID, meta.RequestID),
+	return eventfabric.NewTenantHostRuntime(ctx, eventfabric.TenantRuntimeConfig{
+		Connection:    eventfabric.Config{BaseURL: p.cfg.BaseURL, APIPrefix: p.cfg.APIPrefix, AuthScheme: p.cfg.AuthScheme, APIKey: p.cfg.APIKey, BearerToken: p.cfg.Token, Timeout: p.cfg.Timeout, StreamTimeout: 40 * time.Second},
+		TokenProvider: tokens, PluginID: p.cfg.SourcePlugin, TenantUUID: p.cfg.TenantUUID, PublishTopicKeys: p.cfg.PublishTopicKeys, ConsumeTopicKeys: p.cfg.ConsumeTopicKeys,
 	})
-	if !result.OK {
-		e.logEmit(topic, meta, runtimelogging.StatusFailed, result.ErrorCode)
-		return fmt.Errorf("taskbus host publish failed: %s (%s)", result.ErrorCode, result.ErrorMessage)
-	}
-	e.logEmit(topic, meta, runtimelogging.StatusSucceeded, "")
-
-	return nil
-}
-
-func (e *hostEmitter) logEmit(topic string, meta event.Meta, status, reason string) {
-	if e == nil || e.logger == nil {
-		return
-	}
-	fields := runtimelogging.NormalizeRuntimeFields(runtimelogging.Fields{
-		runtimelogging.FieldTraceID:    firstNonEmpty(meta.TraceID, meta.RequestID),
-		runtimelogging.FieldTaskID:     firstNonEmpty(meta.RequestID, meta.TraceID),
-		runtimelogging.FieldTenantUUID: strings.TrimSpace(meta.TenantUUID),
-		runtimelogging.FieldTenantKey:  runtimelogging.TenantKeyFromUUID(meta.TenantUUID),
-		runtimelogging.FieldSubscriber: "taskbus.host_emitter",
-		runtimelogging.FieldTopic:      strings.TrimSpace(topic),
-		runtimelogging.FieldStatus:     status,
-		runtimelogging.FieldReason:     reason,
-	})
-	facade := runtimelogging.NewFacade(nil, e.logger)
-	if status == runtimelogging.StatusFailed {
-		facade.Error("taskbus host emit failed", runtimelogging.Entry{
-			Fields: fields,
-			Context: runtimelogging.Fields{
-				"module":     "taskbus.host_emitter",
-				"plugin_id":  strings.TrimSpace(meta.SourcePlugin),
-				"biz_scene":  "event_emit",
-				"biz_domain": "runtime",
-			},
-		})
-		return
-	}
-	facade.Info("taskbus host emit completed", runtimelogging.Entry{
-		Fields: fields,
-		Context: runtimelogging.Fields{
-			"module":     "taskbus.host_emitter",
-			"plugin_id":  strings.TrimSpace(meta.SourcePlugin),
-			"biz_scene":  "event_emit",
-			"biz_domain": "runtime",
-		},
-	})
-}
-
-func (e *hostEmitter) ensureMeta(meta event.Meta) (event.Meta, error) {
-	tenantUUID := strings.TrimSpace(meta.TenantUUID)
-	requestID := strings.TrimSpace(meta.RequestID)
-	traceID := strings.TrimSpace(meta.TraceID)
-
-	if tenantUUID == "" {
-		return event.Meta{}, errors.New("event tenant_uuid is required")
-	}
-
-	if requestID != "" && traceID != "" {
-		if strings.TrimSpace(meta.SourcePlugin) == "" {
-			meta.SourcePlugin = e.metaBuilder.SourcePlugin
-		}
-		if strings.TrimSpace(meta.PayloadVersion) == "" {
-			meta.PayloadVersion = e.metaBuilder.PayloadVersion
-		}
-		if meta.OccurredAt.IsZero() {
-			meta.OccurredAt = e.metaBuilder.Now()
-		}
-		return meta, nil
-	}
-
-	built, err := e.metaBuilder.Build(tenantUUID, requestID, traceID)
-	if err != nil {
-		return event.Meta{}, err
-	}
-	return built, nil
 }
 
 func decodePayload(raw json.RawMessage) (any, error) {
@@ -437,6 +354,7 @@ func (c *RedisConsumer) Consume(ctx context.Context, handler func(context.Contex
 	if handler == nil {
 		return errors.New("taskbus redis consumer handler is required")
 	}
+	defer c.client.Close()
 	if err := c.ensureGroup(ctx); err != nil {
 		return err
 	}
@@ -590,4 +508,12 @@ func defaultRedisConsumerID() string {
 		host = "localhost"
 	}
 	return host + "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+}
+
+// Close 释放当前 emitter 独占的 Redis 连接池。
+func (e *redisEmitter) Close() error {
+	if e == nil || e.client == nil {
+		return nil
+	}
+	return e.client.Close()
 }

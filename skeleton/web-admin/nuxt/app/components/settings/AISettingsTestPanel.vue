@@ -3,6 +3,18 @@
     <h2 v-if="!embedded" class="border-b border-default px-4 py-3 font-semibold text-highlighted">{{ t('aiSettings.workspace.testPanelTitle') }}</h2>
     <div :class="embedded ? 'space-y-4' : 'space-y-4 p-4'">
       <p class="ai-settings-copy break-words text-xs">{{ t('aiSettings.testTarget', { modality: currentTitle, provider: providerLabel, model: modelLabel }) }}</p>
+      <div class="space-y-3">
+        <p class="ai-settings-copy text-xs">{{ t('aiSettings.testing.connectionDescription') }}</p>
+        <p v-if="connectionBlockedReason" data-testid="ai-connection-blocked" class="ai-settings-copy text-xs">{{ t(`aiSettings.testing.blocked.${connectionBlockedReason}`) }}</p>
+        <UButton data-testid="ai-test-connection" size="sm" color="neutral" variant="outline" icon="i-heroicons-wifi" :disabled="Boolean(connectionBlockedReason) || Boolean(testing)" :loading="testing === 'connection'" @click="emit('connection')">{{ t('aiSettings.testConnection') }}</UButton>
+        <div v-if="connection.result || connection.failed" role="status" class="ai-settings-test-result space-y-2 rounded-lg border border-default p-3">
+          <p data-testid="ai-connection-result" class="text-sm text-default">{{ connection.failed ? t('aiSettings.testing.connectionFailed') : t(connection.result?.verification.authentication === 'not_required' ? 'aiSettings.testing.connectionNoAuth' : 'aiSettings.testing.connectionVerified') }}</p>
+          <p v-if="connection.result" class="ai-settings-copy text-xs">{{ t('aiSettings.testing.connectionEnvironment', { environment: connection.result.env }) }} · {{ t('aiSettings.testing.connectionModelUnverified') }}</p>
+        </div>
+        <details v-if="connection.diagnostic"><summary class="ai-settings-copy cursor-pointer text-xs">{{ t('aiSettings.testing.diagnostics') }}</summary><pre class="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-all text-xs text-default">{{ connection.diagnostic }}</pre></details>
+      </div>
+      <div class="space-y-4 border-t border-default pt-4">
+      <h3 class="text-sm font-semibold text-highlighted">{{ t('aiSettings.quickCall') }}</h3>
       <UFormField :label="t('aiSettings.testing.prompt')">
         <UTextarea data-testid="ai-test-prompt" v-model="prompt" :disabled="Boolean(state.attempt) || Boolean(testing)" :rows="2" class="w-full" />
       </UFormField>
@@ -13,7 +25,6 @@
       <p v-if="generation" class="ai-settings-caution text-xs">{{ t('aiSettings.testing.generationCost') }}</p>
       <p v-if="blockedReason" data-testid="ai-test-blocked" class="ai-settings-copy text-xs">{{ t(`aiSettings.testing.blocked.${blockedReason}`) }}</p>
       <div class="flex flex-wrap gap-2">
-        <UButton data-testid="ai-test-connection" size="sm" color="neutral" variant="outline" icon="i-heroicons-wifi" :disabled="Boolean(blockedReason) || Boolean(testing) || Boolean(state.task)" :loading="testing === 'connection'" @click="emit('connection')">{{ t('aiSettings.testConnection') }}</UButton>
         <UButton data-testid="ai-test-quick" size="sm" color="neutral" variant="ghost" icon="i-heroicons-command-line" :disabled="Boolean(blockedReason) || Boolean(testing) || Boolean(state.task)" :loading="testing === 'quick'" @click="emit('quick')">{{ t('aiSettings.quickCall') }}</UButton>
       </div>
       <div class="ai-settings-test-result rounded-lg border border-default p-3" role="status" :aria-busy="Boolean(testing)">
@@ -34,12 +45,13 @@
         <summary class="ai-settings-copy cursor-pointer text-xs">{{ t('aiSettings.testing.diagnostics') }}</summary>
         <pre class="mt-2 max-h-60 overflow-auto whitespace-pre-wrap break-all text-xs text-default">{{ state.diagnostic }}</pre>
       </details>
+      </div>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { isMediaTaskTerminal, type MediaTask } from '@artisan-cloud/plugin-framework-client';
+import { isMediaTaskTerminal, type MediaTask, type AIConnectionTestResult } from '@artisan-cloud/plugin-framework-client';
 
 defineProps<{
   embedded?: boolean;
@@ -49,6 +61,8 @@ defineProps<{
   modality: string;
   generation: boolean;
   blockedReason?: string;
+  connectionBlockedReason?: string;
+  connection: { result?: AIConnectionTestResult; failed: boolean; diagnostic: string };
   testing: '' | 'connection' | 'quick';
   imageTypeOptions: { value: string; label: string }[];
   state: { text: string; diagnostic: string; task?: MediaTask; attempt?: unknown };

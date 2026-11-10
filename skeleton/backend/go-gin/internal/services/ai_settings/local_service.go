@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 
+	fwsettings "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/aisettings"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/hostapi"
 	powerxai "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/ai"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
@@ -26,10 +27,12 @@ type SaveInput struct {
 	Parameters    map[string]any `json:"parameters"`
 }
 type LocalSettingsService struct {
-	Repository *repository.LocalSettingsRepository
-	models     map[string]config.LocalAIModel
-	ai         *runtimeexample.LocalAI
-	Catalog    *Catalog
+	Repository            *repository.LocalSettingsRepository
+	models                map[string]config.LocalAIModel
+	ai                    *runtimeexample.LocalAI
+	Catalog               *Catalog
+	credentials           []config.LocalAICredential
+	catalogTimeoutSeconds int
 }
 
 func NewLocalSettingsService(repo *repository.LocalSettingsRepository, cfg *config.LocalAIConfig, ai *runtimeexample.LocalAI) (*LocalSettingsService, error) {
@@ -42,7 +45,15 @@ func NewLocalSettingsService(repo *repository.LocalSettingsRepository, cfg *conf
 			modelsByKey[model.Key] = model
 		}
 	}
-	return &LocalSettingsService{Repository: repo, models: modelsByKey, ai: ai}, nil
+	s := &LocalSettingsService{Repository: repo, models: modelsByKey, ai: ai}
+	if cfg != nil {
+		s.credentials = append([]config.LocalAICredential(nil), cfg.Credentials...)
+		s.catalogTimeoutSeconds = cfg.CatalogTimeoutSeconds
+		if err := s.validateCredentials(); err != nil {
+			return nil, err
+		}
+	}
+	return s, nil
 }
 
 func (s *LocalSettingsService) CatalogProviders(modality string) []map[string]any {
@@ -73,8 +84,21 @@ func (s *LocalSettingsService) Save(ctx context.Context, tenantUUID, catalogSour
 	}
 	switch catalogSource {
 	case "local":
-		if s.Catalog != nil && !s.Catalog.HasModel(in.Modality, in.Provider, in.App, in.ModelKey) {
-			return nil, errors.New("selected model is not declared in the local AI catalog")
+		if s.Catalog != nil {
+			items, err := s.ListLocalCatalog(ctx, tenantUUID, OnlineCatalogInput{Environment: in.Environment, Modality: in.Modality, Provider: in.Provider, App: in.App, Endpoint: in.Endpoint, CredentialRef: in.CredentialRef})
+			if err != nil {
+				return nil, err
+			}
+			found := false
+			for _, item := range items {
+				if item["id"] == in.ModelKey {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return nil, onlineError(422, "AI_MODEL_NOT_IN_CATALOG")
+			}
 		}
 		if model, isLocalRuntimeModel := s.models[in.ModelKey]; isLocalRuntimeModel && !supports(model, in.Modality) {
 			return nil, errors.New("selected local runtime model does not support this modality")
@@ -98,10 +122,18 @@ func (s *LocalSettingsService) Save(ctx context.Context, tenantUUID, catalogSour
 	return s.Repository.Upsert(ctx, &models.LocalAISetting{TenantUUID: tenantUUID, Environment: in.Environment, Modality: in.Modality, Source: catalogSource, Provider: in.Provider, App: in.App, ModelKey: in.ModelKey, Endpoint: in.Endpoint, CredentialRef: in.CredentialRef, Parameters: datatypes.JSON(params)})
 }
 func (s *LocalSettingsService) TestConnection(ctx context.Context, in SaveInput) error {
-	if in.Modality != "llm" {
-		return &hostapi.HTTPError{StatusCode: 422, ReasonCode: "AI_MODEL_CAPABILITY_UNSUPPORTED"}
-	}
 	return s.ai.TestConnectionWithProfile(ctx, profileRuntimeModel(in))
+}
+
+func (s *LocalSettingsService) ProbeConnection(ctx context.Context, environment string, in fwsettings.ConnectionTestInput, endpoint string) (*fwsettings.ConnectionTestResult, error) {
+	if err := in.Validate(); err != nil {
+		return nil, err
+	}
+	verification, err := s.ai.ProbeProviderConnection(ctx, in.Provider, endpoint)
+	if err != nil {
+		return nil, err
+	}
+	return &fwsettings.ConnectionTestResult{ContractVersion: 1, OK: true, Environment: environment, Modality: in.Modality, Verification: *verification}, nil
 }
 func (s *LocalSettingsService) QuickCall(ctx context.Context, in SaveInput) (string, error) {
 	if in.Modality != "llm" {

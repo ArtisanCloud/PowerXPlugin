@@ -42,6 +42,19 @@ func main() {
 		fmt.Println("regression_migrate_ok")
 		return
 	}
+	if cmd == "migrate-ai-online-catalog" {
+		models.InitSchemaFrom(cfg.Database.Schema)
+		connection, err := db.Connect(cfg.Database)
+		if err != nil {
+			log.Fatal("AI_ONLINE_DATABASE_CONNECT_FAILED")
+		}
+		defer db.Close()
+		if err := migrate.MigrateAIOnlineCatalog(context.Background(), connection); err != nil {
+			log.Fatal("AI_ONLINE_MIGRATION_FAILED")
+		}
+		fmt.Println("ai_online_catalog_migrate_ok")
+		return
+	}
 	if err := pluginbootstrap.EnsureLocalIAMSecret(cfg); err != nil {
 		log.Fatalf("初始化本地 IAM Secret 失败: %v", err)
 	}

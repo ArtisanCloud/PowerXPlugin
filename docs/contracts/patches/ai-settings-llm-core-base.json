@@ -1,0 +1,9 @@
+{
+  "source_root": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/PowerX",
+  "files": {
+    "backend/internal/service/ai/media_invoker.go": "d747f60bbcecb0cb8cb7260a23a29bd705b9e6024fd3f5198e809eb5141c257a",
+    "backend/internal/service/ai/settings_catalog.go": null,
+    "backend/internal/service/ai/settings_catalog_test.go": null,
+    "docs/contracts/ai-media-v2.openapi.yaml": "ea8be3e47ddc28c4e35a8051ac5e02ed3d1b93f28944d7a443e72088309e16ad"
+  }
+}

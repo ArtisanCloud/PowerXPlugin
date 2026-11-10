@@ -1,0 +1,90 @@
+{
+  "contract": "plugin-id.v1",
+  "validated_at": "2026-11-05T03:50:03.336795+00:00",
+  "scope": {
+    "powerxplugin_branch": "025-framework-business-regression",
+    "powerxdocs_branch": "dev/scenario",
+    "core_modified": false,
+    "business_data_modified": false,
+    "committed": false,
+    "pushed": false,
+    "released": false
+  },
+  "source": {
+    "repository": "ArtisanCloud/PowerXDocs",
+    "schema": "docs/standards/powerx-plugin/_shared/plugin-id.schema.json",
+    "schema_sha256": "27f1a43ff8809a41bce9e936571a80129d74743b1a9861bfb677a08d3c7191b1",
+    "distribution": "publish:standards --dry-run; JSON fields restricted to properties.id; no branch switch or push",
+    "other_manifest_fields_preserved": true
+  },
+  "checks": {
+    "node_schema_conformance": "passed; 6 Manifest schema variants",
+    "go_manifest_cli_and_skeleton_identity": "passed",
+    "cli_all_packages": "passed",
+    "generated_consumers": [
+      {
+        "backend": "go-gin",
+        "id": "com.powerx.plugins.demo",
+        "result": "passed",
+        "acceptance": "generated; shared CLI and Make ID gate; legacy ID rejected by package, plugin-yaml-check and make dist; actual backend binaries built and archived, frontend explicitly excluded"
+      },
+      {
+        "backend": "go-gin",
+        "id": "com.example.demo",
+        "result": "passed",
+        "acceptance": "generated; shared CLI and Make ID gate; legacy ID rejected by package, plugin-yaml-check and make dist; actual backend binaries built and archived, frontend explicitly excluded"
+      },
+      {
+        "backend": "python-fastapi",
+        "id": "com.powerx.plugins.demo",
+        "result": "passed",
+        "acceptance": "generated; shared CLI and Make ID gate; legacy ID rejected by package, plugin-yaml-check and make dist; Python contract examples and runtime identity validation"
+      },
+      {
+        "backend": "python-fastapi",
+        "id": "com.example.demo",
+        "result": "passed",
+        "acceptance": "generated; shared CLI and Make ID gate; legacy ID rejected by package, plugin-yaml-check and make dist; Python contract examples and runtime identity validation"
+      }
+    ],
+    "template_sync": "passed",
+    "powerxdocs_source_generation_and_field_distribution": "passed; 2 tests",
+    "ci_release_guardrails": "passed",
+    "full_framework": {
+      "result": "failed outside this change",
+      "test": "TestPublicStreamRejectsRedirectAndNonSSE",
+      "cases": [
+        "gateway/too-large",
+        "capability/too-large"
+      ],
+      "files_unchanged_since_task_start": [
+        "framework/backend/go/gateway/stream_contract_test.go",
+        "framework/backend/go/internal/integration/gateway/stream.go",
+        "framework/backend/go/runtime/powerx/capability/stream.go"
+      ],
+      "gateway_imports_plugin_id_module": false
+    },
+    "race": "passed: Framework manifest, CLI manifest/package, Skeleton manifestcheck/bootstrap"
+  },
+  "commands": [
+    "npm run check:plugin-id",
+    "npm run sync:templates -- --check",
+    "go test ./framework/backend/go/manifest ./tools/cli/... ./skeleton/backend/go-gin/cmd/manifestcheck ./skeleton/backend/go-gin/internal/bootstrap -count=1",
+    "PX_TEST_PLUGIN_ID=1 go test ./tools/cli/internal/templates -run ^TestPluginIDGeneratedConsumers$ -count=1 -timeout=15m",
+    "node .codex/skills/ci/audit/scripts/ci-guardrails.mjs"
+  ],
+  "limits": [
+    "No Core installation, real Host/STS authorization, existing-plugin rename or migration performed.",
+    "The Go packaging acceptance explicitly skips frontend bundling. FastAPI acceptance covers generation and ID validation, not full installation packaging.",
+    "New validation API and CLI command are source changes and require a subsequent SDK/CLI release for downstream projects."
+  ],
+  "preservation": {
+    "preexisting_files_verified": 276,
+    "preexisting_files_extended_for_this_task": [
+      "package.json",
+      "scripts/template-sync-config.yaml",
+      "tools/cli/internal/contracts/embed.go"
+    ],
+    "other_preexisting_file_hashes_unchanged": true
+  }
+}

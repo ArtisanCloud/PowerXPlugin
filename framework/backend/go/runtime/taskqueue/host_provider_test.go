@@ -53,7 +53,7 @@ func TestHostProviderRefreshesTokenOnceOnUnauthorized(t *testing.T) {
 			http.Error(w, "expired", http.StatusUnauthorized)
 		case "Bearer fresh-token":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"success":true,"data":{"messages":[]}}`))
+			_, _ = w.Write([]byte(`{"code":200,"data":{"status":"completed","protocol_used":"core_internal","fallback_used":false,"result":{"contract_version":"taskqueue.v2","messages":[]}}}`))
 		default:
 			t.Fatalf("unexpected Authorization header: %q", r.Header.Get("Authorization"))
 		}

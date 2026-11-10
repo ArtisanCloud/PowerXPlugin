@@ -1,0 +1,19 @@
+{
+  "application_contract": "event_fabric.service.v1",
+  "core_source": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/PowerX",
+  "core_base_commit": "a1956aa3601786ed05a59236477ed3a67cfc7a67",
+  "core_source_uncommitted": true,
+  "sha256": {
+    "event-fabric-service-v1.md": "9ea5e1a1a10e350b126707053aaeec55cc091bdb61b868b0e31048e108eae7f0",
+    "event-fabric-service-v1.openapi.yaml": "1afe8c6315759c118dce93a0e2704cda268a3a7a5d93993c9f05bd2d42622ccf",
+    "event-fabric-service-v1.proto": "57de55f4e1f8d4a0335eee2c8823294c31de61838ef1b413f2265aae3bd59879",
+    "plugin-event-fabric-install.md": "e9a54db18bd13e9a62c69e7a91055d3ed6fcc7b030c81d560be635247ff7a358"
+  },
+  "framework_fixture": {
+    "owner": "Framework",
+    "file": "fixtures/event-fabric-service.v1.json",
+    "sha256": "7bc86592e87674c3cc693aa6ff6b1fef3318516dd2272845159f6967e5b9ceb2"
+  },
+  "deployment_verified": false,
+  "alignment": "2026-11-05 tenant resolve_topics and installation mapping contract"
+}

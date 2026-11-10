@@ -51,6 +51,17 @@ func (s directoryStub) GetMember(_ context.Context, _ string, memberUUID string)
 func (directoryStub) CheckPermission(context.Context, iamservice.TenantContext, string, string) error {
 	return nil
 }
+
+func TestPluginAuthorizationCannotBeSilentlyHandledAsLocalResourceAction(t *testing.T) {
+	bundle, err := NewBundle(directoryStub{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := bundle.Authz.Authorize(context.Background(), fwiamcontracts.AuthorizationRequest{PluginID: "com.example.messaging", PermissionCode: "messages.conversation:reply", Resource: "conversation", Action: "reply"})
+	if result != nil || fwiamerrors.CodeOf(err) != fwiamerrors.CodeAuthorizationUnsupported {
+		t.Fatal("PLUGIN_AUTHORIZATION_FELL_BACK_TO_LOCAL", result, err)
+	}
+}
 func (s directoryStub) ListPermissions(context.Context, string) ([]iamservice.PermissionInfo, error) {
 	return s.permissions, nil
 }

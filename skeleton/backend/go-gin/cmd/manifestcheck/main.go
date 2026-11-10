@@ -39,6 +39,9 @@ func run(pluginPath, manifestPath, schemaPath, eventFabricPath string, capabilit
 	if err != nil {
 		return fmt.Errorf("load plugin: %w", err)
 	}
+	if err := fwmanifest.ValidatePluginDocument(initial); err != nil {
+		return err
+	}
 	if _, err := fwmanifest.DecodeNotificationPresentations(initial["notification_presentations"]); err != nil {
 		return fmt.Errorf("invalid_manifest: %w", err)
 	}

@@ -1,9 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
-import { settingsTestAttempt, settingsTestBlocked } from '../../app/utils/aiSettingsTesting';
+import { settingsTestAttempt, settingsTestBlocked, settingsConnectionBlocked } from '../../app/utils/aiSettingsTesting';
 import fixture from '../../../../../docs/contracts/fixtures/ai-media-v2.json';
 
 const ready = () => ({ ready: true, modality: 'image', delegated: true, source: 'powerx', modelKey: 'fixture.model', provider: 'fixture.provider', endpoint: '', prompt: 'fixture.prompt', image: '', imageType: 'image_url', catalogFailed: false, available: true, operation: fixture.catalog_result.items[0]!.operations.image_generation, localVision: false });
 describe('settings capability tests', () => {
+  it('enables an available Core probe independently of the business runtime and trial input', () => {
+    const probe = { ready: true, source: 'powerx' as const, provider: 'ollama', endpoint: '', adapterAvailable: true, providersReady: true, catalogFailed: false };
+    expect(settingsConnectionBlocked(probe)).toBe('');
+    expect(settingsTestBlocked({ ...ready(), delegated: false, modality: 'llm' })).toBe('powerxRuntimeRequired');
+    expect(settingsConnectionBlocked({ ...probe, adapterAvailable: false })).toBe('probeUnavailable');
+    expect(settingsConnectionBlocked({ ...probe, provider: '' })).toBe('providerRequired');
+    expect(settingsConnectionBlocked({ ...probe, source: 'local', endpoint: 'http://localhost:11434' })).toBe('');
+    expect(settingsConnectionBlocked({ ...probe, source: 'local', provider: 'openai', endpoint: 'http://localhost' })).toBe('localProbeUnsupported');
+  });
   it('disables unavailable runtime, models, operations and undeclared modalities', () => {
     expect(settingsTestBlocked(ready())).toBe('');
     for (const input of [{ ready: false }, { modelKey: '' }, { available: false }, { catalogFailed: true }, { operation: undefined }, { modality: 'embedding' }, { modality: 'audio_asr' }, { modality: 'model3d' }, { modality: 'rerank' }, { source: 'local' }]) {

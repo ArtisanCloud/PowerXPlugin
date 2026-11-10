@@ -33,6 +33,9 @@ func NewBundle(directory iamservice.IAMDirectory) (fwiamadapters.Bundle, error) 
 }
 
 func (a *Adapter) Authorize(ctx context.Context, req fwiamcontracts.AuthorizationRequest) (*fwiamcontracts.AuthorizationDecision, error) {
+	if req.PluginID != "" || req.PermissionCode != "" {
+		return nil, fwiamerrors.New(fwiamerrors.CodeAuthorizationUnsupported, fwiamerrors.CodeAuthorizationUnsupported)
+	}
 	tc := iamservice.TenantContext{
 		TenantUUID: req.TenantUUID,
 		UserUUID:   req.UserUUID,

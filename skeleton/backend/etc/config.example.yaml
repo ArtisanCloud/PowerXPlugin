@@ -97,7 +97,7 @@ runtime:
   event_bridge:
     enabled: true
     mode: "taskbus" # local | taskbus | dual
-    fallback_to_local: true
+    fallback_to_local: false
     local_queue_size: 1024
     taskbus_provider: "redis" # standalone 推荐 redis；宿主模式改为 host
     redis_url: "redis://localhost:6379"
@@ -105,8 +105,11 @@ runtime:
     redis_group: "powerx.plugin"
     redis_consumer: ""
     redis_max_len: 10000
-    source_plugin: "com.powerx.plugins.base"
+    source_plugin: "" # 启动时使用当前插件 ID
     payload_version: "v1"
+    topic_bindings: {}
+    publish_topic_keys: []
+    consume_topic_keys: []
   ws_bus:
     provider: "redis" # memory | redis
     redis_url: "redis://localhost:6379"
@@ -288,3 +291,18 @@ regression:
 # Versioned provider catalog packaged with this plugin build.
 ai_catalog:
   directory: ai/providers.d
+
+# Plugin-owned online catalog discovery. Keys stay in server environment variables.
+# The browser supplies only the reference; every binding is tenant/env/provider/endpoint scoped.
+local_ai:
+  catalog_timeout_seconds: 20
+  credentials: []
+  # credentials:
+  #   - reference: "22222222-2222-4222-8222-222222222222"
+  #     tenant_uuid: "11111111-1111-4111-8111-111111111111"
+  #     environment: development
+  #     provider: openai
+  #     endpoint: https://api.openai.com/v1
+  #     api_key_env: PLUGIN_AI_OPENAI_KEY
+  models: []
+  agents: []

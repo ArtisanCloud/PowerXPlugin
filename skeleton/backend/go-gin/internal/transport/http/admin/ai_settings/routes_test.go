@@ -144,7 +144,7 @@ func TestLocalSettingsHTTPUsesBoundRuntime(t *testing.T) {
 	}
 }
 
-func TestAISettingsConnectionAndQuickCallUseDelegatedRuntime(t *testing.T) {
+func TestAISettingsQuickCallUsesDelegatedRuntime(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	var requests []map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -175,7 +175,7 @@ func TestAISettingsConnectionAndQuickCallUseDelegatedRuntime(t *testing.T) {
 	h := &Handler{mode: fwprovider.ModeDelegated, deps: &app.Deps{AIInvocation: runtime}}
 	body := `{"source":"powerx","environment":"development","modality":"llm","provider":"ollama","model_key":"qwen3:8b","endpoint":"http://127.0.0.1:11434","parameters":{"temperature":0.2},"inputs":[{"role":"user","type":"text","content":"fixture.input"}]}`
 
-	for _, handler := range []gin.HandlerFunc{h.TestConnection, h.QuickCall} {
+	for _, handler := range []gin.HandlerFunc{h.QuickCall, h.QuickCall} {
 		rec := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(rec)
 		c.Request = httptest.NewRequest(http.MethodPost, "/ai-settings", strings.NewReader(body))

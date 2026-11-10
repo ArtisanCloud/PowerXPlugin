@@ -1,0 +1,139 @@
+{
+  "fixture_owner": "Framework",
+  "contract_version": 2,
+  "catalog_result": {
+    "contract_version": 2,
+    "items": [
+      {
+        "model_key": "fixture/image-limits",
+        "provider": "fixture",
+        "model": "image-limits",
+        "label": "fixture",
+        "capabilities": [
+          "image_generation"
+        ],
+        "configured": true,
+        "available": true,
+        "operations": {
+          "image_generation": {
+            "driver": "qwen",
+            "input_types": [
+              "text"
+            ],
+            "max_images": 0,
+            "max_videos": 0,
+            "parameters": {
+              "size": {
+                "type": "string",
+                "enum": [
+                  "2048*2048",
+                  "2688*1536",
+                  "1536*2688",
+                  "2368*1728",
+                  "1728*2368"
+                ],
+                "default": "2048*2048"
+              },
+              "n": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 6,
+                "default": 1
+              },
+              "seed": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2147483647
+              },
+              "negative_prompt": {
+                "type": "string"
+              },
+              "prompt_extend": {
+                "type": "boolean"
+              },
+              "watermark": {
+                "type": "boolean"
+              }
+            },
+            "async": false,
+            "available": true,
+            "parameter_schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "size": {
+                  "type": "string",
+                  "enum": [
+                    "2048*2048",
+                    "2688*1536",
+                    "1536*2688",
+                    "2368*1728",
+                    "1728*2368"
+                  ],
+                  "default": "2048*2048"
+                },
+                "n": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 6,
+                  "default": 1
+                },
+                "seed": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 2147483647
+                },
+                "negative_prompt": {
+                  "type": "string"
+                },
+                "prompt_extend": {
+                  "type": "boolean"
+                },
+                "watermark": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "defaults": {
+              "size": "2048*2048",
+              "n": 1
+            },
+            "max_image_bytes": 5242880,
+            "max_total_image_bytes": 20971520,
+            "max_image_pixels": 36000000
+          }
+        }
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "declared",
+      "limits": {
+        "max_image_bytes": 5242880,
+        "max_total_image_bytes": 20971520,
+        "max_image_pixels": 36000000
+      }
+    },
+    {
+      "name": "undeclared",
+      "limits": {}
+    },
+    {
+      "name": "explicit_zero",
+      "limits": {
+        "max_image_bytes": 0,
+        "max_total_image_bytes": 0,
+        "max_image_pixels": 0
+      }
+    },
+    {
+      "name": "provider_specific",
+      "limits": {
+        "max_image_bytes": 17,
+        "max_total_image_bytes": 31,
+        "max_image_pixels": 43
+      }
+    }
+  ]
+}

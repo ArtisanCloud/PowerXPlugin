@@ -1,0 +1,702 @@
+openapi: 3.0.3
+info:
+  title: PowerXPlugin 本地发布工具
+  version: 1.0.0
+  description: F02/F03 本地计划、会话及首个隔离构建配置已实现并受控验证；真实 Linux/Nuxt 运行、上传及送审尚未验收。
+servers:
+  - url: http://127.0.0.1:{port}
+    variables:
+      port:
+        default: "4242"
+        description: 实际端口由 serve 启动 JSON 返回
+security:
+  - ToolSessionBearer: []
+x-local-guards:
+  host: exact-listener-ip-and-port
+  origin: exact-configured-loopback-origin
+  cors: false
+  cookies: false
+  bootstrap_ttl_seconds: 300
+  session_ttl_seconds: 3600
+  max_request_bytes: 65536
+  read_header_timeout_seconds: 5
+  read_timeout_seconds: 10
+  write_timeout_seconds: 10
+  idle_timeout_seconds: 30
+  max_header_bytes: 16384
+paths:
+  /v1/session:
+    parameters:
+      - &a1
+        $ref: "#/components/parameters/Origin"
+    post:
+      operationId: exchangeLocalPublisherSession
+      summary: 交换一次性引导凭据
+      security:
+        - BootstrapBearer: []
+      description: 无请求体。引导凭据来自工作区私有文件，仅可使用一次。
+      responses:
+        "201":
+          description: 短期工具会话
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Session"
+        default: &a2
+          $ref: "#/components/responses/Error"
+  /v1/info:
+    parameters:
+      - *a1
+    get:
+      operationId: getLocalPublisherInfo
+      summary: 读取实际本地能力
+      responses:
+        "200":
+          description: 当前仅支持 release-plans，build_targets 为空
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                properties:
+                  data:
+                    $ref: "#/components/schemas/LocalInfo"
+        default: *a2
+  /v1/plans:
+    parameters:
+      - *a1
+    post:
+      operationId: createLocalPublisherPlan
+      summary: 原子保存不可变本地计划
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePlan"
+      responses:
+        "201":
+          description: 本地计划已可靠保存，未执行构建或市场写入
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Plan"
+        default: *a2
+    get:
+      operationId: listLocalPublisherPlans
+      summary: 分页读取本地计划
+      parameters: &a4
+        - name: page
+          in: query
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: 完整历史上的有界分页，空结果为数组
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PlanPage"
+        default: *a2
+  /v1/plans/{release_plan_id}:
+    parameters:
+      - *a1
+      - name: release_plan_id
+        in: path
+        required: true
+        schema: &a3
+          type: string
+          format: uuid
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+          not:
+            enum:
+              - 00000000-0000-0000-0000-000000000000
+    get:
+      operationId: getLocalPublisherPlan
+      summary: 读取 UUID 对应计划
+      responses:
+        "200":
+          description: 已存在的同插件计划
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Plan"
+        default: *a2
+  /v1/builds:
+    parameters:
+      - &a6
+        $ref: "#/components/parameters/Origin"
+    post:
+      operationId: startLocalPublisherBuild
+      summary: 创建所属执行器中的隔离构建任务
+      description: 只接受 release_plan_id；202 不是构建成功；请求结束不会取消任务。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                release_plan_id: *a3
+              required:
+                - release_plan_id
+      responses:
+        "202":
+          description: 已接受独立任务
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Build"
+                required:
+                  - data
+        default: &a5
+          $ref: "#/components/responses/Error"
+    get:
+      operationId: listLocalPublisherBuilds
+      parameters: *a4
+      summary: 分页读取构建任务
+      responses:
+        "200":
+          description: 任务列表
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/BuildPage"
+                required:
+                  - data
+        default: *a5
+  /v1/builds/{build_id}:
+    parameters:
+      - *a6
+      - &a7
+        name: build_id
+        in: path
+        required: true
+        schema: *a3
+    get:
+      operationId: getLocalPublisherBuild
+      summary: 读取构建阶段及结果
+      responses:
+        "200":
+          description: 当前任务记录
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Build"
+                required:
+                  - data
+        default: *a5
+  /v1/builds/{build_id}/cancel:
+    parameters:
+      - *a6
+      - *a7
+    post:
+      operationId: cancelLocalPublisherBuild
+      summary: 取消所属任务并等待进程组结束
+      description: 无请求体。
+      responses:
+        "200":
+          description: 取消所属任务并等待进程组结束
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Build"
+                required:
+                  - data
+        default: *a5
+  /v1/builds/{build_id}/verify:
+    parameters:
+      - *a6
+      - *a7
+    post:
+      operationId: verifyLocalPublisherBuild
+      summary: 复算同一冻结文件，不重建或压缩
+      description: 无请求体。
+      responses:
+        "200":
+          description: 复算同一冻结文件，不重建或压缩
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Artifact"
+                required:
+                  - data
+        default: *a5
+  /v1/builds/{build_id}/logs:
+    parameters:
+      - *a6
+      - *a7
+    get:
+      operationId: logsLocalPublisherBuild
+      summary: 读取有界脱敏诊断
+      description: 日志已脱敏且有截断标记。
+      responses:
+        "200":
+          description: 读取有界脱敏诊断
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/BuildLog"
+                required:
+                  - data
+        default: *a5
+components:
+  securitySchemes:
+    BootstrapBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque-once
+      description: 五分钟有效的一次性引导令牌，不是市场凭据
+    ToolSessionBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+      description: 一小时有效的进程内工具会话，不授权市场操作
+  parameters:
+    Origin:
+      name: Origin
+      in: header
+      required: true
+      schema:
+        type: string
+      description: 必须精确匹配 serve --origin，例如 http://localhost:3131
+  responses:
+    Error:
+      description: 机器错误与 locale key；400/401/403/404/405/409/413/415/422/500/501，不输出底层异常
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Target:
+      type: object
+      additionalProperties: false
+      required:
+        - os
+        - arch
+      properties:
+        os:
+          type: string
+          enum:
+            - linux
+        arch:
+          type: string
+          enum:
+            - amd64
+    CreatePlan:
+      type: object
+      additionalProperties: false
+      required:
+        - version
+        - channel
+        - target
+      properties:
+        version: &a8
+          type: string
+          maxLength: 50
+          pattern: ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$
+        channel: &a9
+          type: string
+          enum:
+            - stable
+        target: &a10
+          $ref: "#/components/schemas/Target"
+        release_notes: &a11
+          type: string
+          maxLength: 10000
+          x-max-utf8-bytes: 10000
+    Plan:
+      type: object
+      additionalProperties: false
+      required:
+        - schema
+        - release_plan_id
+        - plugin_id
+        - version
+        - channel
+        - target
+        - release_notes
+        - created_at
+      properties:
+        schema:
+          type: string
+          enum:
+            - powerx.plugin-publisher-plan/v1
+        release_plan_id: *a3
+        plugin_id:
+          type: string
+        version: *a8
+        channel: *a9
+        target: *a10
+        release_notes: *a11
+        created_at: &a12
+          type: string
+          format: date-time
+    PlanPage:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - total
+        - page
+        - size
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Plan"
+        total:
+          type: integer
+          minimum: 0
+        page:
+          type: integer
+          minimum: 1
+        size:
+          type: integer
+          minimum: 1
+          maximum: 100
+    Session:
+      type: object
+      additionalProperties: false
+      required:
+        - session_token
+        - expires_at
+      properties:
+        session_token:
+          type: string
+          pattern: ^[A-Za-z0-9_-]{43}$
+        expires_at: *a12
+    Plugin:
+      type: object
+      additionalProperties: false
+      required:
+        - plugin_id
+        - name
+        - source_version
+      properties:
+        plugin_id:
+          type: string
+        name:
+          type: string
+        source_version:
+          type: string
+    LocalInfo:
+      type: object
+      additionalProperties: false
+      required:
+        - protocol
+        - plugin
+        - features
+        - build_targets
+      properties:
+        protocol:
+          type: string
+          enum:
+            - powerx.plugin-publisher-local/v1
+        plugin:
+          $ref: "#/components/schemas/Plugin"
+        features:
+          type: array
+          items:
+            type: string
+            enum:
+              - release-plans
+              - local-builds
+          minItems: 2
+          maxItems: 2
+        build_targets:
+          type: array
+          items:
+            $ref: "#/components/schemas/Target"
+          maxItems: 1
+    Error:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+      properties:
+        error: &a15
+          type: object
+          additionalProperties: false
+          required:
+            - code
+            - message_key
+          properties:
+            code:
+              type: string
+              enum:
+                - PUBLISHER_INVALID_INPUT
+                - PUBLISHER_INVALID_WORKSPACE
+                - PUBLISHER_WORKSPACE_CHANGED
+                - PUBLISHER_INVALID_RECORD
+                - PUBLISHER_STORAGE_FAILURE
+                - PUBLISHER_NOT_FOUND
+                - PUBLISHER_CONFLICT
+                - PUBLISHER_UNAUTHORIZED
+                - PUBLISHER_FORBIDDEN
+                - PUBLISHER_UNSUPPORTED_PLATFORM
+                - PUBLISHER_REQUEST_TOO_LARGE
+                - PUBLISHER_MEDIA_TYPE_REQUIRED
+                - PUBLISHER_METHOD_NOT_ALLOWED
+                - PUBLISHER_BUILD_PLATFORM_REQUIRED
+                - PUBLISHER_BUILD_BUSY
+                - PUBLISHER_BUILD_FAILED
+                - PUBLISHER_BUILD_SOURCE_CHANGED
+                - PUBLISHER_BUILD_SOURCE_UNSAFE
+                - PUBLISHER_ARTIFACT_INVALID
+                - PUBLISHER_ARTIFACT_CHANGED
+                - PUBLISHER_NATIVE_RUNTIME_UNVERIFIED
+                - PUBLISHER_BUILD_CANCELLED
+            message_key:
+              type: string
+            params:
+              type: object
+              additionalProperties: false
+              required:
+                - field
+              properties:
+                field:
+                  type: string
+    BuildTools:
+      type: object
+      additionalProperties: false
+      properties:
+        go:
+          type: string
+        node:
+          type: string
+        node_os:
+          type: string
+        node_arch:
+          type: string
+      required:
+        - go
+        - node
+        - node_os
+        - node_arch
+    BuildSource:
+      type: object
+      additionalProperties: false
+      properties:
+        sha256: &a13
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        commit:
+          type: string
+        dirty:
+          type: boolean
+          nullable: true
+        vcs:
+          type: string
+          enum:
+            - git
+            - filesystem
+      required:
+        - sha256
+        - dirty
+        - vcs
+    Artifact:
+      type: object
+      additionalProperties: false
+      properties:
+        path:
+          type: string
+          pattern: ^work/[0-9a-f-]+/artifact\.zip$
+        sha256: *a13
+        size:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 2147483648
+        file_count:
+          type: integer
+          minimum: 1
+      required:
+        - path
+        - sha256
+        - size
+        - file_count
+    BuildProcess:
+      type: object
+      additionalProperties: false
+      properties:
+        parent_pid:
+          type: integer
+          minimum: 1
+        leader_pid:
+          type: integer
+          minimum: 1
+        group_id:
+          type: integer
+          minimum: 1
+        working_directory:
+          type: string
+        started_at: &a14
+          type: string
+          format: date-time
+        exited_at: *a14
+      required:
+        - parent_pid
+        - leader_pid
+        - group_id
+        - working_directory
+        - started_at
+    Build:
+      type: object
+      additionalProperties: false
+      properties:
+        schema:
+          type: string
+          enum:
+            - powerx.plugin-publisher-build/v1
+        build_id: *a3
+        release_plan_id: *a3
+        plugin_id:
+          type: string
+        version: *a8
+        target:
+          $ref: "#/components/schemas/Target"
+        stage:
+          type: string
+          enum:
+            - queued
+            - prechecking
+            - building
+            - packing
+            - verifying
+            - ready
+            - failed
+            - cancelled
+            - interrupted
+        source:
+          $ref: "#/components/schemas/BuildSource"
+        tools:
+          $ref: "#/components/schemas/BuildTools"
+        artifact:
+          $ref: "#/components/schemas/Artifact"
+        error: *a15
+        pid:
+          type: integer
+          minimum: 1
+        process:
+          $ref: "#/components/schemas/BuildProcess"
+        created_at: *a14
+        updated_at: *a14
+      required:
+        - schema
+        - build_id
+        - release_plan_id
+        - plugin_id
+        - version
+        - target
+        - stage
+        - created_at
+        - updated_at
+    BuildPage:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Build"
+        total:
+          type: integer
+          minimum: 0
+        page:
+          type: integer
+          minimum: 1
+        size:
+          type: integer
+          minimum: 1
+          maximum: 100
+      required:
+        - items
+        - total
+        - page
+        - size
+    BuildLog:
+      type: object
+      additionalProperties: false
+      properties:
+        text:
+          type: string
+          x-max-utf8-bytes: 4194304
+      required:
+        - text
+x-local-build-profile:
+  id: make-dist-pure-go-js/v1
+  executor: native-linux-amd64
+  go_minimum: "1.24"
+  node_minimum_major: 20
+  cgo_enabled: false
+  native_frontend_files: false
+  timeout_seconds: 1800
+  snapshot_max_bytes: 8589934592
+  snapshot_max_files: 200000
+  package_max_bytes: 2147483648
+  log_max_bytes: 4194304
+  source_snapshot: true
+  automatic_dependency_install: false
+  os_sandbox: false

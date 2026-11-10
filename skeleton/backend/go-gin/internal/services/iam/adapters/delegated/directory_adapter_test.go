@@ -21,7 +21,16 @@ type directoryProxyStub struct {
 	roles          []authproxy.DirectoryRole
 	permissions    []authproxy.DirectoryPermission
 	decision       *authproxy.AuthorizationDecision
+	authorizer     fwiamcontracts.AuthzService
 	err            error
+}
+
+func (s directoryProxyStub) AuthorizationProvider() fwiamcontracts.AuthzService { return s.authorizer }
+
+type authorizationFixtureFunc func(context.Context, fwiamcontracts.AuthorizationRequest) (*fwiamcontracts.AuthorizationDecision, error)
+
+func (f authorizationFixtureFunc) Authorize(ctx context.Context, in fwiamcontracts.AuthorizationRequest) (*fwiamcontracts.AuthorizationDecision, error) {
+	return f(ctx, in)
 }
 
 func (s directoryProxyStub) MeContext(context.Context, string) (*authproxy.MeContext, error) {
@@ -234,7 +243,9 @@ func TestAdapterListDirectoryRecordsMapsUUIDDTOs(t *testing.T) {
 }
 
 func TestAdapterAuthorizePreservesDeniedDecision(t *testing.T) {
-	bundle, err := NewBundle(directoryProxyStub{decision: &authproxy.AuthorizationDecision{Allowed: false, ReasonCode: "IAM_PERMISSION_DENIED"}})
+	bundle, err := NewBundle(directoryProxyStub{authorizer: authorizationFixtureFunc(func(_ context.Context, q fwiamcontracts.AuthorizationRequest) (*fwiamcontracts.AuthorizationDecision, error) {
+		return &fwiamcontracts.AuthorizationDecision{Allowed: false, ReasonCode: fwiamerrors.CodePermissionDenied, TenantUUID: q.TenantUUID, MemberUUID: q.MemberUUID, UserUUID: q.UserUUID, Resource: q.Resource, Action: q.Action, Mode: "delegated"}, nil
+	})})
 	if err != nil {
 		t.Fatalf("NewBundle() error = %v", err)
 	}

@@ -327,6 +327,7 @@ export default defineNuxtConfig({
       frameworkLogEnabled,
       frameworkLogLevel,
       powerxCoreBase,
+      powerxConsoleBase: process.env.NUXT_PUBLIC_POWERX_CONSOLE_BASE || '',
       pxGatewayBaseUrl: pxGatewayBaseURL,
       pxWsBaseUrl: pxWsBaseURL,
       wsOrigin,

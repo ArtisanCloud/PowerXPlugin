@@ -1,0 +1,34 @@
+package migrate
+
+import (
+	"context"
+	"{{ .BackendModulePath }}/internal/entity/models"
+	"gorm.io/gorm"
+)
+
+func MigrateAIOnlineCatalog(ctx context.Context, db *gorm.DB) error {
+	if err := db.WithContext(ctx).AutoMigrate(&models.LocalAIOnlineCatalog{}); err != nil {
+		return err
+	}
+	// Provider-native identifiers can exceed the former 128-character profile
+	// limit. Widen only this column; no active profile values are rewritten.
+	if db.Dialector.Name() == "postgres" && db.Migrator().HasTable(&models.LocalAISetting{}) {
+		if err := db.WithContext(ctx).Migrator().AlterColumn(&models.LocalAISetting{}, "ModelKey"); err != nil {
+			return err
+		}
+	}
+	if db.Dialector.Name() != "postgres" {
+		return nil
+	}
+	name := models.LocalAIOnlineCatalog{}.TableName()
+	for _, sql := range []string{"ALTER TABLE " + name + " ENABLE ROW LEVEL SECURITY", "ALTER TABLE " + name + " FORCE ROW LEVEL SECURITY", "DROP POLICY IF EXISTS ai_online_tenant ON " + name, "CREATE POLICY ai_online_tenant ON " + name + " USING (tenant_uuid = current_setting('app.tenant_uuid', true)::uuid) WITH CHECK (tenant_uuid = current_setting('app.tenant_uuid', true)::uuid)"} {
+		if err := db.WithContext(ctx).Exec(sql).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func RollbackAIOnlineCatalog(ctx context.Context, db *gorm.DB) error {
+	return db.WithContext(ctx).Migrator().DropTable(&models.LocalAIOnlineCatalog{})
+}

@@ -21,6 +21,7 @@ export function definePowerXAdminConfig(options: PowerXAdminConfigOptions) {
     runtimeConfig: {
       public: {
         powerx: {
+          pluginId,
           apiBase: inferredApiBase,
           capabilityEndpoint: inferredCapabilityEndpoint
         }

@@ -7,6 +7,8 @@ import (
 )
 
 type Event struct {
+	EventID    string `json:"event_id,omitempty"`
+	Cursor     string `json:"cursor,omitempty"`
 	Topic      string `json:"topic"`
 	Payload    any    `json:"payload"`
 	TenantUUID string `json:"tenant_uuid"`

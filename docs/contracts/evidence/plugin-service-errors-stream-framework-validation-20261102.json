@@ -1,0 +1,207 @@
+{
+  "status": "pass",
+  "scope": "Go Framework plugin service failures and constrained Gateway SSE",
+  "verified_at": "2026-11-01T17:49:49.505940+00:00",
+  "core_source": {
+    "contract": "plugin-service-authorization.v1",
+    "source_repo": "../../PowerX",
+    "source_commit": "97ae4d43e0d0e48516d8ffe46bbd7bc388aab0ad",
+    "source_worktree_uncommitted": true,
+    "synced_at": "2026-11-01T17:35:37.749686+00:00",
+    "sha256": {
+      "plugin-service-authorization.md": "a8b1de3bd640f8429cae20923a1a76b79333198b3fbb26763e99b7c0ddd83e58",
+      "plugin-service-authorization.openapi.yaml": "fb5471ea55b93833a2f69a9e7f9ba8f208bbc055306eea8f057572507235aa6f"
+    },
+    "framework_fixture": {
+      "owner": "Framework",
+      "file": "fixtures/plugin-authorization.v1.json",
+      "sha256": "42d0194df0529660b9a221b24ac3f0d024723baacc6ae38fafcea46032ef9038"
+    },
+    "framework_service_fixture": {
+      "owner": "Framework",
+      "file": "fixtures/plugin-service-errors-stream.v1.json",
+      "sha256": "f60a08a8d5e126fc06485615e23a9ab03831ea2f9342aac62d8f55e9885db28a"
+    },
+    "core_validation_reference": "docs/contracts/evidence/plugin-service-errors-stream-validation-20261102.json"
+  },
+  "core_validation_reference": {
+    "path": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/PowerX/docs/contracts/evidence/plugin-service-errors-stream-validation-20261102.json",
+    "sha256": "fec00d716f6b09343ec2eb78b6cca3732a992a8c44428a03c393f1a6e97900ac"
+  },
+  "checks": {
+    "race": {
+      "status": "pass",
+      "log_sha256": "c53210b012f2ae9149196670cb9bc655f008b9816715169f0fa763857092f710",
+      "packages_passed": 7
+    },
+    "vet": {
+      "status": "pass",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "packages_passed": 0
+    },
+    "skeleton-race": {
+      "status": "pass",
+      "log_sha256": "895039c8a3e5ddebbadb1f96bb570c7628a15a1204bcfdd1423515ccbed0aa2b",
+      "packages_passed": 4
+    },
+    "skeleton-vet": {
+      "status": "pass",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "packages_passed": 0
+    },
+    "integration-race": {
+      "status": "pass",
+      "log_sha256": "931dd071fc9e4f8c537b2933cbdd2c49055196e108fb84c913465a0b1f36d0bc",
+      "packages_passed": 2
+    },
+    "cli": {
+      "status": "pass",
+      "log_sha256": "9ca1113df82e339534bd59860f0a2da9891949c55c59113ec8acc5a8eb8b7502",
+      "packages_passed": 3
+    },
+    "contracts": {
+      "status": "pass",
+      "log_sha256": "5387990ccbc1cd943672d46237dc35008c1da9e4657b3d3621def92c0b1195cb",
+      "packages_passed": 6
+    },
+    "package_consumer": {
+      "status": "pass",
+      "command": "python3 scripts/contracts/package-media-thumbnail64.py --profile plugin-service",
+      "log_sha256": "6667d5089e635794add0babc29de84c18aeb36a62bb4b3e09001200d490382bc",
+      "local_framework_replace": false,
+      "contract_fixtures_exported": true,
+      "sdk_tests_from_snapshot": true,
+      "backend_build": true,
+      "gowork": "off",
+      "source_hash_matches_current_workspace": true
+    }
+  },
+  "process_statuses": {
+    "go": {
+      "race_exit": 0,
+      "vet_exit": 0
+    },
+    "skeleton": {
+      "race_exit": 0,
+      "vet_exit": 0
+    },
+    "cli": {
+      "cli_exit": 0,
+      "contracts_exit": 0
+    }
+  },
+  "covered": [
+    "ApiKey and STS separate transports",
+    "business 409 and 503 machine diagnostics",
+    "typed safe recovery incl false zero and absent values",
+    "Core and plugin trace IDs isolated",
+    "expected and actual runtime versions",
+    "no automatic business replay for retryable or denial",
+    "configured prefix once",
+    "fixed stream routing and headers",
+    "SSE events IDs multiline data and heartbeat",
+    "non-SSE and redirects rejected",
+    "invalid input rejected before HTTP",
+    "callback cancellation timeout close upstream",
+    "Core service-ticket stream unsupported remains error",
+    "runtime-selected registry streaming no fallback",
+    "AI runtime LLMStream uses new Gateway binding",
+    "Host Contract diagnostics retain safe details",
+    "CLI init fixture export and independent backend build"
+  ],
+  "delivery": {
+    "bundle": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-plugin-service-20261102-2ff6526b92e5f5d5",
+    "profile": "plugin-service",
+    "published": false,
+    "changes_committed": false,
+    "base_commit": "32aaf0bd33ecda9860384484b55aa1d092ad27fc",
+    "source_sha256": {
+      "go": "ad2129efb4087712cc20a4d7712fc58d1ab8043dd5a9444bc416f37c72e10152",
+      "nuxt": "9d2245a4ce0866acbafb25044b4fb22e6cc3c355253182b8fe70e6d7ef5814a5",
+      "generator": "b9aabc521150368b3889a16144d93c68628ff0e874a82eafef609404cdb8d115",
+      "contracts": "159e30d15d62a053a1b4cfb9257b816b18e0bee11fa72fa49d5a7b1604b000e1",
+      "ai_contracts": "aa99611b8ac247e573a03654874cc6aa2a789839952e08593c949b9225c3574b"
+    },
+    "go_module": "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go",
+    "go_sdk_version": "v0.0.29-dev.pluginservice.ad2129efb4087712",
+    "go_proxy": "file:///private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-plugin-service-20261102-2ff6526b92e5f5d5/go-proxy",
+    "nuxt_client_version": "0.0.14-dev.pluginservice.9d2245a4ce0866ac",
+    "nuxt_client_ref": "file:/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-plugin-service-20261102-2ff6526b92e5f5d5/artisan-cloud-plugin-framework-client-0.0.14-dev.pluginservice.9d2245a4ce0866ac.tgz",
+    "nuxt_client_tarball": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-plugin-service-20261102-2ff6526b92e5f5d5/artisan-cloud-plugin-framework-client-0.0.14-dev.pluginservice.9d2245a4ce0866ac.tgz",
+    "generator_version": "v0.0.0-pluginservice.b9aabc521150368b",
+    "generator_binary": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-plugin-service-20261102-2ff6526b92e5f5d5/px-plugin",
+    "consumer": {
+      "path": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-plugin-service-20261102-2ff6526b92e5f5d5/generated-consumer",
+      "go_work": "off",
+      "local_replace": false,
+      "four_bindings": "passed",
+      "manifest_validation": "passed",
+      "backend_build": "passed",
+      "shared_fixtures": "passed",
+      "packed_typescript": "passed"
+    },
+    "artifact_sha256": {
+      "px-plugin": "12531d3523409e95ff47b6448aca88885c96eee1b2a6a775a2d3c9a0dfe6e294",
+      "artisan-cloud-plugin-framework-client-0.0.14-dev.pluginservice.9d2245a4ce0866ac.tgz": "a18516522955fb471f776ab1f000aae66104688d580fcd19d61bf7a6fca12b6d",
+      "go-proxy/github.com/!artisan!cloud/!power!x!plugin/framework/backend/go/@v/v0.0.29-dev.pluginservice.ad2129efb4087712.zip": "253b2425113bff40476c1841f96bba2b0a012bf52a336a59e0ff056bac900027"
+    }
+  },
+  "completion_matrix": {
+    "Go": "implemented and controlled validated",
+    "Skeleton_CLI": "synced and generated consumer validated",
+    "Nuxt": "no UI change in this fix",
+    "dotnet": "not implemented in this fix"
+  },
+  "boundaries": {
+    "committed": false,
+    "published": false,
+    "user_services_restarted": false,
+    "live_core_or_scrm_acceptance": false,
+    "Core_or_SCRM_source_changed": false,
+    "database_grants_changed": false,
+    "no_manual_background_services_started": true,
+    "unrelated_existing_files_preserved": 5407,
+    "target_plugin_service_identity_validation_client": "outside this fix"
+  },
+  "source_sha256": {
+    "docs/contracts/plugin-authorization-framework.md": "cb2357bc9b659a7d3b3616a11942f2391f653da5d879a3b7f6602269fd48f85e",
+    "docs/contracts/plugin-authorization-source.json": "42f769265ecd438ddda1c6a2f33a53a7dee58cca55a5649e922f75f5cf0a80d5",
+    "docs/contracts/plugin-service-authorization.md": "a8b1de3bd640f8429cae20923a1a76b79333198b3fbb26763e99b7c0ddd83e58",
+    "docs/contracts/plugin-service-authorization.openapi.yaml": "fb5471ea55b93833a2f69a9e7f9ba8f208bbc055306eea8f057572507235aa6f",
+    "scripts/contracts/validate-plugin-authorization.mjs": "c8ff1dccb1e8c092092821eb489e8c449a18e9fe495891509ce6bc1f8bfde194",
+    "tools/cli/internal/contracts/data/media-contracts/plugin-authorization-framework.md": "cb2357bc9b659a7d3b3616a11942f2391f653da5d879a3b7f6602269fd48f85e",
+    "tools/cli/internal/contracts/data/media-contracts/plugin-authorization-source.json": "42f769265ecd438ddda1c6a2f33a53a7dee58cca55a5649e922f75f5cf0a80d5",
+    "tools/cli/internal/contracts/data/media-contracts/plugin-service-authorization.md": "a8b1de3bd640f8429cae20923a1a76b79333198b3fbb26763e99b7c0ddd83e58",
+    "tools/cli/internal/contracts/data/media-contracts/plugin-service-authorization.openapi.yaml": "fb5471ea55b93833a2f69a9e7f9ba8f208bbc055306eea8f057572507235aa6f",
+    "framework/backend/go/gateway/client.go": "606cdabd6d61d1b73600e48e79b7beafde33c554fb92093cbe5c662f074868ef",
+    "framework/backend/go/internal/integration/gateway/client.go": "444e55c2e412e7b1176e0808656700026d9cadb10cb608a06b74d11dcf77ce9a",
+    "framework/backend/go/runtime/ai/runtime_test.go": "24685e6459573925e455e39b125c93fc46178ebfc29b1cc2d4037b5c2bc5db5b",
+    "framework/backend/go/runtime/capability/runtime.go": "3ae5731cb095d51250b1fd6084298ab51830a180b79e34954d0d6696fc3944e0",
+    "framework/backend/go/runtime/capability/runtime_test.go": "b3f0c2233d0370b09a16b9b3a0a6e7593bc1596ee036aefc6411e5a026d41d60",
+    "framework/backend/go/runtime/powerx/ai/client.go": "66ee103e79c0fecfa9c66d2f2622f3c8040086274c6fd4e752a3fdf4990d8a6a",
+    "framework/backend/go/runtime/powerx/ai/error_contract_test.go": "a63f751dad72de693a2e26a461c473a54c1e89b77513f4ed324b4f2660c94e82",
+    "framework/backend/go/runtime/powerx/ai/stream.go": "17c5387611eb16ae10bc9925381aea31959a3b070b1296241847b5f369290495",
+    "framework/backend/go/runtime/powerx/ai/stream_test.go": "18501eca158e9e2db58ccc03e9539aff7068a9379e1889ebe7bf05cc34888e08",
+    "framework/backend/go/runtime/powerx/capability/client.go": "a5e5433f38e9efc9e3d25c0fe37926c1964faae0d25130414c187de968c741dd",
+    "scaffold/templates/backend/go-gin/cmd/plugin/main.go.tmpl": "5c360d26bec3eb8c2448c89307a289493cc8715f4aa31c9954a7dc294401f6c3",
+    "scaffold/templates/backend/go-gin/internal/transport/http/admin/host_contract/handler.go.tmpl": "9439fe56bce7e3b8d3309538a61f1377667013701bad4fba55d46b55696026cb",
+    "scripts/contracts/package-media-thumbnail64.py": "64360e101d77dbb3b06ff48bb38ee4b4f74a0a0f5a60e92cbd845a7bdf1d5e18",
+    "scripts/template-sync-config.yaml": "3bd463cb2c570809c5595ec3bdb204d5b68461cf2f29ec9e397614d3ef4556b1",
+    "skeleton/backend/go-gin/cmd/plugin/main.go": "64a69cf22df0b3fffce40f39ca464a9d396972a1f36bff63eeaa0da1f485f5f0",
+    "skeleton/backend/go-gin/internal/transport/http/admin/host_contract/handler.go": "af88c4da3ea6a89fdacd6b8a5b9c2b105e286e371edda35e7e3defeb3eef8879",
+    "tools/cli/cmd/init_framework_test.go": "ea12cf7d5b7d44fdf054ef77e0c122df66f49056fe943803635b17d6f2dd8873",
+    "tools/cli/internal/contracts/embed.go": "faa5a6507c92e5adbf11472e4ee00a88430d2742318e4e52aaedf0b8e5914e7f",
+    "tools/cli/internal/templates/data/backend/go-gin/cmd/plugin/main.go.tmpl": "5c360d26bec3eb8c2448c89307a289493cc8715f4aa31c9954a7dc294401f6c3",
+    "tools/cli/internal/templates/data/backend/go-gin/internal/transport/http/admin/host_contract/handler.go.tmpl": "9439fe56bce7e3b8d3309538a61f1377667013701bad4fba55d46b55696026cb",
+    "docs/contracts/fixtures/plugin-service-errors-stream.v1.json": "f60a08a8d5e126fc06485615e23a9ab03831ea2f9342aac62d8f55e9885db28a",
+    "framework/backend/go/gateway/service_contract_test.go": "9e17c2d423bccd4243a68cd94dad8323484e1be41571be738e62921f04ad4e8a",
+    "framework/backend/go/gateway/stream_contract_test.go": "eac4e9baf0c4711b66b2c72fdc0fc3dbcf1be5205a1e362a44122d1c68ffd146",
+    "framework/backend/go/internal/integration/gateway/stream.go": "d10af92e82847192434e8b98aa86c677ac5d655554f3a0ca6bb4fce49aa75218",
+    "framework/backend/go/runtime/powerx/capability/stream.go": "b39c8b30f0045b3c7a1006ae2c531f772fe93613e50b3e1370d7392aab2dfaf9",
+    "framework/backend/go/runtime/powerx/hostcontract/invocation_failure.go": "61bc081ee521858710426d49ffd1ce4c228ae1298fc685ca24aad0517a03e33a",
+    "framework/backend/go/runtime/powerx/hostcontract/invocation_failure_test.go": "27461637bcff5d1449122fe25c6c9843f7cdb474ca9232eb076d6e9b30cc78c3",
+    "framework/backend/go/runtime/powerx/hostcontract/invocation_stream.go": "7a51e1f73dd4efe5e0252607304a69a075cb1e717fc13e517585002765dcde07",
+    "framework/backend/go/runtime/powerx/hostcontract/testdata/plugin-service-errors-stream.v1.json": "f60a08a8d5e126fc06485615e23a9ab03831ea2f9342aac62d8f55e9885db28a",
+    "skeleton/backend/go-gin/internal/transport/http/admin/host_contract/service_failure_test.go": "531d5749195c7cd1644f5c42ab04f34029ec799aa992ac012b7827e5571df0d1"
+  }
+}

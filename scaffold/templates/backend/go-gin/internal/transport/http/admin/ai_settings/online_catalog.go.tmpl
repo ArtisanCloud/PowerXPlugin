@@ -1,0 +1,49 @@
+package ai_settings
+
+import (
+	"encoding/json"
+	"io"
+	"net/http"
+
+	powerxai "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/ai"
+	"{{ .BackendModulePath }}/internal/contracts"
+	authx "{{ .BackendModulePath }}/internal/middleware"
+	local "{{ .BackendModulePath }}/internal/services/ai_settings"
+	"github.com/gin-gonic/gin"
+)
+
+func (h *Handler) SyncLocalCatalog(c *gin.Context) {
+	svc, tenant, ok := h.localService(c)
+	if !ok {
+		return
+	}
+	actor, exists := authx.GetTenantContext(c)
+	admin := actor.IsRoot
+	for _, role := range actor.Roles {
+		if role == "role_owner" || role == "role_admin" {
+			admin = true
+		}
+	}
+	if !exists || actor.TenantUUID != tenant || !admin {
+		mediaFailure(c, &powerxai.HTTPError{StatusCode: 403, ReasonCode: "AI_MODEL_SYNC_ADMIN_REQUIRED"})
+		return
+	}
+	var input struct {
+		local.OnlineCatalogInput
+		Action   string   `json:"action"`
+		Revision string   `json:"revision"`
+		Models   []string `json:"models"`
+	}
+	decoder := json.NewDecoder(http.MaxBytesReader(c.Writer, c.Request.Body, 768<<10))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(&input) != nil || decoder.Decode(&struct{}{}) != io.EOF {
+		mediaFailure(c, &powerxai.HTTPError{StatusCode: 400, ReasonCode: "AI_REQUEST_INVALID"})
+		return
+	}
+	result, err := svc.SyncOnlineCatalog(c.Request.Context(), tenant, input.OnlineCatalogInput, input.Action, input.Revision, input.Models)
+	if err != nil {
+		mediaFailure(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, result)
+}

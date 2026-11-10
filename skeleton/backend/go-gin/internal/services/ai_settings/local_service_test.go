@@ -28,7 +28,7 @@ func TestLocalSettingsServicePersistsTenantScopedProfile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&models.LocalAISetting{}); err != nil {
+	if err := db.AutoMigrate(&models.LocalAISetting{}, &models.LocalAIOnlineCatalog{}); err != nil {
 		t.Fatal(err)
 	}
 	repo, err := repository.NewLocalSettingsRepository(db)
@@ -70,7 +70,7 @@ func TestLocalSettingsServiceUsesCatalogSourceOnlyForThisSave(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&models.LocalAISetting{}); err != nil {
+	if err := db.AutoMigrate(&models.LocalAISetting{}, &models.LocalAIOnlineCatalog{}); err != nil {
 		t.Fatal(err)
 	}
 	repo, err := repository.NewLocalSettingsRepository(db)
@@ -103,7 +103,7 @@ func TestLocalSettingsServiceSeparatesLocalAndPowerXProfiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&models.LocalAISetting{}); err != nil {
+	if err := db.AutoMigrate(&models.LocalAISetting{}, &models.LocalAIOnlineCatalog{}); err != nil {
 		t.Fatal(err)
 	}
 	repo, err := repository.NewLocalSettingsRepository(db)
@@ -150,18 +150,11 @@ func TestLocalSettingsServiceTestsTheProfileInsteadOfStaticRuntimeModels(t *test
 		t.Fatal(err)
 	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/chat" {
-			t.Fatalf("path=%s, want /api/chat", r.URL.Path)
-		}
-		var body struct {
-			Model string `json:"model"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Model != "qwen3:8b" {
-			t.Fatalf("body=%#v err=%v; want selected profile model", body, err)
+		if r.Method != http.MethodGet || r.URL.Path != "/api/tags" {
+			t.Fatalf("unexpected connection probe: %s %s", r.Method, r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"message":{"content":"pong"},"done":true}`))
+		_, _ = w.Write([]byte(`{"models":[]}`))
 	}))
 	defer server.Close()
 	cfg := &config.LocalAIConfig{Models: []config.LocalAIModel{{Key: "chat", Provider: "ollama", Model: "fixture", Endpoint: server.URL, Modalities: []string{"llm"}}}}
@@ -178,7 +171,7 @@ func TestLocalSettingsServiceTestsTheProfileInsteadOfStaticRuntimeModels(t *test
 	}
 }
 
-func TestLocalSettingsRejectsMediaAndPreservesExplicitLLMInputs(t *testing.T) {
+func TestLocalQuickCallRejectsMediaAndPreservesExplicitLLMInputs(t *testing.T) {
 	var calls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
@@ -216,7 +209,7 @@ func TestLocalSettingsRejectsMediaAndPreservesExplicitLLMInputs(t *testing.T) {
 	}
 	for _, modality := range []string{"vlm", "image", "video", "audio_tts", "embedding"} {
 		in := SaveInput{Modality: modality, Provider: "ollama", ModelKey: "fixture.unsaved", Endpoint: server.URL}
-		for _, err := range []error{svc.TestConnection(context.Background(), in), func() error { _, err := svc.QuickCall(context.Background(), in); return err }()} {
+		for _, err := range []error{func() error { _, err := svc.QuickCall(context.Background(), in); return err }()} {
 			var typed *hostapi.HTTPError
 			if !errors.As(err, &typed) || typed.StatusCode != 422 {
 				t.Fatalf("%s: %v", modality, err)

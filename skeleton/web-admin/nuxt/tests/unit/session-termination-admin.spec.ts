@@ -1,0 +1,21 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { getPowerXHostSession } from '../../../../../framework/frontend/nuxt/framework-client';
+const mocks = vi.hoisted(() => ({ config: {} }));
+vi.mock('#imports', () => ({ useRuntimeConfig: () => mocks.config }));
+afterEach(() => vi.unstubAllGlobals());
+const pluginId = 'com.example.admin-session';
+it('admin_capability_uses_shared_snapshot_reports_and_preserves_structured_cause', async () => {
+  const report = vi.fn();
+  vi.stubGlobal('defineNuxtPlugin', (fn: unknown) => fn);
+  vi.stubGlobal('window', { location: { origin: 'https://host.test' }, PowerXBridgeClient: { protocolVersion: 2, onAuthToken: vi.fn(), setNavigator: vi.fn(), requestAuth: vi.fn(), requestSync: vi.fn(), getLastSyncAt: () => 0, reportSessionInvalid: report } });
+  const session = getPowerXHostSession(pluginId);
+  await session.apply({ source: 'powerx', type: 'auth-token', protocolVersion: 2, pluginId, instanceId: 'frame', sequence: 1, sessionId: 'login', revision: 1, accessToken: 'fixture', tokenType: 'Bearer', scope: 'powerx', tenantUuid: null, expiresAt: Date.now()+60_000, expiresIn: 60 }, { readContext: async()=>({}), validateContext: ()=>({ tenantUuid: null, memberUuid: null }), commitContext: vi.fn(), clearContext: vi.fn() });
+  const { createPowerXCapabilityBridge } = await import('../../../../../framework/frontend/nuxt/framework-admin/layer/app/plugins/powerx-capability.client');
+  const original = { response: { status: 401, _data: { error_code: 'IAM_CONTEXT_USER_SESSION_INVALID' } } };
+  const raw = vi.fn().mockRejectedValue(original); const fetcher = { create: () => ({ raw }) } as any;
+  const bridge = createPowerXCapabilityBridge({ pluginId, insidePowerX: true, apiBase: `/_p/${pluginId}/api/v1`, fetcher });
+  await expect(bridge.invoke({ capabilityId: 'fixture.capability', action: 'run' })).rejects.toBe(original);
+  expect(report).toHaveBeenCalledExactlyOnceWith({ sessionId: 'login', revision: 1, code: 'IAM_CONTEXT_USER_SESSION_INVALID' });
+  expect(raw.mock.calls[0][0]).toBe(`https://host.test/_p/${pluginId}/api/v1/integration/capabilities/invoke`);
+  expect(new Headers(raw.mock.calls[0][1].headers).get('Authorization')).toBe('Bearer fixture');
+});

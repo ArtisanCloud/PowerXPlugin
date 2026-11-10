@@ -8,11 +8,13 @@ export interface PowerXAuthTokenPayload extends PowerXBridgeEnvelope {
 export interface PowerXAuthClearedPayload extends PowerXBridgeEnvelope { source: 'powerx'; type: 'auth-cleared'; sequence: number; sessionId?: string; revision?: number; }
 export type PowerXAuthMessage = PowerXAuthTokenPayload | PowerXAuthClearedPayload;
 export interface PowerXNavigationRequest { signal: AbortSignal; requestId: string; instanceId: string; }
+export interface PowerXSessionInvalidReport { sessionId: string; revision: number; code: 'IAM_CONTEXT_USER_SESSION_INVALID'; }
 export interface PowerXFrameBridgeClient {
   readonly protocolVersion: 2;
   onAuthToken(handler: (message: PowerXAuthMessage) => void | Promise<void>): () => void;
   setNavigator(handler: (path: string, request: PowerXNavigationRequest) => void | Promise<void>): () => void;
   requestAuth(): void; requestSync(): void; getLastSyncAt(): number;
+  reportSessionInvalid(report: PowerXSessionInvalidReport): void;
 }
 export type PowerXHostMessage = PowerXSyncPayload | PowerXAuthMessage | (PowerXBridgeEnvelope & { source: 'powerx'; type: 'navigate'; path: string; requestId: string });
 export type PowerXFullscreenAction = 'enter' | 'exit' | 'toggle';
@@ -29,7 +31,7 @@ export interface PowerXBridgeOptions {
 }
 export function getPowerXFrameBridge(): PowerXFrameBridgeClient {
   const bridge = typeof window === 'undefined' ? undefined : (window as Window & { PowerXBridgeClient?: PowerXFrameBridgeClient }).PowerXBridgeClient;
-  if (!bridge || bridge.protocolVersion !== 2 || typeof bridge.onAuthToken !== 'function' || typeof bridge.setNavigator !== 'function' || typeof bridge.requestAuth !== 'function' || typeof bridge.requestSync !== 'function' || typeof bridge.getLastSyncAt !== 'function') throw new Error('PLUGIN_BRIDGE_V2_REQUIRED');
+  if (!bridge || bridge.protocolVersion !== 2 || typeof bridge.onAuthToken !== 'function' || typeof bridge.setNavigator !== 'function' || typeof bridge.requestAuth !== 'function' || typeof bridge.requestSync !== 'function' || typeof bridge.getLastSyncAt !== 'function') throw Object.assign(new Error('PLUGIN_BRIDGE_V2_REQUIRED'), { code: 'PLUGIN_BRIDGE_V2_REQUIRED', statusCode: 409 });
   return bridge;
 }
 
@@ -74,6 +76,7 @@ export class PowerXBridgeClient {
   stop(): void { this.cleanup.splice(0).reverse().forEach(dispose => dispose()); this.started = false; }
   requestSync(): void { this.consumer.requestSync(); }
   requestAuthToken(): void { this.consumer.requestAuth(); }
+  reportSessionInvalid(report: PowerXSessionInvalidReport): void { sendSessionInvalid(this.consumer, report); }
   private metadata = (event: MessageEvent) => {
     const payload = event.data;
     if (event.source !== window.parent || event.origin !== this.origin || payload?.source !== 'powerx' || payload.protocolVersion !== 2 || payload.pluginId !== this.options.pluginId || !payload.instanceId || payload.type !== 'sync') return;
@@ -98,6 +101,12 @@ export function initPowerXBridge(options: PowerXBridgeOptions): PowerXBridgeClie
   return client;
 }
 export function requestPowerXHostAuthToken(): void { getPowerXFrameBridge().requestAuth(); }
+function sendSessionInvalid(bridge: PowerXFrameBridgeClient, report: PowerXSessionInvalidReport): void {
+  if (typeof bridge.reportSessionInvalid !== 'function') throw Object.assign(new Error('PLUGIN_BRIDGE_SESSION_TERMINATION_REQUIRED'), { code: 'PLUGIN_BRIDGE_SESSION_TERMINATION_REQUIRED', statusCode: 409 });
+  if (report.code !== 'IAM_CONTEXT_USER_SESSION_INVALID' || !report.sessionId || !Number.isSafeInteger(report.revision) || report.revision < 1) throw Object.assign(new Error('PLUGIN_SESSION_REPORT_INVALID'), { code: 'PLUGIN_SESSION_REPORT_INVALID', statusCode: 400 });
+  bridge.reportSessionInvalid({ sessionId: report.sessionId, revision: report.revision, code: report.code });
+}
+export function reportPowerXHostSessionInvalid(report: PowerXSessionInvalidReport): void { sendSessionInvalid(getPowerXFrameBridge(), report); }
 export function requestPowerXHostFullscreen(pluginId: string, options: PowerXFullscreenRequestOptions = {}): boolean { return clients.get(window)?.get(pluginId)?.requestFullscreen(options) || false; }
 export function exitPowerXHostFullscreen(pluginId: string, options: PowerXFullscreenRequestOptions = {}): boolean { return clients.get(window)?.get(pluginId)?.exitFullscreen(options) || false; }
 export function togglePowerXHostFullscreen(pluginId: string, options: PowerXFullscreenRequestOptions = {}): boolean { return clients.get(window)?.get(pluginId)?.toggleFullscreen(options) || false; }

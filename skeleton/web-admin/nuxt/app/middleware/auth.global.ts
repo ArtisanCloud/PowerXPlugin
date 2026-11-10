@@ -47,6 +47,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
     } catch {
       // If token still exists, do not force-redirect to login on transient context fetch failures.
       if (!auth.token.value) {
+        if (insidePowerX) return;
         return navigateTo({
           path: "/users/login",
           query: { redirect: to.fullPath },

@@ -1,10 +1,59 @@
 mappings:
+  - name: plugin-session-termination-contract
+    source: docs/contracts
+    targets:
+      - path: tools/cli/internal/contracts/data/media-contracts
+    include:
+      - "plugin-session-termination-v2.md"
+      - "plugin-session-termination-source.json"
+      - "plugin-session-termination-framework.md"
+  - name: ai-media-v2-contract
+    source: docs/contracts
+    targets:
+      - path: tools/cli/internal/contracts/data/media-contracts
+    include:
+      - "ai-media-v2.md"
+      - "ai-media-v2.openapi.yaml"
+      - "ai-media-v2-source.json"
+      - "ai-media-model-limits-framework.md"
+      - "fixtures/ai-media-v2.json"
+      - "fixtures/ai-media-v2-registration.json"
+      - "fixtures/capability-version-upgrade-errors.v1.json"
+      - "fixtures/ai-media-model-limits.v1.json"
+  - name: event-fabric-service-contract
+    source: docs/contracts
+    targets:
+      - path: tools/cli/internal/contracts/data/media-contracts
+    include:
+      - "event-fabric-service-v1.md"
+      - "event-fabric-service-v1.openapi.yaml"
+      - "event-fabric-service-v1.proto"
+      - "event-fabric-service-source.json"
+      - "plugin-event-fabric-install.md"
+      - "event-fabric-framework.md"
+      - "fixtures/event-fabric-service.v1.json"
+  - name: plugin-authorization-contract
+    source: docs/contracts
+    targets:
+      - path: tools/cli/internal/contracts/data/media-contracts
+    include:
+      - "plugin-service-authorization.md"
+      - "plugin-service-authorization.openapi.yaml"
+      - "plugin-authorization-source.json"
+      - "plugin-authorization-framework.md"
+      - "fixtures/plugin-authorization.v1.json"
+      - "fixtures/plugin-service-errors-stream.v1.json"
   - name: ai-settings-llm-contract
     source: docs/contracts
     targets:
       - path: tools/cli/internal/contracts/data/media-contracts
     include:
       - "ai-settings-llm-catalog.v1.md"
+      - "ai-online-model-catalog.md"
+      - "ai-online-model-catalog-source.json"
+      - "ai-local-model-catalog.v1.openapi.yaml"
+      - "ai-local-model-catalog.v1.md"
+      - "fixtures/ai-local-model-catalog.v1.json"
       - "fixtures/ai-settings-catalog.v1.json"
   - name: web-admin
     source: skeleton/web-admin/nuxt
@@ -243,8 +292,8 @@ mappings:
         literal: 'const PluginName = "PowerX Base Plugin"'
         replace: 'const PluginName = "{{ .PluginName }}"'
       - globs: ["internal/shared/app/consts.go"]
-        literal: 'const PluginVersion = "0.1.0"'
-        replace: 'const PluginVersion = "{{ .Version }}"'
+        literal: 'var PluginVersion = "0.1.0"'
+        replace: 'var PluginVersion = "{{ .Version }}"'
       - globs: ["internal/services/iam/local_store.go"]
         literal: 'defaultPluginID      = "com.powerx.plugins.base"'
         replace: 'defaultPluginID      = "{{ .PluginID }}"'
@@ -287,9 +336,13 @@ mappings:
     include:
       - ".env.example"
       - "app/**/*.py"
+      - "app/manifestx/*.json"
       - "requirements.txt"
       - "README.md"
     replacements:
+      - globs: ["app/**/*.py"]
+        literal: "com.powerx.plugins.base"
+        replace: "{{ .PluginID }}"
       - globs: [".env.example"]
         literal: "PORT=8078"
         replace: "PORT={{ .BackendPort }}"
@@ -323,6 +376,7 @@ mappings:
       - "make-files/**/*"
       - "scripts/manifest/**/*"
       - "docs/guides/plugin_release/**/*"
+      - "docs/conventions/plugin-id.md"
     exclude:
       - "make-files/**/.DS_Store"
     targets:

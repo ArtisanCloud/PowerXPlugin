@@ -9,8 +9,23 @@ import (
 // LocalAIConfig describes plugin-owned model execution. It is never populated
 // from gateway credentials or selected dynamically by a business request.
 type LocalAIConfig struct {
-	Models []LocalAIModel `yaml:"models" json:"models"`
-	Agents []LocalAgent   `yaml:"agents" json:"agents"`
+	Models                []LocalAIModel      `yaml:"models" json:"models"`
+	Agents                []LocalAgent        `yaml:"agents" json:"agents"`
+	Credentials           []LocalAICredential `yaml:"credentials" json:"-"`
+	CatalogTimeoutSeconds int                 `yaml:"catalog_timeout_seconds" json:"catalog_timeout_seconds"`
+}
+
+// LocalAICredential is an explicit server-owned binding, never a browser-selected
+// environment variable. The actual API key is resolved only on the server.
+type LocalAICredential struct {
+	Reference        string `yaml:"reference" json:"reference"`
+	TenantUUID       string `yaml:"tenant_uuid" json:"tenant_uuid"`
+	Environment      string `yaml:"environment" json:"environment"`
+	Provider         string `yaml:"provider" json:"provider"`
+	Endpoint         string `yaml:"endpoint" json:"endpoint"`
+	APIKeyEnv        string `yaml:"api_key_env" json:"-"`
+	OrganizationEnv  string `yaml:"organization_env" json:"-"`
+	AnthropicVersion string `yaml:"anthropic_version" json:"anthropic_version,omitempty"`
 }
 
 // AICatalogConfig stores the versioned PowerX provider catalog separately from

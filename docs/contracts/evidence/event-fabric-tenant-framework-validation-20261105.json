@@ -1,0 +1,154 @@
+{
+  "contract": "event_fabric.service.v1",
+  "validated_at": "2026-11-05T14:31:34.328633+00:00",
+  "scope": "Framework Event Fabric tenant mapping and Runtime lifecycle; Skeleton/template/contract distribution; no AI Craft or Core modifications",
+  "branch": "025-framework-business-regression",
+  "apis": [
+    "Client.ResolveTopics",
+    "NewTenantHostRuntime",
+    "RuntimeSlot.Switch",
+    "RuntimeSlot.Close",
+    "Runtime.TopicBindings",
+    "HostProvider.NewResolvedRuntime"
+  ],
+  "invariants": [
+    "tenant/plugin/contract/requested-key equality",
+    "direction-specific publish and consume lookup",
+    "tenant-prefixed nonempty FullTopics and no duplicate physical mappings",
+    "no unscoped static Runtime",
+    "independent service clients and token providers per tenant",
+    "switch closes previous subscriptions and pending publications; failed switch has no previous-tenant fallback",
+    "readonly resolve_topics; no topic creation, grant mutation or Admin/WSBus/local fallback",
+    "original envelope and persisted event/idempotency identity preserved; business commit before ACK; uncertain settlement preserved"
+  ],
+  "tests": {
+    "race": "passed",
+    "race_packages": [
+      "runtime/eventfabric/...",
+      "runtime/taskbus",
+      "eventbridge",
+      "runtime/powerx/hostcontract",
+      "runtime/powerx/capability",
+      "skeleton/cmd/plugin",
+      "skeleton/internal/config"
+    ],
+    "cases": [
+      "API Key and STS; publish and consume directions",
+      "two tenants using distinct service credentials",
+      "same owner distinct credentials cannot acknowledge each others receipts",
+      "revocation after successful mapping; missing/preparation/authorization errors propagated once",
+      "wrong contract/tenant/plugin/keys; extra/missing/foreign/duplicate physical topics",
+      "direction conflicts and no static-plus-resolved mixing",
+      "tenant switch cancels old subscription; failed switch leaves no active runtime",
+      "Close cancels pending mapping query and publication",
+      "reconnect keeps tenant, subscriber and credentials",
+      "stable identity, preserved envelope, commit-before-ACK and uncertain ACK regression"
+    ],
+    "go_1_24_13_no_workspace": "passed: runtime/eventfabric/... and runtime/taskbus",
+    "vet": "passed",
+    "cli_contract_exports_and_templates": "passed",
+    "template_sync": "passed",
+    "source_contract_hashes": "passed; all four current Core files matched",
+    "ci_release_guardrails": "passed",
+    "packaged_sdk": "passed",
+    "generated_backend_build": "passed",
+    "generated_tenant_runtime_api": "passed"
+  },
+  "package": {
+    "application_contract": "event_fabric.service.v1",
+    "published": false,
+    "changes_committed": false,
+    "base_commit": "32aaf0bd33ecda9860384484b55aa1d092ad27fc",
+    "source_sha256": {
+      "go": "a7fce28cc5753a164520fecc75e40c595d4a88cbc15d394c351af802252af739",
+      "generator": "2f73c8f947f609d2df8afc5ad47a8bf602d665bfecb74af81ee04a59c8f3d4f4",
+      "contracts": "c0871d05847ecb082df2ff8cdb2b6fb30ec923b7a35597230cec3cedf4770496"
+    },
+    "go_module": "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go",
+    "go_sdk_version": "v0.0.30-dev.eventfabric.a7fce28cc5753a16",
+    "go_proxy": "file:///private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-event-fabric-tenant-20261105-525c5a79d0aea6ae/go-proxy",
+    "go_checksums": {
+      "sum": "h1:eJx3fbNBh6fe94/oVmrWtcYSCDFa08sj8Dv+VwV+s0s=",
+      "go_mod_sum": "h1:Xmb97ZEMwaN9kaz32/7GHXR/oQESdc3ILbiCtOHh+2w="
+    },
+    "generator_version": "v0.0.0-eventfabric.2f73c8f947f609d2",
+    "generator_binary": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-event-fabric-tenant-20261105-525c5a79d0aea6ae/px-plugin",
+    "bundle": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-event-fabric-tenant-20261105-525c5a79d0aea6ae",
+    "consumer": {
+      "path": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-event-fabric-tenant-20261105-525c5a79d0aea6ae/generated-consumer",
+      "go_work": "off",
+      "local_replace": false,
+      "shared_contracts": "passed",
+      "sdk_tests": "passed",
+      "tenant_resolve_runtime": "passed",
+      "backend_build": "passed"
+    },
+    "upgrade_command": "GOWORK=off GOPROXY=file:///private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-event-fabric-tenant-20261105-525c5a79d0aea6ae/go-proxy,https://proxy.golang.org,direct GONOSUMDB=github.com/ArtisanCloud/PowerXPlugin/framework/backend/go go get github.com/ArtisanCloud/PowerXPlugin/framework/backend/go@v0.0.30-dev.eventfabric.a7fce28cc5753a16",
+    "artifact_sha256": {
+      "px-plugin": "60e88165940db4081ac0e84b668f7176eae888506078f02685babce6325e2869",
+      "go-proxy/github.com/!artisan!cloud/!power!x!plugin/framework/backend/go/@v/v0.0.30-dev.eventfabric.a7fce28cc5753a16.zip": "a09b4e0b0c1e88cd102d051ec149965126c90c7033d8861b02031770b331b2c5",
+      "generated-plugin": "c3be5bbf8b77970cb0c40d86fc9f14ad49e7560a42a97508548b9da75e50d186"
+    },
+    "acceptance": {
+      "controlled_http_sse": true,
+      "live_core": false,
+      "live_scrm": false,
+      "migration_applied": false,
+      "grants_changed": false
+    },
+    "upgrade_steps": [
+      "go mod edit -dropreplace=github.com/ArtisanCloud/PowerXPlugin/framework/backend/go",
+      "GOWORK=off GOPROXY=file:///private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-event-fabric-tenant-20261105-525c5a79d0aea6ae/go-proxy,https://proxy.golang.org,direct GONOSUMDB=github.com/ArtisanCloud/PowerXPlugin/framework/backend/go go get github.com/ArtisanCloud/PowerXPlugin/framework/backend/go@v0.0.30-dev.eventfabric.a7fce28cc5753a16",
+      "GOWORK=off go list -m -json github.com/ArtisanCloud/PowerXPlugin/framework/backend/go"
+    ]
+  },
+  "preservation": {
+    "preexisting_files_extended_for_this_task": [
+      "docs/contracts/event-fabric-framework.md",
+      "docs/contracts/event-fabric-service-source.json",
+      "docs/contracts/event-fabric-service-v1.md",
+      "docs/contracts/event-fabric-service-v1.openapi.yaml",
+      "docs/contracts/fixtures/event-fabric-service.v1.json",
+      "framework/backend/go/runtime/eventfabric/client_test.go",
+      "framework/backend/go/runtime/eventfabric/runtime.go",
+      "framework/backend/go/runtime/eventfabric/testdata/event-fabric-service.v1.json",
+      "framework/backend/go/runtime/eventfabric/types.go",
+      "scripts/contracts/package-event-fabric.py",
+      "scripts/contracts/validate-event-fabric.mjs",
+      "tools/cli/internal/contracts/data/media-contracts/event-fabric-framework.md",
+      "tools/cli/internal/contracts/data/media-contracts/event-fabric-service-source.json",
+      "tools/cli/internal/contracts/data/media-contracts/event-fabric-service-v1.md",
+      "tools/cli/internal/contracts/data/media-contracts/event-fabric-service-v1.openapi.yaml",
+      "tools/cli/internal/contracts/data/media-contracts/fixtures/event-fabric-service.v1.json",
+      "tools/cli/internal/contracts/event_fabric_test.go",
+      ".github/workflows/ci.yml",
+      ".github/workflows/release.yml",
+      "framework/backend/go/runtime/taskbus/provider.go",
+      "scaffold/templates/backend/go-gin/cmd/plugin/taskbus_provider.go.tmpl",
+      "scaffold/templates/backend/go-gin/etc/config.example.yaml.tmpl",
+      "scaffold/templates/backend/go-gin/internal/config/config.go.tmpl",
+      "scripts/template-sync-config.yaml",
+      "skeleton/backend/etc/config.example.yaml",
+      "skeleton/backend/go-gin/cmd/plugin/taskbus_provider.go",
+      "skeleton/backend/go-gin/cmd/plugin/taskbus_provider_test.go",
+      "skeleton/backend/go-gin/internal/config/config.go",
+      "tools/cli/internal/contracts/embed.go",
+      "tools/cli/internal/templates/data/backend/go-gin/cmd/plugin/taskbus_provider.go.tmpl",
+      "tools/cli/internal/templates/data/backend/go-gin/etc/config.example.yaml.tmpl",
+      "tools/cli/internal/templates/data/backend/go-gin/internal/config/config.go.tmpl"
+    ],
+    "unrelated_preexisting_file_hashes_unchanged": true
+  },
+  "acceptance": {
+    "controlled_http_sse": true,
+    "postgresql_test_rerun": false,
+    "live_8077": false,
+    "ai_craft_alignment": false,
+    "namespace_owner_configuration_changed": false,
+    "database_or_grants_changed": false,
+    "daily_services_restarted": false,
+    "public_release": false,
+    "committed_or_pushed": false
+  },
+  "handoff": "docs/contracts/event-fabric-framework.md"
+}

@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.contracts.response import ok
+from app.manifestx.identity import PLUGIN_ID
 
 router = APIRouter(prefix="/admin")
 
@@ -8,7 +9,7 @@ router = APIRouter(prefix="/admin")
 @router.get("/manifest")
 async def manifest():
     payload = {
-        "id": "com.powerx.plugins.base",
+        "id": PLUGIN_ID,
         "name": "Base Template Plugin",
         "version": "0.1.0",
         "description": "A starter plugin that showcases template management capabilities for PowerX",
@@ -25,7 +26,7 @@ async def manifest():
         "frontend": {
             "entry": "web-admin/.output",
             "routes": {"/admin/*": "index.html"},
-            "public_path": "/_p/com.powerx.plugins.base/admin/",
+            "public_path": f"/_p/{PLUGIN_ID}/admin/",
         },
         "menus": [
             {
@@ -79,7 +80,7 @@ async def manifest():
         "agents": [
             {
                 "id": "base.assistant",
-                "plugin_id": "com.powerx.plugins.base",
+                "plugin_id": PLUGIN_ID,
                 "name": "Base 助理",
                 "description": "智能的 Base 模板助手，可以帮助创建与查询模板内容",
                 "model": "gpt-4",

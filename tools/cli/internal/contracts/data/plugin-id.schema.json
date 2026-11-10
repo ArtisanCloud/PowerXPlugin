@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PowerX Plugin ID v1",
+  "type": "string",
+  "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$",
+  "not": {
+    "pattern": "^com\\.powerx\\.plugin(?:\\.|$)|^com\\.powerx\\.plugins$|[^a-z0-9.-]"
+  },
+  "$comment": "PowerX-owned IDs use com.powerx.plugins.<name>. Third-party namespaces and single-segment IDs remain supported. No additional total-length limit. Reject legacy IDs without rewriting."
+}

@@ -1,7 +1,8 @@
 {
   "source": "PowerX/web-admin/public/powerx-bridge-client.js",
   "protocol_version": 2,
-  "date": "2026-10-10",
-  "sha256": "502d943cb15a91bb5abbc4289aebde72429cced4fecb9321df4ef6d46ef452a3",
-  "usage": "contract_interoperability_fixture_not_live_browser_acceptance"
+  "date": "2026-11-07",
+  "sha256": "4af4fbcd54a07fa91cf0a0a18cbefcd9c0a10edc06080d85280abcce40092b09",
+  "usage": "contract_interoperability_fixture_not_live_browser_acceptance",
+  "contract": "plugin-session-termination-v2"
 }

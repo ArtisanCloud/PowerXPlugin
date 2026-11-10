@@ -48,6 +48,9 @@ func Load(path string) (*PluginManifest, error) {
 	if err := yaml.Unmarshal(data, &raw); err != nil {
 		return nil, err
 	}
+	if err := fwmanifest.ValidatePluginDocument(raw); err != nil {
+		return nil, err
+	}
 	if _, err := fwmanifest.DecodeNotificationPresentations(raw["notification_presentations"]); err != nil {
 		return nil, fmt.Errorf("manifest notification_presentations: %w", err)
 	}

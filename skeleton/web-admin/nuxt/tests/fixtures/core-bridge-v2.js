@@ -41,37 +41,27 @@
         if (payload.type === 'auth-token' && lastAuthPayload === payload && bindingId === instanceId) {
           send({ type: 'auth:applied', sequence: payload.sequence, sessionId: payload.sessionId, revision: payload.revision });
         }
-      }).catch(function () {
-        if (lastAuthPayload === payload && bindingId === instanceId) send({ type: 'auth:rejected', sequence: payload.sequence });
+      }).catch(function (error) {
+        var body = error && (error.data || (error.response && error.response._data));
+        var code = body && (body.error_code || body.reason_code) || error && error.code;
+        if (lastAuthPayload === payload && bindingId === instanceId) send({ type: 'auth:rejected', sequence: payload.sequence,
+          sessionId: payload.sessionId, revision: payload.revision,
+          code: code === 'IAM_CONTEXT_USER_SESSION_INVALID' ? code : undefined });
       });
   }
 
   function normalizeNavigatePath(path) {
-    if (!path || typeof path !== "string") return "/";
+    if (typeof path !== "string") throw new Error('PLUGIN_NAVIGATION_INVALID');
     var p = path.trim();
-    if (!p) return "/";
+    if (!p || /^[a-z][a-z0-9+.-]*:/i.test(p) || p.startsWith('//') || p.includes('\\')) {
+      throw new Error('PLUGIN_NAVIGATION_INVALID');
+    }
     if (!p.startsWith("/")) p = "/" + p;
 
-    var adminBase =
-      (window.__NUXT__ &&
-        window.__NUXT__.config &&
-        window.__NUXT__.config.public &&
-        window.__NUXT__.config.public.pluginAdminBase) ||
-      (window.__NUXT__ &&
-        window.__NUXT__.config &&
-        window.__NUXT__.config.app &&
-        window.__NUXT__.config.app.baseURL) ||
-      "";
-    adminBase = String(adminBase || "").replace(/\/?$/, "/");
-
-    var match = p.match(/^\/_p\/[^/]+\/admin(\/.*)?$/);
-    if (match) {
-      return p;
-    }
-    if (adminBase && adminBase.startsWith("/_p/") && !p.startsWith(adminBase)) {
-      p = adminBase.replace(/\/$/, "") + p;
-    }
-    return p;
+    // Nuxt 水合后会删除 __NUXT__；挂载范围由 iframe 入口确认的插件 ID 决定。
+    // 已带命名空间的地址交给下面的严格范围校验，不能重新包装跨插件地址。
+    if (p.startsWith('/_p/')) return p;
+    return '/_p/' + pluginId + '/admin' + p;
   }
 
   function comparablePath(path) {
@@ -86,7 +76,13 @@
     navigationAbort = new AbortController();
     var signal = navigationAbort.signal;
     var bindingId = instanceId;
-    var acknowledge = function (ok) { if (!signal.aborted && bindingId === instanceId) send({ type: 'navigation:result', requestId: payload.requestId, ok: ok }); };
+    var acknowledge = function (ok, code) {
+      if (!signal.aborted && bindingId === instanceId) {
+        var result = { type: 'navigation:result', requestId: payload.requestId, ok: ok };
+        if (!ok) result.code = code;
+        send(result);
+      }
+    };
     var target;
     try {
       if (typeof payload.path !== 'string' || typeof payload.requestId !== 'string' || !payload.requestId) throw new Error('PLUGIN_NAVIGATION_INVALID');
@@ -94,12 +90,13 @@
       var url = new URL(target, window.location.origin);
       var mount = '/_p/' + pluginId + '/admin';
       if (url.origin !== window.location.origin || !(url.pathname === mount || url.pathname.startsWith(mount + '/'))) throw new Error('PLUGIN_NAVIGATION_INVALID');
-    } catch (_ignore) { acknowledge(false); return; }
+    } catch (_ignore) { acknowledge(false, 'PLUGIN_NAVIGATION_INVALID'); return; }
     if (comparablePath(target) === comparablePath(window.location.href)) { acknowledge(true); return; }
-    if (!navigatorAdapter) { acknowledge(false); return; }
+    if (!navigatorAdapter) { acknowledge(false, 'PLUGIN_NAVIGATION_UNSUPPORTED'); return; }
     Promise.resolve().then(function () { if (signal.aborted) return; return navigatorAdapter(target, { signal: signal, requestId: payload.requestId, instanceId: bindingId }); }).then(function () {
-      acknowledge(comparablePath(target) === comparablePath(window.location.href));
-    }).catch(function () { acknowledge(false); });
+      var matches = comparablePath(target) === comparablePath(window.location.href);
+      acknowledge(matches, 'PLUGIN_NAVIGATION_ROUTE_MISMATCH');
+    }).catch(function () { acknowledge(false, 'PLUGIN_NAVIGATION_FAILED'); });
   }
 
   function handleMessage(event) {
@@ -149,6 +146,13 @@
     },
     requestSync: function () { send({ type: 'request-sync' }); },
     requestAuth: function () { send({ type: 'auth-token:request' }); },
+    reportSessionInvalid: function (failure) {
+      var payload = lastAuthPayload;
+      if (!failure || failure.code !== 'IAM_CONTEXT_USER_SESSION_INVALID' || !payload || payload.type !== 'auth-token' ||
+        failure.sessionId !== payload.sessionId || failure.revision !== payload.revision) return;
+      send({ type: 'auth:required', sequence: payload.sequence, sessionId: payload.sessionId,
+        revision: payload.revision, code: failure.code });
+    },
     getLastSyncAt: function () { return lastSyncAt; },
   };
 })();

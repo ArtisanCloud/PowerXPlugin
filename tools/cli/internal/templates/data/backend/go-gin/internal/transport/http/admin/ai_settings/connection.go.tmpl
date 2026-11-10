@@ -1,0 +1,68 @@
+package ai_settings
+
+import (
+	"encoding/json"
+	"io"
+	"net/http"
+
+	fw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/aisettings"
+	powerxai "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/ai"
+	"{{ .BackendModulePath }}/internal/contracts"
+	"github.com/gin-gonic/gin"
+)
+
+type connectionTestRequest struct {
+	Source   string `json:"source"`
+	Modality string `json:"modality"`
+	Provider string `json:"provider"`
+	Model    string `json:"model,omitempty"`
+	// Endpoint and environment are only accepted for the plugin-local adapter.
+	Endpoint    string `json:"endpoint,omitempty"`
+	Environment string `json:"environment,omitempty"`
+}
+
+func (h *Handler) TestConnection(c *gin.Context) {
+	var req connectionTestRequest
+	decoder := json.NewDecoder(http.MaxBytesReader(c.Writer, c.Request.Body, 16<<10))
+	decoder.DisallowUnknownFields()
+	input := fw.ConnectionTestInput{}
+	if decoder.Decode(&req) != nil || decoder.Decode(&struct{}{}) != io.EOF {
+		mediaFailure(c, &powerxai.HTTPError{StatusCode: 400, ReasonCode: "AI_REQUEST_INVALID"})
+		return
+	}
+	input = fw.ConnectionTestInput{Modality: req.Modality, Provider: req.Provider, Model: req.Model}
+	if input.Validate() != nil {
+		mediaFailure(c, &powerxai.HTTPError{StatusCode: 400, ReasonCode: "AI_REQUEST_INVALID"})
+		return
+	}
+	switch req.Source {
+	case "powerx":
+		if req.Endpoint != "" || req.Environment != "" {
+			mediaFailure(c, &powerxai.HTTPError{StatusCode: 400, ReasonCode: "AI_REQUEST_INVALID"})
+			return
+		}
+		if h == nil || h.deps == nil || h.deps.PowerXAISettings == nil {
+			mediaFailure(c, &powerxai.HTTPError{StatusCode: 503, ReasonCode: "AI_CLIENT_UNAVAILABLE"})
+			return
+		}
+		out, err := h.deps.PowerXAISettings.TestConnection(c.Request.Context(), input, requestID(c))
+		respondDelegated(c, out, err)
+	case "local":
+		if req.Environment != "development" && req.Environment != "production" {
+			mediaFailure(c, &powerxai.HTTPError{StatusCode: 400, ReasonCode: "AI_REQUEST_INVALID"})
+			return
+		}
+		svc, _, ok := h.localService(c)
+		if !ok {
+			return
+		}
+		out, err := svc.ProbeConnection(c.Request.Context(), req.Environment, input, req.Endpoint)
+		if err != nil {
+			mediaFailure(c, err)
+			return
+		}
+		contracts.ResponseSuccess(c, out)
+	default:
+		mediaFailure(c, &powerxai.HTTPError{StatusCode: 400, ReasonCode: "AI_REQUEST_INVALID"})
+	}
+}

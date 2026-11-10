@@ -64,7 +64,7 @@ func TestSettingsTestsDispatchByCapabilityAndKeepOriginalAttempt(t *testing.T) {
 			runtime, err := fwai.NewRuntime(provider.ModeDelegated, nil, adapter)
 			require.NoError(t, err)
 			h := &Handler{mode: provider.ModeDelegated, deps: &app.Deps{AIInvocation: runtime}}
-			for _, action := range []gin.HandlerFunc{h.TestConnection, h.QuickCall} {
+			for _, action := range []gin.HandlerFunc{h.QuickCall, h.QuickCall} {
 				body := `{"source":"local","environment":"development","modality":"` + modality + `","provider":"fixture.provider","model_key":"fixture.model","endpoint":"https://must-not-select-route.invalid","inputs":[{"type":"text","content":"fixture.prompt"},{"type":"image_url","url":"https://fixture.invalid/image"}],"parameters":{"seed":0},"idempotency_key":"fixture.attempt"}`
 				rec := httptest.NewRecorder()
 				c, _ := gin.CreateTestContext(rec)
@@ -130,7 +130,7 @@ func TestSettingsTestsRejectUnsupportedAndIncompleteResults(t *testing.T) {
 			c, _ := gin.CreateTestContext(rec)
 			c.Request = httptest.NewRequest(http.MethodPost, "/test", strings.NewReader(`{"source":"powerx","environment":"development","modality":"`+modality+`","provider":"fixture","model_key":"fixture","inputs":[{"type":"text","content":"fixture"}]}`))
 			c.Request.Header.Set("Content-Type", "application/json")
-			h.TestConnection(c)
+			h.QuickCall(c)
 			if modality == "image" {
 				require.Equal(t, 502, rec.Code)
 			} else {

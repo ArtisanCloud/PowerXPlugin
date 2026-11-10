@@ -75,3 +75,23 @@ func TestInitDependencyFailureIsReturned(t *testing.T) {
 		t.Fatal("FRAMEWORK_INIT_MUST_REPORT_DEPENDENCY_FAILURE")
 	}
 }
+
+func TestInitExportsPluginAuthorizationContract(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "plugin")
+	if err := runInit([]string{"com.powerx.authorization-test", "--directory", dir, "--backend", "go-gin", "--admin", "nuxt", "--git-init=false", "--init-config=false"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"plugin-service-authorization.md", "plugin-service-authorization.openapi.yaml", "plugin-authorization-source.json", "plugin-authorization-framework.md", "fixtures/plugin-authorization.v1.json", "fixtures/plugin-service-errors-stream.v1.json"} {
+		canonical, err := os.ReadFile(filepath.Join("../../../docs/contracts", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		generated, err := os.ReadFile(filepath.Join(dir, "docs/contracts", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(canonical) != string(generated) {
+			t.Fatal("PLUGIN_AUTHORIZATION_EXPORT_MISMATCH", name)
+		}
+	}
+}

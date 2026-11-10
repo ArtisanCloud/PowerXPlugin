@@ -1,0 +1,21 @@
+"""ID policy generated from PowerXDocs; no independent naming expression."""
+import json
+import re
+from pathlib import Path
+
+PLUGIN_ID = "{{ .PluginID }}"
+_RULE = json.loads(Path(__file__).with_name("plugin-id.schema.json").read_text(encoding="utf-8"))
+
+
+def validate_plugin_id(plugin_id: str) -> None:
+    if not isinstance(plugin_id, str) or not re.fullmatch(_RULE["pattern"], plugin_id) or re.search(_RULE["not"]["pattern"], plugin_id):
+        code = "PLUGIN_ID_INVALID"
+        if isinstance(plugin_id, str) and (plugin_id == "com.powerx.plugin" or plugin_id.startswith("com.powerx.plugin.")):
+            code = "PLUGIN_ID_LEGACY_PREFIX"
+        raise ValueError(code)
+
+
+def validate_plugin_identity(plugin_id: str, runtime_id: str = "", audience: str = "") -> None:
+    validate_plugin_id(plugin_id)
+    if (runtime_id and runtime_id != plugin_id) or (audience and audience != f"plugin:{plugin_id}"):
+        raise ValueError("PLUGIN_ID_MISMATCH")

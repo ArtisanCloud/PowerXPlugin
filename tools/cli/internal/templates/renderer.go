@@ -64,6 +64,9 @@ type Result struct {
 // RenderAll 将模板渲染到目标目录。
 func RenderAll(baseDir string, data Data, opts Options) (Result, error) {
 	var result Result
+	if err := fwmanifest.ValidatePluginID(data.PluginID); err != nil {
+		return result, err
+	}
 	if err := fwmanifest.ValidateNotificationPresentations(data.NotificationPresentations); err != nil {
 		return result, err
 	}

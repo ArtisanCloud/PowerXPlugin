@@ -47,3 +47,17 @@ func (r *Runtime) Registry() (Registry, error) {
 	}
 	return r.registry.Resolve()
 }
+
+// Streamer resolves only the selected registry; lack of streaming support is
+// explicit and never selects a different adapter.
+func (r *Runtime) Streamer() (powerxcapability.Streamer, error) {
+	registry, err := r.Registry()
+	if err != nil {
+		return nil, err
+	}
+	streamer, ok := registry.(powerxcapability.Streamer)
+	if !ok {
+		return nil, module.NewError("CAPABILITY_SERVICE_STREAM_UNSUPPORTED", "CAPABILITY_SERVICE_STREAM_UNSUPPORTED")
+	}
+	return streamer, nil
+}

@@ -23,7 +23,7 @@ MANIFESTCHECK_DIR := $(BACKEND_DIR)/cmd/manifestcheck
 BACKEND_GOCACHE ?= $(GO_BUILD_CACHE)
 
 .PHONY: plugin-yaml-sync
-plugin-yaml-sync: ## 根据 contracts/capabilities 自动同步 plugin.d/capabilities.yaml 与 exposure.yaml
+plugin-yaml-sync: plugin-id-check ## 根据 contracts/capabilities 自动同步 plugin.d/capabilities.yaml 与 exposure.yaml
 	@echo "[manifest] syncing plugin catalogs from contracts/capabilities"
 	@if [ ! -d "$(MANIFESTCHECK_DIR)" ]; then \
 		echo "❌ 未找到 $(MANIFESTCHECK_DIR)，无法执行 plugin catalog 同步"; \
@@ -92,22 +92,7 @@ plugin-permission-declaration-check: ## 校验 PowerX plugin permissions[] 与 p
 	@echo "[manifest] checking plugin permission declarations"
 	@node scripts/manifest/check-permission-declaration.mjs --manifest "$(PLUGIN_FILE)"
 
+PX_PLUGIN ?= px-plugin
 .PHONY: plugin-id-check
-plugin-id-check: ## 检查插件 ID 命名是否符合 com.powerx.plugins.*
-	@echo "[manifest] checking plugin id naming convention"
-	@PLUGIN_ID_VAL=$$(awk -F': *' '/^id:/ {print $$2; exit}' $(PLUGIN_FILE)); \
-	if [ -z "$$PLUGIN_ID_VAL" ]; then \
-		echo "❌ plugin.yaml 缺少 id"; \
-		exit 1; \
-	fi; \
-	case "$$PLUGIN_ID_VAL" in \
-		com.powerx.plugins.*) ;; \
-		*) echo "❌ plugin id 不符合规范: $$PLUGIN_ID_VAL（应以 com.powerx.plugins. 开头）"; exit 1;; \
-	esac
-	@LEGACY_MATCH=$$(rg -n "com\\.powerx\\.plugin\\." web-admin backend make-files plugin.yaml -g '!make-files/manifest.mk' 2>/dev/null || true); \
-	if [ -n "$$LEGACY_MATCH" ]; then \
-		echo "❌ 发现旧命名 com.powerx.plugin.* 残留:"; \
-		echo "$$LEGACY_MATCH"; \
-		exit 1; \
-	fi; \
-	echo "✅ plugin id naming check passed"
+plugin-id-check:
+	@"$(PX_PLUGIN)" plugin-id check --manifest "$(ABS_PLUGIN_FILE)"

@@ -2,7 +2,9 @@ package bootstrap
 
 import (
 	"context"
+	fwmanifest "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
 	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
+	"os"
 	"sync"
 
 	fwiamadapters "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/adapters"
@@ -39,6 +41,9 @@ var (
 )
 
 func BootstrapPlugin(ctx context.Context, cfg *config.Config) (*gorm.DB, error) {
+	if err := fwmanifest.ValidatePluginEnvironment(sharedapp.PluginID, os.Getenv); err != nil {
+		return nil, err
+	}
 	if err := initializeConfiguredLogging(cfg.Logging); err != nil {
 		return nil, err
 	}

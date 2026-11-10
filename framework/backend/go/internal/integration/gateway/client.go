@@ -16,6 +16,7 @@ import (
 	"time"
 
 	gatewaypb "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/internal/integration/gateway/pb"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/hostcontract"
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -40,6 +41,7 @@ type Config struct {
 	AuthScheme         string
 	HTTPClient         *http.Client
 	RequestTimeout     time.Duration
+	StreamTimeout      time.Duration
 	UserAgent          string
 	GRPCTarget         string
 	GRPCDialOptions    []grpc.DialOption
@@ -91,52 +93,22 @@ type ContractStatus struct {
 
 // InvocationError 提供标准化错误对象。
 type InvocationError struct {
+	ErrorCode         string
+	ReasonCode        string
+	RequestID         string
+	Details           *hostcontract.InvocationFailureDetails
 	TraceID           string
 	UpstreamRequestID string
 	StatusCode        int
 	Errors            []GatewayError
-	Body              []byte
+	Body              []byte `json:"-"`
 }
 
 func (e *InvocationError) Error() string {
 	if e == nil {
 		return "<nil>"
 	}
-	if len(e.Errors) == 0 {
-		if msg := summarizeGatewayBody(e.Body); msg != "" {
-			return fmt.Sprintf("gateway invocation failed: %s (trace=%s status=%d)", msg, e.TraceID, e.StatusCode)
-		}
-		return fmt.Sprintf("gateway invocation failed: status=%d trace=%s", e.StatusCode, e.TraceID)
-	}
-	return fmt.Sprintf("gateway invocation failed: %s (trace=%s status=%d)", e.Errors[0].Message, e.TraceID, e.StatusCode)
-}
-
-func summarizeGatewayBody(body []byte) string {
-	raw := strings.TrimSpace(string(body))
-	if raw == "" {
-		return ""
-	}
-	var env struct {
-		Error any `json:"error"`
-	}
-	if err := json.Unmarshal(body, &env); err == nil && env.Error != nil {
-		switch value := env.Error.(type) {
-		case string:
-			if text := strings.TrimSpace(value); text != "" {
-				return text
-			}
-		case map[string]any:
-			for _, key := range []string{"message", "code"} {
-				if text, ok := value[key].(string); ok && strings.TrimSpace(text) != "" {
-					return strings.TrimSpace(text)
-				}
-			}
-		}
-	}
-	if len(raw) > 512 {
-		return raw[:512] + "..."
-	}
-	return raw
+	return fmt.Sprintf("GATEWAY_INVOCATION_FAILED reason=%s status=%d trace_id=%s", e.ReasonCode, e.StatusCode, e.TraceID)
 }
 
 // Client 负责 REST/gRPC 能力调用封装。
@@ -149,6 +121,7 @@ type Client struct {
 	tokenProvider  TokenProvider
 	userAgent      string
 	requestTimeout time.Duration
+	streamTimeout  time.Duration
 
 	httpClient *http.Client
 
@@ -198,6 +171,7 @@ func NewClient(cfg Config) (*Client, error) {
 		tokenProvider:   cfg.TokenProvider,
 		userAgent:       ua,
 		requestTimeout:  timeout,
+		streamTimeout:   cfg.StreamTimeout,
 		httpClient:      httpClient,
 		grpcTarget:      strings.TrimSpace(cfg.GRPCTarget),
 		grpcDialOptions: cfg.GRPCDialOptions,
@@ -236,7 +210,6 @@ func (c *Client) Invoke(ctx context.Context, req InvokeRequest) (*Response, erro
 		slog.String("preferred_protocol", strings.TrimSpace(req.PreferredProtocol)),
 		slog.String("action", strings.TrimSpace(req.Action)),
 		slog.String("auth_scheme", c.authScheme),
-		slog.String("request_body", string(bodyBytes)),
 	)
 
 	ctxReq, cancel := context.WithTimeout(ctx, c.requestTimeout)
@@ -270,15 +243,20 @@ func (c *Client) Invoke(ctx context.Context, req InvokeRequest) (*Response, erro
 		slog.String("authorization_scheme", extractAuthScheme(httpReq.Header.Get("Authorization"))),
 	)
 
-	resp, err := c.httpClient.Do(httpReq)
+	client := *c.httpClient
+	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	resp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("gateway: http invoke failed: %w", err)
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, hostcontract.MaxInvocationResponseBytes+1))
 	if err != nil {
 		return nil, fmt.Errorf("gateway: read response: %w", err)
+	}
+	if len(respBody) > hostcontract.MaxInvocationResponseBytes {
+		return nil, invocationError(hostcontract.DecodeInvocationFailure(502, resp.Header, nil, "GATEWAY_RESPONSE_INVALID"), nil)
 	}
 
 	envelope := parseEnvelope(respBody)
@@ -309,14 +287,19 @@ func (c *Client) Invoke(ctx context.Context, req InvokeRequest) (*Response, erro
 		}
 	}
 
-	if resp.StatusCode >= http.StatusBadRequest || len(envelope.Errors) > 0 {
-		return result, &InvocationError{
-			TraceID:           traceID,
-			UpstreamRequestID: result.UpstreamRequestID,
-			StatusCode:        resp.StatusCode,
-			Errors:            envelope.Errors,
-			Body:              respBody,
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 || len(envelope.Errors) > 0 {
+		failure := hostcontract.DecodeInvocationFailure(resp.StatusCode, resp.Header, respBody, "GATEWAY_UPSTREAM_DEPENDENCY")
+		result.TraceID = failure.TraceID
+		result.UpstreamRequestID = failure.RequestID
+		err := invocationError(failure, respBody)
+		err.Errors = envelope.Errors
+		if len(err.Errors) == 0 {
+			err.Errors = []GatewayError{{Code: failure.ReasonCode}}
 		}
+		return result, err
+	}
+	if !json.Valid(respBody) || len(envelope.Data) == 0 || string(envelope.Data) == "null" {
+		return nil, invocationError(hostcontract.DecodeInvocationFailure(502, resp.Header, nil, "GATEWAY_RESPONSE_INVALID"), nil)
 	}
 
 	return result, nil

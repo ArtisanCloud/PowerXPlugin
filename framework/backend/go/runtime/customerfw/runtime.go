@@ -111,3 +111,19 @@ func (r *Runtime) Identities() (ExternalIdentityStore, error) {
 	}
 	return r.identities.Resolve()
 }
+
+// PhoneVerifier 返回手机号认证能力：只有委派模式的 Core 客户端实现；本地模式明确返回不可用。
+func (r *Runtime) PhoneVerifier() (CustomerPhoneVerifier, error) {
+	if r != nil && r.mode != provider.ModeDelegated {
+		return nil, NewError(CodeCustomerDelegateUnavailable, "customer.phone.delegated_required")
+	}
+	auth, err := r.Auth()
+	if err != nil {
+		return nil, err
+	}
+	verifier, ok := auth.(CustomerPhoneVerifier)
+	if !ok {
+		return nil, NewError(CodeCustomerDelegateUnavailable, "phone verification requires delegated customer auth")
+	}
+	return verifier, nil
+}

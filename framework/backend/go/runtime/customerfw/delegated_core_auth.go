@@ -15,6 +15,22 @@ import (
 
 const ShopifyStorefrontChannel = "shopify_storefront"
 
+// WeChatMiniAppCredentialType 是转发给 Core 的一次性 wx.login code；
+// code2session 由 Core 用客户端应用注册表中该 app_id 的凭证完成。
+const WeChatMiniAppCredentialType = "wechat_miniapp_code"
+
+// supportedDelegatedCredential 列出 Core Customer Auth Host Contract 支持的渠道与凭证类型。
+func supportedDelegatedCredential(channel string, credential CustomerCredential) bool {
+	if strings.TrimSpace(credential.Value) == "" {
+		return false
+	}
+	if strings.TrimSpace(channel) == ShopifyStorefrontChannel {
+		return strings.TrimSpace(credential.Type) == "shopify_customer_access_token"
+	}
+	want, ok := MiniAppCredentialType(channel)
+	return ok && strings.TrimSpace(credential.Type) == want
+}
+
 // DelegatedCoreAuthClient calls the formal Core Customer Auth Host Contract.
 // Tenant comes only from the plugin STS credential; TenantUUID input fields
 // are rejected rather than forwarded.
@@ -50,10 +66,10 @@ func NewDelegatedCoreAuthClient(cfg DelegatedCoreAuthClientConfig) (*DelegatedCo
 }
 
 func (c *DelegatedCoreAuthClient) Register(ctx context.Context, in RegisterInput) (*AuthResult, error) {
-	return c.issue(ctx, "/api/v1/tenant/customer/auth/register", in.TenantUUID, in.Channel, in.Credential)
+	return c.issue(ctx, "/api/v1/tenant/customer/auth/register", in.TenantUUID, in.Channel, in.AppID, in.Credential)
 }
 func (c *DelegatedCoreAuthClient) Login(ctx context.Context, in LoginInput) (*AuthResult, error) {
-	return c.issue(ctx, "/api/v1/tenant/customer/auth/login", in.TenantUUID, in.Channel, in.Credential)
+	return c.issue(ctx, "/api/v1/tenant/customer/auth/login", in.TenantUUID, in.Channel, in.AppID, in.Credential)
 }
 func (c *DelegatedCoreAuthClient) Validate(ctx context.Context, _ string) (*CustomerContext, error) {
 	if _, ok := CustomerCredentialFromContext(ctx); !ok {
@@ -74,20 +90,29 @@ func (c *DelegatedCoreAuthClient) Validate(ctx context.Context, _ string) (*Cust
 	return contextFromMembership(out.Item), nil
 }
 
-func (c *DelegatedCoreAuthClient) issue(ctx context.Context, path, tenant, channel string, credential CustomerCredential) (*AuthResult, error) {
+func (c *DelegatedCoreAuthClient) issue(ctx context.Context, path, tenant, channel, appID string, credential CustomerCredential) (*AuthResult, error) {
 	if strings.TrimSpace(tenant) != "" {
 		return nil, NewError(CodeCustomerTenantMismatch, "delegated customer auth does not accept tenant_uuid")
 	}
-	if strings.TrimSpace(channel) != ShopifyStorefrontChannel || strings.TrimSpace(credential.Type) != "shopify_customer_access_token" || strings.TrimSpace(credential.Value) == "" {
+	if !supportedDelegatedCredential(channel, credential) {
 		return nil, NewError(CodeCustomerTokenInvalid, "unsupported delegated customer credential")
 	}
-	var out struct {
-		AccessToken  string              `json:"access_token"`
-		RefreshToken string              `json:"refresh_token"`
-		ExpiresIn    int64               `json:"expires_in"`
-		Context      customerContextWire `json:"context"`
+	body := map[string]any{"channel": channel, "credential": credential}
+	if IsMiniAppChannel(channel) {
+		// 小程序 code 归属某个应用：Core 需要 app_id 才能找到凭证并校验插件授权。
+		if strings.TrimSpace(appID) == "" {
+			return nil, NewError(CodeCustomerInvalidArgument, "mini-program login requires app_id")
+		}
+		body["app_id"] = strings.TrimSpace(appID)
 	}
-	if err := c.call(ctx, http.MethodPost, path, map[string]any{"channel": channel, "credential": credential}, &out, false); err != nil {
+	var out struct {
+		AccessToken   string              `json:"access_token"`
+		RefreshToken  string              `json:"refresh_token"`
+		ExpiresIn     int64               `json:"expires_in"`
+		PhoneVerified bool                `json:"phone_verified"`
+		Context       customerContextWire `json:"context"`
+	}
+	if err := c.call(ctx, http.MethodPost, path, body, &out, false); err != nil {
 		return nil, err
 	}
 	context := CustomerContext{TenantUUID: out.Context.TenantUUID, CustomerUUID: out.Context.CustomerUUID, MembershipUUID: out.Context.MembershipUUID, Roles: out.Context.Roles, Scopes: out.Context.Scopes, Source: CustomerAuthSourceDelegate, Authenticated: out.Context.Authenticated, TokenExpiresAt: out.Context.ExpiresAt}
@@ -97,7 +122,7 @@ func (c *DelegatedCoreAuthClient) issue(ctx context.Context, path, tenant, chann
 	if out.Context.Status != "active" {
 		return nil, NewError(CodeCustomerMembershipDisabled, "customer.membership.inactive")
 	}
-	return &AuthResult{AccessToken: out.AccessToken, RefreshToken: out.RefreshToken, ExpiresIn: out.ExpiresIn, Context: NormalizeContext(&context)}, nil
+	return &AuthResult{AccessToken: out.AccessToken, RefreshToken: out.RefreshToken, ExpiresIn: out.ExpiresIn, PhoneVerified: out.PhoneVerified, Context: NormalizeContext(&context)}, nil
 }
 
 type customerContextWire struct {

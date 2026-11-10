@@ -84,9 +84,28 @@ class FrameworkArchiveTests(unittest.TestCase):
         module = "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go"
         manifest = (repository / "tools/cli/go.mod").read_text()
         version = re.search(re.escape(module) + r"\s+(\S+)", manifest)[1]
-        proxy, _ = self.proxy("repository-proxy", source_files(repository / "framework/backend/go"), module, version)
+        # A released module is immutable: new Framework work must not be
+        # compared with, or replace, the checksum of the CLI's published pin.
+        # Current source consumers are covered by the generated snapshot job.
+        if re.fullmatch(r"v\d+\.\d+\.\d+", version):
+            files = committed_files(repository, "refs/tags/framework/backend/go/" + version, "framework/backend/go")
+        else:
+            files = source_files(repository / "framework/backend/go")
+        proxy, _ = self.proxy("repository-proxy", files, module, version)
         checksums = module_checksums(proxy, module, version)
         check_locked_checksums(repository / "tools/cli/go.sum", module, version, checksums)
+
+    def test_checksum_lock_rejects_different_sdk_bytes(self):
+        module, version = "example.invalid/framework", "v0.0.1-dev.fixture"
+        proxy, _ = self.proxy("locked-proxy", source_files(self.sdk), module, version)
+        checksums = module_checksums(proxy, module, version)
+        lock = self.root / "go.sum"
+        lock.write_text(module + " " + version + " " + checksums["sum"] + "\n" +
+                        module + " " + version + "/go.mod " + checksums["go_mod_sum"] + "\n")
+        (self.sdk / "sdk.go").write_text("package framework\nconst Changed = true\n")
+        changed, _ = self.proxy("changed-proxy", source_files(self.sdk), module, version)
+        with self.assertRaisesRegex(ValueError, "FRAMEWORK_LOCKED_CHECKSUM_MISMATCH"):
+            check_locked_checksums(lock, module, version, module_checksums(changed, module, version))
 
 
 if __name__ == "__main__":

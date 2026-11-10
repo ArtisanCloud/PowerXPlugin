@@ -23,6 +23,16 @@ const (
 	CodeCustomerInvalidArgument       ErrorCode = "CUSTOMER_INVALID_ARGUMENT"
 	CodeCustomerCredentialInvalid     ErrorCode = "CUSTOMER_CREDENTIAL_INVALID"
 	CodeCustomerIdentityNotFound      ErrorCode = "CUSTOMER_IDENTITY_NOT_FOUND"
+
+	// 小程序客户端应用（Core 注册表 customer_auth.client_apps）相关。
+	CodeCustomerClientAppNotFound         ErrorCode = "CUSTOMER_CLIENT_APP_NOT_FOUND"
+	CodeCustomerClientAppForbidden        ErrorCode = "CUSTOMER_CLIENT_APP_FORBIDDEN"
+	CodeCustomerClientPlatformUnsupported ErrorCode = "CUSTOMER_CLIENT_PLATFORM_UNSUPPORTED"
+	CodeCustomerClientAppNotConfigured    ErrorCode = "CUSTOMER_CLIENT_APP_NOT_CONFIGURED"
+
+	// 手机号认证相关。
+	CodeCustomerPhoneCodeInvalid ErrorCode = "CUSTOMER_PHONE_CODE_INVALID"
+	CodeCustomerPhoneConflict    ErrorCode = "CUSTOMER_PHONE_CONFLICT"
 )
 
 type Error struct {
@@ -94,15 +104,17 @@ func CodeOf(err error) ErrorCode {
 
 func HTTPStatusForCode(code ErrorCode) int {
 	switch code {
-	case CodeCustomerTokenMissing, CodeCustomerTokenInvalid, CodeCustomerUnauthenticated, CodeCustomerContextMissing, CodeCustomerCredentialInvalid:
+	case CodeCustomerTokenMissing, CodeCustomerTokenInvalid, CodeCustomerUnauthenticated, CodeCustomerContextMissing, CodeCustomerCredentialInvalid, CodeCustomerPhoneCodeInvalid:
 		return http.StatusUnauthorized
-	case CodeCustomerTenantMismatch, CodeCustomerMembershipRequired, CodeCustomerMembershipDisabled, CodeCustomerForbidden, CodeCustomerIdentitySourceBlocked:
+	case CodeCustomerTenantMismatch, CodeCustomerMembershipRequired, CodeCustomerMembershipDisabled, CodeCustomerForbidden, CodeCustomerIdentitySourceBlocked, CodeCustomerClientAppForbidden:
 		return http.StatusForbidden
-	case CodeCustomerTenantRequired, CodeCustomerBootstrapFailed, CodeCustomerInvalidArgument:
+	case CodeCustomerTenantRequired, CodeCustomerBootstrapFailed, CodeCustomerInvalidArgument, CodeCustomerClientAppNotFound, CodeCustomerClientPlatformUnsupported:
 		return http.StatusBadRequest
 	case CodeCustomerIdentityNotFound:
 		return http.StatusNotFound
-	case CodeCustomerDelegateUnavailable:
+	case CodeCustomerPhoneConflict:
+		return http.StatusConflict
+	case CodeCustomerDelegateUnavailable, CodeCustomerClientAppNotConfigured:
 		return http.StatusServiceUnavailable
 	default:
 		return http.StatusUnauthorized

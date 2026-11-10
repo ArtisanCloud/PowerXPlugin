@@ -95,7 +95,7 @@ func TestDelegatedRuntimeLLMStreamUsesCoreGatewayBinding(t *testing.T) {
 			t.Error("LLM_STREAM_RUNTIME_BYPASSED_GATEWAY")
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
-		_, _ = fmt.Fprint(w, "event: end\ndata: {}\n\n")
+		_, _ = fmt.Fprint(w, "event: done\ndata: {\"ok\":true,\"text\":\"fixture\",\"finish_reason\":\"stop\",\"traceId\":\"fixture-trace\"}\n\n")
 	}))
 	defer server.Close()
 	client, err := powerxai.NewClientWithTokenProvider(powerxai.Config{BaseURL: server.URL}, powerxai.TokenProviderFunc(func(context.Context) (string, error) { return "selected-sts", nil }), server.Client())
@@ -110,7 +110,19 @@ func TestDelegatedRuntimeLLMStreamUsesCoreGatewayBinding(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := service.LLMStream(context.Background(), powerxai.LLMStreamInput{LLMInvokeInput: powerxai.LLMInvokeInput{ModelKey: "fixture", Inputs: []powerxai.ContentItem{{Type: "text", Content: "fixture"}}}}, func(powerxai.LLMStreamEvent) error { return nil }); err != nil || calls != 1 {
+	var events []powerxai.LLMStreamEvent
+	if err := service.LLMStream(context.Background(), powerxai.LLMStreamInput{LLMInvokeInput: powerxai.LLMInvokeInput{ModelKey: "fixture", Inputs: []powerxai.ContentItem{{Type: "text", Content: "fixture"}}}}, func(event powerxai.LLMStreamEvent) error {
+		events = append(events, event)
+		return nil
+	}); err != nil || calls != 1 {
 		t.Fatal("LLM_STREAM_RUNTIME_FAILED", err, calls)
+	}
+	if len(events) != 2 || events[0].Type != "final" || events[1].Type != "end" || events[0].Text != "fixture" {
+		t.Fatalf("LLM_STREAM_RUNTIME_EVENTS_INVALID: %#v", events)
+	}
+	for _, event := range events {
+		if event.TraceID != "fixture-trace" || event.FinishReason != "stop" {
+			t.Fatalf("LLM_STREAM_RUNTIME_COMPLETION_INVALID: %#v", event)
+		}
 	}
 }

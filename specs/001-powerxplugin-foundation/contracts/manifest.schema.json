@@ -6,8 +6,10 @@
   "properties": {
     "pluginId": {
       "type": "string",
-      "pattern": "^[a-z0-9\\.\\-]+$",
-      "description": "唯一插件 ID，同步用于目录与路由前缀。"
+      "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$",
+      "not": {
+        "pattern": "^com\\.powerx\\.plugin(?:\\.|$)|^com\\.powerx\\.plugins$|[^a-z0-9.-]"
+      }
     },
     "version": {
       "type": "string",

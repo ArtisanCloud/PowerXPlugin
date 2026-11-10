@@ -1,0 +1,12 @@
+{
+  "en": {
+    "PLUGIN_ID_INVALID": "%[1]s=%[2]q: use lowercase letters, digits and interior hyphens in nonempty dot-separated segments. PowerX plugins use com.powerx.plugins.<name>; third-party namespaces remain supported.%[3]s",
+    "PLUGIN_ID_LEGACY_PREFIX": "%[1]s=%[2]q: com.powerx.plugin.* is retired. Explicitly choose com.powerx.plugins.<name>; the ID will not be renamed automatically.%[3]s",
+    "PLUGIN_ID_MISMATCH": "%[1]s=%[2]q does not match the plugin identity; expected %[3]q."
+  },
+  "zh": {
+    "PLUGIN_ID_INVALID": "%[1]s=%[2]q：使用小写字母、数字和段内中划线，点分隔的各段不能为空。PowerX 自有插件使用 com.powerx.plugins.<名称>，第三方命名空间仍可使用。%[3]s",
+    "PLUGIN_ID_LEGACY_PREFIX": "%[1]s=%[2]q：旧前缀 com.powerx.plugin.* 已停用，请明确选择 com.powerx.plugins.<名称>；不会自动修改 ID。%[3]s",
+    "PLUGIN_ID_MISMATCH": "%[1]s=%[2]q 与插件身份不一致，应为 %[3]q。"
+  }
+}

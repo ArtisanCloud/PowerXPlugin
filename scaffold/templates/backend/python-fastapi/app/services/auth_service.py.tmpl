@@ -69,7 +69,7 @@ def _resolve_plugin_id() -> str:
     return (
         os.getenv("POWERX_PLUGIN_ID", "").strip()
         or os.getenv("PLUGIN_ID", "").strip()
-        or "com.powerx.plugins.base"
+        or "{{ .PluginID }}"
     )
 
 

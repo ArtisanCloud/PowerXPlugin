@@ -77,6 +77,7 @@ import (
 	ebmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/event_bridge"
 	integrationmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/integration"
 	opsmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/operations"
+	startupnotice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/startup"
 	pluginrouter "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/router"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/security"
 	httpserver "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/server"
@@ -96,6 +97,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
+	fweventfabric "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/eventfabric"
 )
 
 type bridgeRecorder struct{}
@@ -139,6 +141,7 @@ func flushStartupLogs(logs []startupLog) {
 }
 
 func main() {
+	startupStartedAt := time.Now()
 	rootCtx := context.Background()
 	ctx, cancel := context.WithCancel(rootCtx)
 	defer cancel()
@@ -435,11 +438,11 @@ func main() {
 		if err != nil {
 			logger.WithError(err).Fatal("Failed to initialize delegated Agent runtime client")
 		}
-		aiRuntime, err = powerxai.NewClientWithTokenProvider(powerxai.Config{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL)}, powerxai.TokenProviderFunc(stsTokens.TokenFunc()), nil)
+		aiRuntime, err = powerxai.NewClientWithTokenProvider(powerxai.Config{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL), APIPrefix: cfg.Gateway.APIPrefix}, powerxai.TokenProviderFunc(stsTokens.TokenFunc()), nil)
 		if err != nil {
 			logger.WithError(err).Fatal("Failed to initialize delegated AI runtime client")
 		}
-		capabilityRegistry, err = powerxcapability.NewClientWithTokenProvider(powerxcapability.Config{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL)}, powerxcapability.TokenProviderFunc(stsTokens.TokenFunc()), nil)
+		capabilityRegistry, err = powerxcapability.NewClientWithTokenProvider(powerxcapability.Config{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL), APIPrefix: cfg.Gateway.APIPrefix}, powerxcapability.TokenProviderFunc(stsTokens.TokenFunc()), nil)
 		if err != nil {
 			logger.WithError(err).Fatal("Failed to initialize delegated Capability Registry client")
 		}
@@ -500,12 +503,13 @@ func main() {
 	} else if cfg != nil && cfg.Gateway != nil && strings.TrimSpace(cfg.Gateway.BaseURL) != "" && strings.EqualFold(strings.TrimSpace(cfg.Gateway.AuthScheme), "apikey") && strings.TrimSpace(cfg.Gateway.APIKey) != "" {
 		// A read-only Core catalog client for the explicit Host simulation source.
 		// AIInvocation below still binds the local adapter for business execution.
-		aiRuntime, err = powerxai.NewClient(powerxai.Config{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL), AuthScheme: "apikey", APIKey: strings.TrimSpace(cfg.Gateway.APIKey), Timeout: cfg.Gateway.Timeout}, nil)
+		aiRuntime, err = powerxai.NewClient(powerxai.Config{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL), APIPrefix: cfg.Gateway.APIPrefix, AuthScheme: "apikey", APIKey: strings.TrimSpace(cfg.Gateway.APIKey), Timeout: cfg.Gateway.Timeout}, nil)
 		if err != nil {
 			logger.WithError(err).Fatal("AI_CATALOG_CLIENT_INITIALIZATION_FAILED")
 		}
 		capabilityRegistry, err = powerxcapability.NewClient(powerxcapability.Config{
 			BaseURL:    strings.TrimSpace(cfg.Gateway.BaseURL),
+			APIPrefix:  cfg.Gateway.APIPrefix,
 			AuthScheme: "apikey",
 			APIKey:     strings.TrimSpace(cfg.Gateway.APIKey),
 			Timeout:    cfg.Gateway.Timeout,
@@ -785,7 +789,7 @@ func main() {
 		}
 	}
 
-	// 初始化 EventBridge Emitter（本地/TaskBus/双写；TaskBus SDK 未就绪时可自动降级到本地 emitter）
+	// Host 可靠事件使用固定 Event Fabric；启动失败不得切换到其他通道。
 	eventLogger := logger.WithField("component", "event_bridge")
 	eventCfg := cfg.EventBridge
 	if eventCfg != nil && strings.TrimSpace(eventCfg.SourcePlugin) == "" {
@@ -794,7 +798,23 @@ func main() {
 	taskBusRuntime := resolveTaskBusRuntime(cfg, wsHub, eventLogger, pxc, realtimeDescriptors)
 
 	var bridgeEmitter fweventbridge.Emitter
-	if eventCfg == nil {
+	var reliableEvents *fweventfabric.Runtime
+	if eventCfg != nil && eventCfg.Enabled && resolveTaskBusProviderMode(cfg) == "host" {
+		if eventCfg.Mode != "taskbus" || eventCfg.FallbackToLocal {
+			eventLogger.Fatal("EVENT_FABRIC_RUNTIME_CONFIG_INVALID")
+		}
+		selected, err := taskBusRuntime.Provider.NewEmitter()
+		if err != nil {
+			eventLogger.WithError(err).Fatal("EVENT_FABRIC_RUNTIME_INITIALIZATION_FAILED")
+		}
+		var ok bool
+		reliableEvents, ok = selected.(*fweventfabric.Runtime)
+		if !ok {
+			eventLogger.Fatal("EVENT_FABRIC_RUNTIME_ADAPTER_REQUIRED")
+		}
+		defer reliableEvents.Close()
+		bridgeEmitter = selected
+	} else if eventCfg == nil {
 		bridgeEmitter = fweventbridge.NewLocalEmitter(1024)
 	} else {
 		factory, err := fweventbridge.NewFactory(fweventbridge.Config{
@@ -876,6 +896,7 @@ func main() {
 		OperationsMetrics:              opsmetrics.NewMetrics(),
 		AdminConsoleMetrics:            adminmetrics.NewMetrics(),
 		EventEmitter:                   bridgeEmitter,
+		ReliableEvents:                 reliableEvents,
 		WSBusHub:                       wsHub,
 		RealtimeDescriptors:            realtimeDescriptors,
 		ProviderMode:                   providerResolver.Mode(),
@@ -1026,6 +1047,15 @@ func main() {
 	}
 
 	// 先启动核心 HTTP/gRPC 服务，避免后台任务异常影响 healthz 探活。
+	startupReporter := startupnotice.Reporter{
+		StartedAt: startupStartedAt,
+		Terminal:  os.Stderr,
+		Logger:    logger.Slog(),
+		Locale:    "zh-CN",
+		PluginID:  app.PluginID,
+		Mode:      mode,
+	}
+	fwApp.OnHTTPReady(startupReporter.HTTPReady)
 	safeGo("http_server", func() error {
 		logger.WithField("addr", cfg.Server.BindAddr).Info("Starting HTTP server...")
 		return fwApp.Run()

@@ -48,16 +48,19 @@ type ParameterSchema struct {
 	Default              any                        `json:"default,omitempty"`
 }
 type MediaModelOperation struct {
-	Driver          string                     `json:"driver"`
-	InputTypes      []string                   `json:"input_types"`
-	MaxImages       int                        `json:"max_images"`
-	MaxVideos       int                        `json:"max_videos"`
-	Parameters      map[string]ParameterSchema `json:"parameters"`
-	ParameterSchema ParameterSchema            `json:"parameter_schema"`
-	Defaults        map[string]any             `json:"defaults"`
-	Async           bool                       `json:"async"`
-	Available       bool                       `json:"available"`
-	ReasonCode      string                     `json:"reason_code,omitempty"`
+	Driver             string                     `json:"driver"`
+	InputTypes         []string                   `json:"input_types"`
+	MaxImages          int                        `json:"max_images"`
+	MaxImageBytes      *int64                     `json:"max_image_bytes,omitempty"`
+	MaxTotalImageBytes *int64                     `json:"max_total_image_bytes,omitempty"`
+	MaxImagePixels     *int64                     `json:"max_image_pixels,omitempty"`
+	MaxVideos          int                        `json:"max_videos"`
+	Parameters         map[string]ParameterSchema `json:"parameters"`
+	ParameterSchema    ParameterSchema            `json:"parameter_schema"`
+	Defaults           map[string]any             `json:"defaults"`
+	Async              bool                       `json:"async"`
+	Available          bool                       `json:"available"`
+	ReasonCode         string                     `json:"reason_code,omitempty"`
 }
 type MediaModel struct {
 	ModelKey     string                         `json:"model_key"`

@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	fwmanifest "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
 	"io"
 	"io/fs"
 	"os"
@@ -132,10 +133,6 @@ func (b *Builder) Build(ctx context.Context, userOpts *Options) (*Result, error)
 	if opts.OutputDir == "" {
 		opts.OutputDir = filepath.Join(opts.EntryPath, ".px-plugin", "build")
 	}
-	if err := os.MkdirAll(opts.OutputDir, 0o755); err != nil {
-		return nil, fmt.Errorf("create build root: %w", err)
-	}
-
 	if opts.FrontendDir == "" {
 		opts.FrontendDir = filepath.Join(opts.EntryPath, "web-admin")
 	}
@@ -159,21 +156,33 @@ func (b *Builder) Build(ctx context.Context, userOpts *Options) (*Result, error)
 	if err != nil {
 		return nil, fmt.Errorf("load plugin manifest: %w", err)
 	}
+	if err := fwmanifest.ValidatePluginEnvironment(manifestFile.ID, os.Getenv); err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(opts.OutputDir, 0o755); err != nil {
+		return nil, fmt.Errorf("create build root: %w", err)
+	}
 	version := manifestFile.Version
 	if opts.VersionOverride != "" {
 		version = opts.VersionOverride
 	}
 
 	// 确保 Nuxt 构建使用插件前缀，避免产物引用宿主根路径的 /assets/**
-	if os.Getenv("NUXT_APP_BASE_URL") == "" {
-		_ = os.Setenv("NUXT_APP_BASE_URL", fmt.Sprintf("/_p/%s/admin/", manifestFile.ID))
-	}
-	// 默认作为宿主模式构建，便于复用宿主 token 与代理
-	if os.Getenv("POWERX_PROXY") == "" {
-		_ = os.Setenv("POWERX_PROXY", "1")
-	}
-	if os.Getenv("NUXT_PUBLIC_POWERX_PROXY") == "" {
-		_ = os.Setenv("NUXT_PUBLIC_POWERX_PROXY", "1")
+	for key, value := range map[string]string{"NUXT_APP_BASE_URL": fmt.Sprintf("/_p/%s/admin/", manifestFile.ID), "POWERX_PROXY": "1", "NUXT_PUBLIC_POWERX_PROXY": "1"} {
+		original, present := os.LookupEnv(key)
+		if original != "" {
+			continue
+		}
+		if err := os.Setenv(key, value); err != nil {
+			return nil, err
+		}
+		defer func(key, original string, present bool) {
+			if present {
+				_ = os.Setenv(key, original)
+			} else {
+				_ = os.Unsetenv(key)
+			}
+		}(key, original, present)
 	}
 
 	if err := ensureFileExists(opts.ManifestPath, "manifest.json", "run 'npm run sync:manifest' first"); err != nil {

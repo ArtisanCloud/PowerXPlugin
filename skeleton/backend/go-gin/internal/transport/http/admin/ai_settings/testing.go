@@ -21,6 +21,10 @@ func (h *Handler) invokeSettingTest(c *gin.Context) {
 		mediaFailure(c, &powerxai.HTTPError{StatusCode: 400, ReasonCode: "AI_REQUEST_INVALID"})
 		return
 	}
+	if req.Source == "powerx" && !h.isDelegated() {
+		mediaFailure(c, &powerxai.HTTPError{StatusCode: 409, ReasonCode: "AI_SETTINGS_RUNTIME_MISMATCH"})
+		return
+	}
 	if req.Modality != "llm" {
 		if _, ok := mediaCapability(req.Modality); !ok {
 			mediaFailure(c, &powerxai.HTTPError{StatusCode: 422, ReasonCode: "AI_MODEL_CAPABILITY_UNSUPPORTED"})

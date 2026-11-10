@@ -87,3 +87,7 @@ Admin 页面保留 `admin_user + user_jwt + RBAC`；服务客户端使用 API Ke
 5. 由运行进程管理者重新编译、重启 Core 后，用原始 API Key／STS 验证两个操作；记录实际版本／PID／发布时间和同租户同环境目录比较结果。受控测试与未加载新代码的旧进程不能标记为真实接通。
 
 2026-10-25 开发实例已完成 API Key 实测：原 Framework Host Key 两项 grant 均为 `granted`，两个操作返回 200、`core_internal`、无 fallback；与同租户 `dev` 管理页底层服务的 13 个 Provider（含名称、Apps）及 Ollama 完整 tag `qwen3:14b` 一致。STS 的授权、撤销与隔离通过受控集成测试，未将它标记为真实实例 STS 验收。详见 [验收记录](evidence/ai-settings-llm-catalog-validation-20261025.json)。
+
+## 管理页在线同步
+
+管理页新增「更新在线模型」，按 Provider 原生目录协议获取并保存租户范围快照。云 Provider 的本契约读取共用该快照，保持原有输出和授权边界；同步写入仅限用户管理员，不作为插件服务能力。操作方式及协议表见 [AI 在线模型目录](ai-online-model-catalog.md)。

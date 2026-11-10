@@ -24,7 +24,7 @@ func TestJSONAndSSEPreserveCoreReason(t *testing.T) {
 				}
 				var err error
 				if stream {
-					err = c.LLMStream(context.Background(), LLMStreamInput{}, func(LLMStreamEvent) error { return nil })
+					err = c.LLMStream(context.Background(), LLMStreamInput{LLMInvokeInput: LLMInvokeInput{ModelKey: "fixture-model", Inputs: []ContentItem{{Type: "text", Content: "fixture"}}}}, func(LLMStreamEvent) error { return nil })
 				} else {
 					var out any
 					err = c.doJSON(context.Background(), "GET", "/test", nil, &out)

@@ -3,6 +3,18 @@ import type { MediaModelOperation } from '@artisan-cloud/plugin-framework-client
 export const settingsMediaCapabilities: Record<string, string> = {
   vlm: 'vision_understanding', image: 'image_generation', video: 'video_generation', audio_tts: 'speech_synthesis',
 };
+export function settingsConnectionBlocked(input: {
+  ready: boolean; source: 'local' | 'powerx'; provider: string; endpoint: string;
+  adapterAvailable: boolean; providersReady: boolean;
+}): string {
+  if (!input.ready) return 'runtimePending';
+  if (!input.adapterAvailable) return 'probeUnavailable';
+  if (!input.providersReady) return 'modelUnavailable';
+  if (!input.provider) return 'providerRequired';
+  if (input.source === 'local' && input.provider !== 'ollama') return 'localProbeUnsupported';
+  if (input.source === 'local' && !input.endpoint.trim()) return 'localProfileRequired';
+  return '';
+}
 export function settingsTestBlocked(input: {
   ready: boolean; modality: string; delegated: boolean; source: string; modelKey: string;
   provider: string; endpoint: string; prompt: string; image: string; imageType: string;

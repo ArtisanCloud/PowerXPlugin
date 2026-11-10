@@ -468,7 +468,7 @@ class CapabilityService:
             namespace = candidate.rsplit(".", 1)[0] if "." in candidate else candidate
             break
         if not namespace:
-            namespace = "com.powerx.plugins.base"
+            namespace = "{{ .PluginID }}"
         return {
             "namespace": namespace,
             "sensitivity_options": ["low", "medium", "high"],

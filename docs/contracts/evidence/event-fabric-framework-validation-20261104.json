@@ -1,0 +1,175 @@
+{
+  "date": "2026-11-04T07:37:59.858188+00:00",
+  "application_contract": "event_fabric.service.v1",
+  "scope": "Framework source, isolated HTTP/SSE, SDK snapshot and generated plugin only",
+  "base_commit": "32aaf0bd33ecda9860384484b55aa1d092ad27fc",
+  "changes_committed": false,
+  "new_commit_sha": null,
+  "core_source": {
+    "application_contract": "event_fabric.service.v1",
+    "core_source": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/PowerX",
+    "core_base_commit": "a1956aa3601786ed05a59236477ed3a67cfc7a67",
+    "core_source_uncommitted": true,
+    "sha256": {
+      "event-fabric-service-v1.md": "2a1981f1cae670c7d8bafa8c7cb0cad13256d7c0d0728158dce750fe76e4f409",
+      "event-fabric-service-v1.openapi.yaml": "1741f98055c3156cb468a03cd64cc17c959bf940ed6415bef73117245913ae71",
+      "event-fabric-service-v1.proto": "57de55f4e1f8d4a0335eee2c8823294c31de61838ef1b413f2265aae3bd59879"
+    },
+    "framework_fixture": {
+      "owner": "Framework",
+      "file": "fixtures/event-fabric-service.v1.json",
+      "sha256": "b629376d8922eed1bddc30e66851d5d58efb0b27af8dad796a7bba43fe0a6f08"
+    },
+    "deployment_verified": false
+  },
+  "implementation": {
+    "sdk_package": "framework/backend/go/runtime/eventfabric",
+    "transport": "core_internal + SSE",
+    "host_outbox_adapter": "runtime/taskbus.HostProvider -> eventfabric.Runtime",
+    "stable_identity": "explicit event.ReliableIdentity; never derived from request/trace/payload",
+    "consumer": "Runtime.RunConsumer; caller commits business and dedupe atomically before returning nil",
+    "shutdown": "cancel subscriptions, requests, reconnects and cooperative business workers; wait for exit",
+    "proto": "pinned Core source plus generated Go messages/RPC declarations; no Host gRPC fallback"
+  },
+  "checks": {
+    "framework_race": {
+      "command": "go test -race -json ./runtime/eventfabric/... ./runtime/taskbus ./eventbridge ./runtime/powerx/hostcontract ./runtime/powerx/capability -count=1",
+      "passed_test_records": 76,
+      "packages": [
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/capability",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/hostcontract",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/taskbus",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/eventfabric"
+      ],
+      "failed": [],
+      "log": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-event-fabric-20261104-1603173e3816b935/framework-race.jsonl"
+    },
+    "framework_vet": "passed affected packages",
+    "skeleton_selected_race": "passed cmd/plugin internal/config internal/security tests/integration; HostTaskBus/ValidateTaskBus/EventBridge/RuntimeNamespacedEventBridge selection",
+    "skeleton_vet": "passed cmd/plugin internal/config internal/shared/app",
+    "cli_contract_export": "passed go test ./internal/contracts -count=1",
+    "template_sync": "passed node scripts/sync-templates.mjs --check",
+    "contract_consistency": "passed node scripts/contracts/validate-event-fabric.mjs",
+    "git_diff_check": "passed affected source files",
+    "embedded_inputs": "passed Git source selection checks for CLI contracts/templates and SDK Proto/testdata",
+    "generated_plugin": {
+      "path": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-event-fabric-20261104-1603173e3816b935/generated-consumer",
+      "go_work": "off",
+      "local_replace": false,
+      "shared_contracts": "passed",
+      "sdk_tests": "passed",
+      "backend_build": "passed"
+    }
+  },
+  "controlled_scenarios": {
+    "api_key_and_sts": "passed HTTP/SSE credential framing; no inbound Admin token forwarding or credential fallback",
+    "fixed_binding_and_prefix": "passed core_internal, configured prefix once, no WSBus/Admin/redirect fallback",
+    "publish_identity_and_envelope": "passed stable outbox IDs, version string 1, business and Core trace separation",
+    "response_incomplete_or_fallback": "explicit contract errors",
+    "delivery_scope": "reject foreign tenant/publisher/subscriber/topic and invalid receipt/deadline/version/attempt",
+    "sse": "multiline frames, EOF recovery, reconnect frames, bounded failures, error frames, cancellation",
+    "ack_nack": "typed result validation, stale receipt rejection, upstream status/code/trace/request/raw diagnostics",
+    "commit_then_ack_failure": "controlled handler committed once; 503 ACK uncertain retains receipt; duplicate delivery uses fixture business dedupe",
+    "revocation": "403 error frame stops reconnect; real live-grant revocation remains installed acceptance",
+    "shutdown": "runtime Close cancels and waits for cooperative handler/subscription",
+    "startup_configuration": "invalid URL, typed-nil credential provider and missing bindings fail; generated source_plugin defaults to current plugin identity"
+  },
+  "release": {
+    "application_contract": "event_fabric.service.v1",
+    "published": false,
+    "changes_committed": false,
+    "base_commit": "32aaf0bd33ecda9860384484b55aa1d092ad27fc",
+    "source_sha256": {
+      "go": "3ee2048cfb49538b4c4bffbbbf541e47c5e50e95d054f93026fde0f74d102d26",
+      "generator": "d2d6b61e749ab1175108753e3f9f6d62475ce364b2d465a0e066e231e741d387",
+      "contracts": "300692294515e2a290022335ad29085fbf18b721678b1d1bd3b1e3b6cba8b256"
+    },
+    "go_module": "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go",
+    "go_sdk_version": "v0.0.30-dev.eventfabric.3ee2048cfb49538b",
+    "go_proxy": "file:///private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-event-fabric-20261104-1603173e3816b935/go-proxy",
+    "go_checksums": {
+      "sum": "h1:libSVB0YPJ+tlj5/dBIVc96zcs3YaLf19faOYBaJd7A=",
+      "go_mod_sum": "h1:Xmb97ZEMwaN9kaz32/7GHXR/oQESdc3ILbiCtOHh+2w="
+    },
+    "generator_version": "v0.0.0-eventfabric.d2d6b61e749ab117",
+    "generator_binary": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-event-fabric-20261104-1603173e3816b935/px-plugin",
+    "bundle": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-event-fabric-20261104-1603173e3816b935",
+    "consumer": {
+      "path": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-event-fabric-20261104-1603173e3816b935/generated-consumer",
+      "go_work": "off",
+      "local_replace": false,
+      "shared_contracts": "passed",
+      "sdk_tests": "passed",
+      "backend_build": "passed"
+    },
+    "upgrade_command": "GOWORK=off GOPROXY=file:///private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-event-fabric-20261104-1603173e3816b935/go-proxy,https://proxy.golang.org,direct GONOSUMDB=github.com/ArtisanCloud/PowerXPlugin/framework/backend/go go get github.com/ArtisanCloud/PowerXPlugin/framework/backend/go@v0.0.30-dev.eventfabric.3ee2048cfb49538b",
+    "artifact_sha256": {
+      "px-plugin": "26db92c59819b61e0a5bd6a3e262555cf7b63749fbf2d1d021338cbd57f9ea13",
+      "go-proxy/github.com/!artisan!cloud/!power!x!plugin/framework/backend/go/@v/v0.0.30-dev.eventfabric.3ee2048cfb49538b.zip": "deda29b1a3ca316345ccc3e80e9edc07758f48c9806c517f84f30d40f25bc16e",
+      "generated-plugin": "8b539623a866f3088af10cc0ba2db33384d4af02644f69c36ae5f7ef8580153f"
+    },
+    "acceptance": {
+      "controlled_http_sse": true,
+      "live_core": false,
+      "live_scrm": false,
+      "migration_applied": false,
+      "grants_changed": false
+    },
+    "upgrade_steps": [
+      "go mod edit -dropreplace=github.com/ArtisanCloud/PowerXPlugin/framework/backend/go",
+      "GOWORK=off GOPROXY=file:///private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-event-fabric-20261104-1603173e3816b935/go-proxy,https://proxy.golang.org,direct GONOSUMDB=github.com/ArtisanCloud/PowerXPlugin/framework/backend/go go get github.com/ArtisanCloud/PowerXPlugin/framework/backend/go@v0.0.30-dev.eventfabric.3ee2048cfb49538b",
+      "GOWORK=off go list -m -json github.com/ArtisanCloud/PowerXPlugin/framework/backend/go"
+    ]
+  },
+  "language_matrix": {
+    "go": "implemented and controlled validation passed",
+    "skeleton_cli_templates": "implemented, exported and generated consumer built",
+    "nuxt": "not required for service event transport; no browser credential/consumer added",
+    "dotnet": "not implemented; excluded from full-language delivery"
+  },
+  "remaining_installed_acceptance": [
+    "Core formal claimed_by migration and preflight",
+    "Publish new capabilities and tenant registrations; capture active versions and catalog/protocol hashes",
+    "Exact plugin owner, service grants and topic ACL by environment owner",
+    "User restart of daily Core",
+    "SCRM upgrade pinned SDK and pass env.EventUUID/env.DedupeKey from existing decodeEvent into Event.Reliability",
+    "SCRM wire RunConsumer with production ApplyEventOnce and current endpoint/session permission checks",
+    "API Key and installed STS real end-to-end fanout, revocation, credential ownership and restart redelivery",
+    "Real messaging provider receive/reply only after runtime acceptance"
+  ],
+  "not_performed": {
+    "daily_database_migration": true,
+    "grants_or_acl_changes": true,
+    "daily_service_restart": true,
+    "core_source_edits": true,
+    "scrm_source_edits": true,
+    "external_publish_or_git_commit": true,
+    "full_repo_suite_claim": true,
+    "production_exactly_once_claim": true
+  },
+  "temporary_services": "Only httptest servers inside completed tests; no standalone service started",
+  "scrm_current_dependency": {
+    "observed_version": "v0.0.29-dev.pluginservice.ad2129efb4087712",
+    "observed_replace": "../../PowerXPlugin/framework/backend/go",
+    "updated_by_this_task": false,
+    "upgrade_steps": [
+      "go mod edit -dropreplace=github.com/ArtisanCloud/PowerXPlugin/framework/backend/go",
+      "GOWORK=off GOPROXY=file:///private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-event-fabric-20261104-1603173e3816b935/go-proxy,https://proxy.golang.org,direct GONOSUMDB=github.com/ArtisanCloud/PowerXPlugin/framework/backend/go go get github.com/ArtisanCloud/PowerXPlugin/framework/backend/go@v0.0.30-dev.eventfabric.3ee2048cfb49538b",
+      "GOWORK=off go list -m -json github.com/ArtisanCloud/PowerXPlugin/framework/backend/go"
+    ]
+  },
+  "artifact_log_sha256": {
+    "framework-race.jsonl": "da17ee6ac4762587b76bafc6b26ae0069f957730df36ae707371829ac6de8cd4",
+    "consumer-validation.log": "b7c32d29eaebcd5c081ae3a6b0ccabeeb799d60d1c3e62c6025290a13d86b7ed"
+  },
+  "snapshot_review": {
+    "current_eventfabric_and_transport_source_matches_snapshot": true,
+    "current_full_framework_source_matches_snapshot": false,
+    "parallel_changes_observed_after_packaging": [
+      "runtime/taskqueue/host_provider.go",
+      "runtime/taskqueue/reliability_test.go"
+    ],
+    "policy": "Preserved parallel changes. Deliver the immutable, independently built and tested snapshot; do not replace unrelated TaskQueue work."
+  }
+}

@@ -100,14 +100,20 @@ func newHostTaskBusProvider(cfg *config.Config, pxc *client.PowerXServiceClient)
 		}
 	}
 	hostCfg := fwtaskbus.HostProviderConfig{
-		BaseURL:        strings.TrimSpace(gateway.BaseURL),
-		APIPrefix:      strings.TrimSpace(gateway.APIPrefix),
-		AuthScheme:     strings.ToLower(strings.TrimSpace(gateway.AuthScheme)),
-		APIKey:         strings.TrimSpace(gateway.APIKey),
-		UserAgent:      strings.TrimSpace(gateway.UserAgent),
-		Timeout:        gateway.Timeout,
-		SourcePlugin:   strings.TrimSpace(eventCfg.SourcePlugin),
-		PayloadVersion: strings.TrimSpace(eventCfg.PayloadVersion),
+		BaseURL:          strings.TrimSpace(gateway.BaseURL),
+		TopicBindings:    eventCfg.TopicBindings,
+		PublishTopicKeys: append([]string(nil), eventCfg.PublishTopicKeys...),
+		ConsumeTopicKeys: append([]string(nil), eventCfg.ConsumeTopicKeys...),
+		APIPrefix:        strings.TrimSpace(gateway.APIPrefix),
+		AuthScheme:       strings.ToLower(strings.TrimSpace(gateway.AuthScheme)),
+		APIKey:           strings.TrimSpace(gateway.APIKey),
+		UserAgent:        strings.TrimSpace(gateway.UserAgent),
+		Timeout:          gateway.Timeout,
+		SourcePlugin:     strings.TrimSpace(eventCfg.SourcePlugin),
+		PayloadVersion:   strings.TrimSpace(eventCfg.PayloadVersion),
+	}
+	if cfg != nil && cfg.GRPCUpstream != nil {
+		hostCfg.TenantUUID = cfg.GRPCUpstream.TenantUUID
 	}
 	switch hostCfg.AuthScheme {
 	case "api_key", "api-key":

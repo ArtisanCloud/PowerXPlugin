@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { validateAIMediaV2Contracts } from './validate-ai-media-v2.mjs';
 
@@ -11,7 +12,7 @@ const authority = 'fixtures/capability-version-upgrade-errors.v1.json';
 function copyContracts(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-media-contract-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-  const files = ['ai-media-v2.md', 'ai-media-v2.openapi.yaml', 'ai-media-v2-source.json', 'fixtures/ai-media-v2.json', 'fixtures/ai-media-v2-registration.json', authority];
+  const files = ['ai-media-v2.md', 'ai-media-v2.openapi.yaml', 'ai-media-v2-source.json', 'fixtures/ai-media-v2.json', 'fixtures/ai-media-v2-registration.json', 'fixtures/ai-media-model-limits.v1.json', authority];
   for (const base of ['docs/contracts', 'tools/cli/internal/contracts/data/media-contracts']) {
     for (const file of files) {
       const dest = path.join(dir, base, file);
@@ -19,7 +20,7 @@ function copyContracts(t) {
       fs.copyFileSync(path.join(root, base, file), dest);
     }
   }
-  for (const file of ['ai-media-v2.json', 'ai-media-v2-registration.json', 'capability-version-upgrade-errors.v1.json']) {
+  for (const file of ['ai-media-v2.json', 'ai-media-v2-registration.json', 'ai-media-model-limits.v1.json', 'capability-version-upgrade-errors.v1.json']) {
     const base = 'framework/backend/go/runtime/powerx/ai/testdata';
     fs.mkdirSync(path.join(dir, base), { recursive: true });
     fs.copyFileSync(path.join(root, base, file), path.join(dir, base, file));
@@ -61,4 +62,25 @@ test('rejects synchronized registration copies with obsolete machine-code expect
     fs.writeFileSync(path.join(dir, dest, 'ai-media-v2-registration.json'), JSON.stringify(registration));
   }
   assert.throws(() => validateAIMediaV2Contracts(dir), /AI_MEDIA_UPGRADE_ERROR_CONTRACT_INVALID/);
+});
+
+test('rejects SDK model-limit fixture drift', t => {
+  const dir = copyContracts(t);
+  fs.appendFileSync(path.join(dir, 'framework/backend/go/runtime/powerx/ai/testdata/ai-media-model-limits.v1.json'), '\n');
+  assert.throws(() => validateAIMediaV2Contracts(dir), /AI_MEDIA_MODEL_LIMITS_SDK_MISMATCH/);
+});
+
+test('rejects synchronized fixtures that erase an explicit zero', t => {
+  const dir = copyContracts(t), file = 'fixtures/ai-media-model-limits.v1.json';
+  const sample = JSON.parse(fs.readFileSync(path.join(dir, 'docs/contracts', file)));
+  delete sample.cases.find(item => item.name === 'explicit_zero').limits.max_image_bytes;
+  const raw = Buffer.from(JSON.stringify(sample));
+  const pin = JSON.parse(fs.readFileSync(path.join(dir, 'docs/contracts/ai-media-v2-source.json')));
+  pin.framework_model_limits_fixture.sha256 = crypto.createHash('sha256').update(raw).digest('hex');
+  for (const base of ['docs/contracts', 'tools/cli/internal/contracts/data/media-contracts']) {
+    fs.writeFileSync(path.join(dir, base, file), raw);
+    fs.writeFileSync(path.join(dir, base, 'ai-media-v2-source.json'), JSON.stringify(pin));
+  }
+  fs.writeFileSync(path.join(dir, 'framework/backend/go/runtime/powerx/ai/testdata/ai-media-model-limits.v1.json'), raw);
+  assert.throws(() => validateAIMediaV2Contracts(dir), /AI_MEDIA_MODEL_LIMITS_FIXTURE_INVALID/);
 });

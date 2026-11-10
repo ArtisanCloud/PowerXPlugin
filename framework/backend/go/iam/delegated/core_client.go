@@ -334,15 +334,6 @@ func (c *CoreClient) ListPermissions(ctx context.Context, _ string) ([]contracts
 	}
 	return out.Items, nil
 }
-func (c *CoreClient) Authorize(ctx context.Context, in contracts.AuthorizationRequest) (*contracts.AuthorizationDecision, error) {
-	var out contracts.AuthorizationDecision
-	body := map[string]any{"member_uuid": in.MemberUUID, "user_uuid": in.UserUUID, "resource": in.Resource, "action": in.Action, "trace_id": in.TraceID}
-	if err := c.call(ctx, http.MethodPost, "/tenant/iam/authorization:check", body, &out, ""); err != nil {
-		return nil, err
-	}
-	out.Mode = string(contracts.IAMAdapterModeDelegated)
-	return &out, nil
-}
 func (c *CoreClient) ResolveIdentity(ctx context.Context, bearer string) (*contracts.IdentityContext, error) {
 	return nil, iamerrors.New(iamerrors.CodeIdentityMigrationRequired, iamerrors.CodeIdentityMigrationRequired)
 }

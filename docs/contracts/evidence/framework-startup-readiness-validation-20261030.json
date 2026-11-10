@@ -1,0 +1,118 @@
+{
+  "scope": "framework_skeleton_go_http_startup_readiness",
+  "status": "pass",
+  "verified_at": "2026-10-30T12:56:15.326627+00:00",
+  "powerx_reference": {
+    "path": "PowerX/backend/cmd/app/main.go",
+    "behavior": [
+      "report_after_successful_http_bind",
+      "terminal_stderr_independent_of_logging_sink_and_level",
+      "ready_time_duration_address",
+      "structured_startup_fields"
+    ]
+  },
+  "implementation": {
+    "timer_starts_at": "first_statement_in_plugin_main",
+    "ready_signal": "framework_bootstrap.App.OnHTTPReady",
+    "terminal": "stderr",
+    "default_locale": "zh-CN",
+    "locale_resources": [
+      "zh-CN",
+      "en"
+    ],
+    "structured_event": "plugin.http.ready",
+    "structured_message_code": "PLUGIN_HTTP_READY",
+    "fields": [
+      "module",
+      "event",
+      "plugin_id",
+      "mode",
+      "started_at",
+      "ready_at",
+      "startup_duration_ms",
+      "listen_addr",
+      "url"
+    ]
+  },
+  "checks": [
+    {
+      "cwd": "skeleton/backend/go-gin",
+      "command": "go test ./internal/observability/startup ./cmd/plugin",
+      "result": "pass"
+    },
+    {
+      "cwd": "skeleton/backend/go-gin",
+      "command": "go test -race ./internal/observability/startup ./cmd/plugin ./internal/logger",
+      "result": "pass"
+    },
+    {
+      "cwd": "skeleton/backend/go-gin",
+      "command": "go vet ./internal/observability/startup ./cmd/plugin",
+      "result": "pass"
+    },
+    {
+      "cwd": "framework/backend/go",
+      "command": "go test -race ./bootstrap",
+      "result": "pass"
+    },
+    {
+      "command": "node scripts/sync-templates.mjs --check",
+      "result": "pass"
+    },
+    {
+      "command": "go test ./tools/cli/internal/templates -run TestRenderAll_EmbeddedTemplatesParse -count=1",
+      "result": "pass"
+    },
+    {
+      "command": "PX_TEST_GENERATED_BUILD=1 PX_TEST_FRAMEWORK_SNAPSHOT=1 go test ./tools/cli/internal/templates -run '^TestGeneratedBackendBuild$' -count=1",
+      "result": "pass",
+      "consumer_gowork": "off",
+      "consumer_framework_source": "isolated_module_proxy_snapshot",
+      "consumer_local_replace": false
+    },
+    {
+      "command": "git diff --check",
+      "result": "pass"
+    }
+  ],
+  "behavior_verified": [
+    "terminal_visible_with_file_sink",
+    "terminal_visible_at_error_log_level",
+    "structured_event_obeys_log_level",
+    "startup_duration_and_timestamps_preserved",
+    "wildcard_bind_displayed_as_loopback_url",
+    "locale_resources_embedded",
+    "bind_conflict_does_not_report_success",
+    "successful_listener_serves_requests",
+    "single_ready_notice",
+    "terminal_write_failure_recorded",
+    "test_http_listener_released"
+  ],
+  "live_observation": {
+    "port": 8078,
+    "pid_before": 17712,
+    "pid_after": 17712,
+    "healthz_status_before_change": 200,
+    "current_startup_log_sink": "file",
+    "current_runtime_log": "skeleton/backend/go-gin/logs/runtime.log"
+  },
+  "boundaries": {
+    "user_services_restarted": false,
+    "user_database_modified": false,
+    "core_source_modified": false,
+    "sdk_public_api_changed": false,
+    "source_changes_committed": false,
+    "new_behavior_in_user_process": "pending_user_restart",
+    "grpc_and_background_worker_readiness_certified": false,
+    "go_run_compilation_time_included": false,
+    "protected_user_edits_unchanged": true
+  },
+  "source_sha256": {
+    "skeleton/backend/go-gin/cmd/plugin/main.go": "b0e17132bddf2198353ac8f1f20d2d93a8a510b8df5d3c063587640d2d4cd324",
+    "skeleton/backend/go-gin/internal/observability/startup/startup.go": "9101a001336efe3003d7c63a8ba0b57be9134e4c8d0d2a4073e890b6fc4598c8",
+    "skeleton/backend/go-gin/internal/observability/startup/locales/zh-CN.json": "634e08c91f389333bb759d82186c93598584ced40bb6fa371f49c06b0765e510",
+    "skeleton/backend/go-gin/internal/observability/startup/locales/en.json": "79870f765cb35e568704c40a893a666fbe4a214945088c796f1522d5c7e33536",
+    "scaffold/templates/backend/go-gin/cmd/plugin/main.go.tmpl": "c073db7fd1ee7670964e4058af7a7ab07666f14c3e9a25d8c62436c626fc6545",
+    "tools/cli/internal/templates/data/backend/go-gin/cmd/plugin/main.go.tmpl": "c073db7fd1ee7670964e4058af7a7ab07666f14c3e9a25d8c62436c626fc6545"
+  }
+}

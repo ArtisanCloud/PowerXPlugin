@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/event"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
@@ -20,15 +21,15 @@ func TestHostTaskBusPreservesExplicitAPIKey(t *testing.T) {
 				if r.Header.Get("Authorization") != "ApiKey fixture-key" {
 					t.Error("TASKBUS_AUTH_SCHEME_CHANGED")
 				}
-				_, _ = w.Write([]byte(`{"success":true,"data":{"ok":true}}`))
+				_, _ = w.Write([]byte(`{"code":200,"data":{"status":"completed","protocol_used":"core_internal","fallback_used":false,"result":{"contract_version":"event_fabric.service.v1","accepted":true,"event_id":"stable-event","trace_id":"core-trace"}}}`))
 			}))
 			defer server.Close()
-			cfg := &config.Config{Gateway: &config.GatewayConfig{BaseURL: server.URL, AuthScheme: "apikey", APIKey: "fixture-key"}, Context: &config.ContextConfig{ProviderMode: mode}}
+			cfg := &config.Config{Gateway: &config.GatewayConfig{BaseURL: server.URL, AuthScheme: "apikey", APIKey: "fixture-key"}, Context: &config.ContextConfig{ProviderMode: mode}, GRPCUpstream: &config.GRPCUpstream{TenantUUID: "00000000-0000-0000-0000-000000000001"}, EventBridge: &config.EventBridgeConfig{SourcePlugin: "com.powerx.plugins.fixture", TopicBindings: map[string]string{"fixture.event.v1": "00000000-0000-0000-0000-000000000001._topic.fixture.changed"}}}
 			emitter, err := newHostTaskBusProvider(cfg, nil).NewEmitter()
 			if err != nil {
 				t.Fatal(err)
 			}
-			err = emitter.Emit(context.Background(), event.Event{Topic: "fixture.event.v1", Meta: event.Meta{TenantUUID: "00000000-0000-0000-0000-000000000001", RequestID: "fixture-request", TraceID: "fixture-trace"}, Payload: json.RawMessage(`{}`)})
+			err = emitter.Emit(context.Background(), event.Event{Topic: "fixture.event.v1", Meta: event.Meta{TenantUUID: "00000000-0000-0000-0000-000000000001", RequestID: "fixture-request", TraceID: "fixture-trace", SourcePlugin: "com.powerx.plugins.fixture", PayloadVersion: "1", OccurredAt: time.Now()}, Payload: json.RawMessage(`{}`), Reliability: &event.ReliableIdentity{EventID: "stable-event", IdempotencyKey: "stable-key"}})
 			if err != nil || calls != 1 {
 				t.Fatal("TASKBUS_EXPLICIT_API_KEY_FAILED", err, calls)
 			}

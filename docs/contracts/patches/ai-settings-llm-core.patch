@@ -1,0 +1,189 @@
+--- a/backend/internal/service/ai/media_invoker.go
++++ b/backend/internal/service/ai/media_invoker.go
+@@ -7,6 +7,7 @@
+ 	"github.com/google/uuid"
+ 	"io"
+ 	"sort"
++	"strings"
+ 
+ 	"github.com/ArtisanCloud/PowerX/internal/server/agent/catalog"
+ 	cap "github.com/ArtisanCloud/PowerX/internal/service/capability_registry"
+@@ -22,6 +23,7 @@
+ 	Provider   string `json:"provider,omitempty"`
+ 	App        string `json:"app,omitempty"`
+ 	Capability string `json:"capability,omitempty"`
++	Modality   string `json:"modality,omitempty"`
+ }
+ type MediaInvokeOperation struct {
+ 	Operation       string         `json:"operation"`
+@@ -91,6 +93,12 @@
+ 		var op MediaCatalogOperation
+ 		if err := strictMediaBody(in.Body, &op); err != nil {
+ 			return nil, err
++		}
++		if strings.HasPrefix(op.Operation, "list_settings_") {
++			return i.settingsCatalog(ctx, in.CapabilityID, op)
++		}
++		if op.Modality != "" {
++			return nil, MediaError(400, "AI_OPERATION_INVALID")
+ 		}
+ 		if in.CapabilityID == "com.corex.ai.catalog.providers.read" {
+ 			if op.Operation != "list_providers" || op.Provider != "" || op.App != "" {
+--- /dev/null
++++ b/backend/internal/service/ai/settings_catalog.go
+@@ -0,0 +1,71 @@
++package ai
++
++import (
++	"context"
++	"strings"
++
++	"github.com/ArtisanCloud/PowerX/pkg/corex/iam/reqctx"
++)
++
++// settingsCatalog 复用底座 AI Settings 的目录服务；租户环境和连接信息
++// 只从底座配置解析，不接受调用方传入 endpoint、env 或凭据。
++func (i *MediaInvoker) settingsCatalog(ctx context.Context, capabilityID string, op MediaCatalogOperation) (map[string]any, error) {
++	providers := op.Operation == "list_settings_providers"
++	if op.Modality != "llm" || op.Capability != "" ||
++		(providers && (capabilityID != "com.corex.ai.catalog.providers.read" || op.Provider != "" || op.App != "")) ||
++		(!providers && (op.Operation != "list_settings_models" || capabilityID != MediaCatalogCapability || strings.TrimSpace(op.Provider) == "")) {
++		return nil, MediaError(400, "AI_OPERATION_INVALID")
++	}
++	s := i.Service.ai
++	tenant := reqctx.GetTenantUUID(ctx)
++	env, ok, err := s.ResolveTenantEnv(ctx, tenant)
++	if err != nil {
++		return nil, err
++	}
++	if !ok {
++		return nil, MediaError(409, "AI_ENV_NOT_CONFIGURED")
++	}
++	result := map[string]any{"contract_version": 1, "catalog_kind": "ai_settings", "env": env, "modality": "llm"}
++	list := s.settings.Providers("llm")
++	if providers {
++		items := make([]map[string]any, 0, len(list))
++		for _, provider := range list {
++			apps := make([]map[string]string, 0, len(provider.Apps))
++			for _, app := range provider.Apps {
++				apps = append(apps, map[string]string{"id": app.ID, "name": app.Name})
++			}
++			items = append(items, map[string]any{"id": provider.ID, "name": provider.Name, "apps": apps})
++		}
++		result["providers"] = items
++		return map[string]any{"result": result}, nil
++	}
++	found, appFound := false, op.App == ""
++	for _, provider := range list {
++		if provider.ID != op.Provider {
++			continue
++		}
++		found = true
++		for _, app := range provider.Apps {
++			if app.ID == op.App {
++				appFound = true
++			}
++		}
++	}
++	if !found || !appFound {
++		return nil, MediaError(422, "AI_MODEL_CAPABILITY_UNSUPPORTED")
++	}
++	models, err := s.settings.ModelsForTenant(ctx, env, &tenant, "llm", op.Provider, op.App, "")
++	if err != nil {
++		return nil, err
++	}
++	items := make([]map[string]string, 0, len(models))
++	for _, model := range models {
++		key := op.Provider + "/" + model
++		if op.App != "" {
++			key = op.Provider + "/" + op.App + ":" + model
++		}
++		items = append(items, map[string]string{"model_key": key, "provider": op.Provider, "model": model, "label": model})
++	}
++	result["provider"], result["app"], result["items"] = op.Provider, op.App, items
++	return map[string]any{"result": result}, nil
++}
+--- /dev/null
++++ b/backend/internal/service/ai/settings_catalog_test.go
+@@ -0,0 +1,67 @@
++package ai
++
++import (
++	"encoding/json"
++	"net/http"
++	"net/http/httptest"
++	"testing"
++
++	am "github.com/ArtisanCloud/PowerX/internal/server/agent/persistence/model"
++	cap "github.com/ArtisanCloud/PowerX/internal/service/capability_registry"
++	"github.com/stretchr/testify/require"
++	"gorm.io/datatypes"
++)
++
++func TestSettingsCatalogTypedBindingReadsAISettingsProviderService(t *testing.T) {
++	f := newMediaFixture(t)
++	i := &MediaInvoker{Service: f.s}
++	body := map[string]any{"operation": "list_settings_providers", "modality": "llm"}
++	input := cap.CoreCapabilityInvokeInput{CapabilityID: "com.corex.ai.catalog.providers.read", TenantUUID: mediaTestTenant, Method: "INVOKE", Endpoint: MediaCatalogEndpoint, Body: body, Payload: map[string]any{"body": body}}
++	out, err := i.InvokeCoreCapability(f.ctx, input)
++	require.NoError(t, err)
++	result := out["result"].(map[string]any)
++	require.Equal(t, "ai_settings", result["catalog_kind"])
++	require.Equal(t, "dev", result["env"])
++	expected := map[string]string{}
++	for _, p := range f.s.ai.settings.Providers("llm") {
++		expected[p.ID] = p.Name
++	}
++	actual := map[string]string{}
++	for _, p := range result["providers"].([]map[string]any) {
++		actual[p["id"].(string)] = p["name"].(string)
++	}
++	require.Equal(t, expected, actual)
++	body["env"] = "other-environment"
++	_, err = i.InvokeCoreCapability(f.ctx, input)
++	require.ErrorContains(t, err, "AI_OPERATION_INVALID")
++}
++
++func TestSettingsCatalogTypedBindingUsesCoreOllamaInstanceWithoutStaticFallback(t *testing.T) {
++	f := newMediaFixture(t)
++	status := http.StatusOK
++	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		w.WriteHeader(status)
++		if r.URL.Path == "/api/tags" {
++			_ = json.NewEncoder(w).Encode(map[string]any{"models": []map[string]string{{"name": "private-instance:14b"}}})
++		} else {
++			_ = json.NewEncoder(w).Encode(map[string]any{"capabilities": []string{"completion"}})
++		}
++	}))
++	defer server.Close()
++	require.NoError(t, f.s.ai.settings.SaveCredentialOnly(f.ctx, "dev", ptr(mediaTestTenant), &am.AIProviderCredential{Name: "dev-ollama", Provider: "ollama", Data: datatypes.JSONMap{"base_url": server.URL}}))
++	i := &MediaInvoker{Service: f.s}
++	body := map[string]any{"operation": "list_settings_models", "modality": "llm", "provider": "ollama", "app": ""}
++	input := cap.CoreCapabilityInvokeInput{CapabilityID: MediaCatalogCapability, TenantUUID: mediaTestTenant, Method: "INVOKE", Endpoint: MediaCatalogEndpoint, Body: body, Payload: map[string]any{"body": body}}
++	out, err := i.InvokeCoreCapability(f.ctx, input)
++	require.NoError(t, err)
++	items := out["result"].(map[string]any)["items"].([]map[string]string)
++	require.Equal(t, []map[string]string{{"model_key": "ollama/private-instance:14b", "provider": "ollama", "model": "private-instance:14b", "label": "private-instance:14b"}}, items)
++	status = http.StatusServiceUnavailable
++	out, err = i.InvokeCoreCapability(f.ctx, input)
++	require.Nil(t, out)
++	require.ErrorContains(t, err, "AI_MODEL_DISCOVERY_UPSTREAM_FAILED")
++	status = http.StatusOK
++	body["base_url"] = server.URL
++	_, err = i.InvokeCoreCapability(f.ctx, input)
++	require.ErrorContains(t, err, "AI_OPERATION_INVALID")
++}
+--- a/docs/contracts/ai-media-v2.openapi.yaml
++++ b/docs/contracts/ai-media-v2.openapi.yaml
+@@ -655,6 +655,11 @@
+           enum:
+           - list_models
+           - list_providers
++          - list_settings_providers
++          - list_settings_models
++        modality:
++          type: string
++          enum: [llm]
+         provider: *id001
+         app: *id001
+         capability:

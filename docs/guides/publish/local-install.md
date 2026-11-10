@@ -2,6 +2,8 @@
 
 本指南聚焦一件事：把**已经构建好的插件产物**安装到 PowerX 环境。
 
+市场发布规则统一见[开发者发布中心方案](../../marketplace/plugin-developer-publishing-center-plan.md)与[实现设计](../../marketplace/plugin-publisher-implementation.md)。本地安装不等于市场上传、审核或公开上架；新工具首期使用 dist/ZIP。Go `px-plugin dist` 当前只提示 experimental，当前 Go CLI 未注册 `pack` 子命令。
+
 插件项目如何实现 `make dist`、`make local-install`、`make local-reinstall`，以及 `dist/<version>` 必须长什么样，请先看实现规范：[Makefile 任务与构建说明](../../standards/powerx-plugin/developer/makefile_tasks.md)。本文只说明如何把已经构建好的 dist 安装到 PowerX。
 
 先区分几个常见命令（避免混淆）：
@@ -15,18 +17,18 @@
 - `make dist` / 手动构建：生成可安装产物目录。  
   适用场景：准备提测包、要交给 PowerX 安装。  
   不适用场景：只做本地热更新调试。
-- `px-plugin pack`：在 `dist` 基础上生成 `.pxp` 元数据包（校验/签名用途）。  
-  适用场景：需要签名、审计留痕、离线传输规范化。  
-  不适用场景：只追求最快安装验证。
+- `make package`：构建 dist 后生成 ZIP，可用于传输已构建产物。
+  注意该命令会重新构建，不代表市场上传或已有有效签名。
 - `POST /admin/plugins/install/local`：把产物真正安装到 PowerX（本文核心）。  
   适用场景：联调环境/测试环境/预发布环境安装验证。  
   不适用场景：仅在开发机本地跑服务。
 
-本文覆盖三种可用于安装的输入形态：
+本文覆盖两种实际运行产物输入形态：
 
-1. 构建后的 `dist/` 目录（解压即可运行）。
+1. 构建后的 `dist/` 目录，包含完整运行文件。
 2. 手工压缩包（`.zip/.tar.gz` 等）。
-3. `px-plugin pack` 生成的 `.pxp` 元数据包。
+
+旧 TypeScript `pack` 生成的 JSON 元数据不是完整运行包，不列为当前安装输入。其他 `.pxp` 容器必须按内容及对应宿主契约单独核对，不能仅凭后缀判断。
 
 ## 先选模式：你现在处于哪种场景
 
@@ -35,7 +37,7 @@
 | 日常开发联调（频繁改代码） | `px-plugin dev --watch` | 重点是“快速反馈”，不是部署；改代码后自动重载更高效。 |
 | 提测/联调环境验证（要模拟真实安装） | `make dist` + `/admin/plugins/install/local` | 重点是“验证可安装产物”；与线上安装路径一致，能提前暴露打包问题。 |
 | 内网/隔离网络交付 | 手工压缩包或拷贝 `dist/` | 重点是“可传输、可落地”；不依赖外网拉取。 |
-| 需要审计/签名留痕 | `dist` + `.pxp`（`px-plugin pack`） | 重点是“可追溯”；`.pxp` 提供额外校验元数据。 |
+| 需要审计/签名留痕 | 保存最终包 SHA256、来源和实际签名证据 | 摘要、后缀或签名占位不代表来源已验证；按真实策略验签。 |
 
 一句话区分：
 - `dev --watch`：开发模式（改代码快）。
@@ -43,14 +45,14 @@
 
 > ⚠️ 与 `px-plugin dev --watch` 不同，本地安装是“部署动作”，依赖 PowerX Admin API 写入插件运行目录，不会热重载源码。
 >
-> 🚧 当前 `px-plugin dist/pack` 仍会打印 “experimental” 提示；如果你使用现有 CLI，请优先按本文的 `make dist` 或“手动构建”步骤执行。
+> 当前 Go `px-plugin dist` 只输出 experimental 提示，Go CLI 没有 pack 子命令。构建运行产物请使用本文的 `make dist` 或手动构建步骤。
 
 ---
 
 ## 适用场景
 
 - 研发/测试团队需要在自建 PowerX 环境快速验证插件，而不希望走 Marketplace 提交流程。
-- 运维需要在隔离网络中手动安装 `.pxp` 包（或 dist 目录）并立即启用。
+- 运维需要在隔离网络中传输实际 ZIP 或 dist 目录，并在宿主显式安装及启用。
 - Marketplace 尚未接入，但 PowerX 的插件管理能力已经上线。
 
 ---
@@ -58,7 +60,7 @@
 ## 流程总览
 
 - **方案 A（推荐）**：构建 dist → 将 `dist/<version>` 拷贝到 PowerX → 调 `POST /admin/plugins/install/local` 安装 → 验证。
-- **方案 B（可选）**：在 dist 基础上额外生成 `.pxp` → 传输 `.pxp` → 在 PowerX 上解包成 dist 目录 → 再按方案 A 调用 Admin API。
+- **传输安装包**：生成并传输实际 ZIP 等受支持容器，在宿主按对应安装接口处理；不把旧 JSON 元数据包当作可解压运行包。
 - URL 模式（`/install/url`）和 `apiPrefix` 说明对两种方案都适用。
 
 > 重要：`install/local` 成功不等于插件已可用。`switch_version` 仍会执行进程启动与健康检查；若启动阶段（如 manifest 注册、权限格式、迁移）失败，最终仍会启用失败。发版前请先执行 `docs/guides/publish/preflight-checklist.md`。
@@ -277,7 +279,7 @@ VERSION=0.2.0 make dist
 make dist VERSION=0.1.0 DIST_DIR=dist/mac
 ```
 
-如需额外生成 `.pxp`，请跳转到「方案 B · 步骤 2」使用 `make pack`。
+如需压缩传输，可使用 `make package` 生成 ZIP；该命令会重新构建。新发布工具对冻结目录压缩一次的能力尚待实现。
 
 `make dist` 当前默认执行 `go build`（本机平台）+ `nuxi build`，并将产物归档到 `dist/`；不会自动执行 `npm install`。若依赖未安装，请先按“步骤 1：准备依赖”完成安装。若你的项目尚未集成 Makefile，可先运行下方“手动构建”步骤再回到这里。
 
@@ -330,77 +332,13 @@ cp config/event_fabric.yaml dist/config/
 
 ---
 
-## 方案 B：`.pxp` + dist 解包（可选）
+## 传输包与旧元数据示例边界
 
-如果你需要在 PowerX Marketplace 或离线审核链路中保留完整的签名/完整性信息，可以在完成 dist 之后再执行这一路径。`.pxp` **不会取代** dist，只是附加的校验材料；如果只想快速安装，可跳回方案 A。
+旧文档中的 `px-plugin pack`、PEM 封装及 JSON `.pxp` 示例不作为当前 Go CLI 操作步骤。Go CLI 未注册 pack 命令，Go dist 仅有 experimental 提示；Makefile 的旧 pack 规则不能代替真实文件容器、正式签名或市场上传。
 
-### 步骤 1：使用 CLI 生成 `.pxp`（规划中）
+本指南使用已经构建好的 dist 目录，或对应宿主明确支持的实际 ZIP/TAR 文件。包必须包含运行所需文件，接收方复算摘要并核对 manifest 入口；不能对 JSON 元数据执行 unzip 并宣称得到运行时。
 
-Go 版本 CLI 已提供 `px-plugin dist`/`px-plugin pack` 子命令，但目前仍是 “experimental” 占位（见 `tools/cli/cmd/dist.go`, `package.go`）。Phase 14 将把 TypeScript 的打包逻辑迁移到 Go CLI，届时命令形态如下：
-
-```
-px-plugin dist \
-  --manifest ./dist/manifest.json \
-  --artefact ./dist/backend \
-  --artefact ./dist/web-admin \
-  --output-dir ./artifacts \
-  --marketplace-public-key ./certs/marketplace.pem \
-  --key-id marketplace-dev
-
-px-plugin pack --manifest ./dist/manifest.json --artefact ./dist --output-dir ./artifacts
-```
-
-生成结果包含：
-- `${pluginId}-${version}.pxp`
-- `integrity.txt`
-- `report.json`
-- `manifest.signature`
-
-### 步骤 2：使用 Makefile 生成 `.pxp`
-
-当 Phase 14 的 Makefile 集成完成后，可直接运行：
-
-```bash
-make pack KEY_ID=marketplace-dev PUBLIC_KEY=./keys/marketplace.pem
-```
-
-脚本内部会调用 `px-plugin pack` 并把 `.pxp` 与配套校验文件放到 `dist/artifacts/`。运行该命令不会动 `dist/<version>/` 里的运行时代码，典型输出包括：
-
-- `dist/artifacts/<pluginId>-<version>.pxp`
-- `dist/artifacts/integrity.txt`
-- `dist/artifacts/manifest.signature`
-- `dist/artifacts/report.json`
-
-> `.pxp` 只是带签名/校验信息的元数据包，不要把它塞进 `dist/<version>` 的运行目录；PowerX 仍然直接读取 `dist/<version>/backend/bin/plugin`、`dist/<version>/backend/bin/migrate`、`dist/<version>/web-admin/.output` 等运行产物。
-
-#### 准备 `./keys/marketplace.pem`
-
-`PUBLIC_KEY` 应指向一份 PEM（`-----BEGIN PUBLIC KEY-----` 或证书）文件，`px-plugin pack` 会使用它封装 `.pxp` 内部的对称密钥。通常把该文件放在仓库根目录 `keys/` 下，并通过 `.gitignore` 排除。
-
-1. **使用官方 Marketplace 公钥（推荐）**
-   ```bash
-   mkdir -p keys
-   cp ~/Downloads/marketplace-dev.pem ./keys/marketplace.pem
-   ```
-   拿到的是 `.crt` 时，可执行 `openssl x509 -pubkey -noout -in marketplace.crt > ./keys/marketplace.pem` 提取纯公钥。
-
-2. **仅供本地验证的自签名公钥**
-   ```bash
-   mkdir -p keys
-   openssl genrsa -out ./keys/marketplace-dev.key 2048
-   openssl req -new -x509 -key ./keys/marketplace-dev.key \
-     -subj "/CN=marketplace-dev" -days 365 \
-     -out ./keys/marketplace-dev.crt
-   openssl x509 -pubkey -noout -in ./keys/marketplace-dev.crt \
-     > ./keys/marketplace.pem
-   ```
-   请勿把测试密钥用于生产；生产环境必须使用官方下发的公钥或受信任 CA 证书。
-
-若本地环境尚未升级，可暂时跳过 `.pxp` 步骤，只保留 dist 即可完成 local install。
-
-> 当前实现中 `.pxp` 仍是 JSON 元数据，不包含真实文件。无论是否生成 `.pxp`，PowerX 都必须能读到 dist 目录或已解包的文件。
-
----
+## 已构建产物的传输与宿主安装
 
 ### 步骤 4：传输 dist 目录（可选）
 
@@ -491,7 +429,7 @@ curl -X POST "$API_BASE/admin/plugins/install/url" \
 ```
 
 - `sha256` 可选，提供时 PowerX 会校验包体完整性。
-- `.pxp` 目前仍需在服务器侧解包后才能运行；此模式主要方便上传存档，安装逻辑仍复用 `InstallFromFile`。
+- 容器格式及 URL 安装能力以目标宿主实际支持为准；旧 JSON 元数据不能作为可解压安装包。
 
 ### 步骤 7：关于 `apiPrefix`
 
@@ -499,41 +437,6 @@ curl -X POST "$API_BASE/admin/plugins/install/url" \
 
 - 默认：`server.apiPrefix: /api`，API 地址为 `https://<host>/api/admin/plugins/install/local`。
 - 如果设为 `/api/v1`，需要改成 `https://<host>/api/v1/admin/plugins/install/local`。`px-plugin dev --watch` 的 Dev API 也需保持一致前缀。
-
----
-
-### 步骤 3：传输 `.pxp`
-
-```bash
-aws s3 cp dist/artifacts/com.powerx.helloworld-0.1.0.pxp s3://internal-artifacts/
-# 或
-scp dist/artifacts/com.powerx.helloworld-0.1.0.pxp powerx-admin:/opt/powerx/uploads/
-```
-
-### 步骤 4：在 PowerX 解包并调用 local install
-
-```bash
-make local-install-pxp \
-  PACKAGE=./dist/artifacts/com.powerx.helloworld-0.1.0.pxp \
-  API_BASE=https://dev-api.powerx.local/api/v1 \
-  TOKEN=eyJhbGciOi...
-```
-
-或手工：
-
-```bash
-mkdir -p /tmp/pxp && unzip com.powerx.helloworld-0.1.0.pxp -d /tmp/pxp
-curl -X POST "$API_BASE/admin/plugins/install/local" \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-        "src_dir": "/tmp/pxp/com.powerx.helloworld-0.1.0",
-        "enable": false,
-        "force": false
-      }'
-```
-
-> 解包后若目录结构不同，请确保 `src_dir` 指向含有 `plugin.yaml`、`backend/bin/plugin`、`web-admin/.output` 的根，随后重复方案 A 的验证/启用步骤。
 
 ---
 
@@ -570,12 +473,12 @@ curl -H "Authorization: Bearer $ADMIN_TOKEN" \
 | 版本已存在 | 若只是想覆盖当前版本，传 `force=true`；否则建议 bump `plugin.yaml` 里的 `version`。 |
 | `lifecycle_error: enable: already_enabled` | 说明旧版本仍是 enabled。先用 `ENABLE=false FORCE=true` 覆盖安装，再调用版本切换/启用接口。 |
 | 想“一条命令重装并启用新版本” | 使用 `make skeleton-reinstall VERSION=<target>`（内部执行 disable -> force install(enable=false) -> switch_version(enable=true)）。 |
-| `.pxp` 无法直接运行 | 目前 `.pxp` 只包含 manifest/integrity/audit 信息，仍需解包后把 dist 目录传给 `install/local`。后续计划由 PowerX 直接解析 `.pxp`。 |
+| 包无法解压或缺少运行文件 | 核对实际容器和 manifest 入口；旧 JSON 元数据不能代替完整 dist/ZIP，后缀不作为格式证明。 |
 | 与 `px-plugin dev --watch` 混淆 | `dev --watch` 通过 Dev API 注册临时会话，关闭终端即销毁。Local install 则写入正式的插件版本，需显式卸载或切换版本。 |
 
 ---
 
 ## 7. 下一步
 
-- 完成本地安装后，建议回到《[离线发布指南](./offline.md)》了解 `.pxp` 在 Marketplace 审核链路中的用法。
+- 离线产物和市场发布边界见[离线产物指南](offline.md)，真实上传及审核见[在线发布指南](online.md)。
 - 如需自动化，可参考即将上线的 `make local-install`、`make local-install-pxp` 目标，把上述 curl 调用写入 CI/CD。完成后请在 `docs/guides/publish/online.md` 记录你的实践经验。 

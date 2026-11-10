@@ -2,7 +2,6 @@ package ai
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -10,6 +9,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/hostcontract"
 )
 
 type LLMStreamEvent struct {
@@ -26,11 +27,15 @@ type LLMStreamEvent struct {
 type LLMStreamInput struct {
 	LLMInvokeInput
 	IncludeUsage bool
+	Environment  string
 }
 
 func (c *Client) LLMStream(ctx context.Context, input LLMStreamInput, onEvent func(LLMStreamEvent) error) error {
 	if c == nil || c.http == nil || c.authorization == nil {
-		return errors.New("powerx ai client is not configured")
+		return errors.New("AI_STREAM_UNAVAILABLE")
+	}
+	if strings.TrimSpace(input.ModelKey) == "" || len(input.Inputs) == 0 || onEvent == nil {
+		return errors.New("AI_STREAM_INVALID_ARGUMENT")
 	}
 	body := struct {
 		ModelKey      string         `json:"model_key"`
@@ -41,31 +46,63 @@ func (c *Client) LLMStream(ctx context.Context, input LLMStreamInput, onEvent fu
 		} `json:"stream_options"`
 	}{ModelKey: input.ModelKey, Inputs: input.Inputs, Params: input.Params}
 	body.StreamOptions.IncludeUsage = input.IncludeUsage
-	raw, err := json.Marshal(body)
+	complete := false
+	err := hostcontract.InvokeStream(ctx, hostcontract.StreamTransport{BaseURL: c.baseURL, APIPrefix: c.apiPrefix, Client: c.http, Authorization: c.authorization.Authorization, Timeout: c.streamTimeout}, hostcontract.StreamInput{CapabilityID: "com.corex.ai.llm.stream", PreferredProtocol: "core_internal", Environment: input.Environment, Body: body}, func(event hostcontract.StreamEvent) error {
+		if complete {
+			return errors.New("AI_STREAM_RESPONSE_INVALID")
+		}
+		switch event.Event {
+		case "start", "delta", "usage", "done", "error":
+		default:
+			return errors.New("AI_STREAM_RESPONSE_INVALID")
+		}
+		var payload struct {
+			OK           bool   `json:"ok"`
+			TraceID      string `json:"traceId"`
+			Delta        string `json:"delta"`
+			Index        int    `json:"index"`
+			Text         string `json:"text"`
+			FinishReason string `json:"finish_reason"`
+			Code         string `json:"code"`
+			Message      string `json:"message"`
+		}
+		if json.Unmarshal([]byte(event.Data), &payload) != nil {
+			return errors.New("AI_STREAM_RESPONSE_INVALID")
+		}
+		trace := payload.TraceID
+		if trace == "" {
+			trace = event.TraceID
+		}
+		kind := event.Event
+		if kind == "done" {
+			if !payload.OK {
+				return errors.New("AI_STREAM_RESPONSE_INVALID")
+			}
+			kind = "final"
+			complete = true
+		}
+		if err := onEvent(LLMStreamEvent{Type: kind, TraceID: trace, Delta: payload.Delta, Index: payload.Index, Text: payload.Text, FinishReason: payload.FinishReason, Code: payload.Code, Message: payload.Message}); err != nil {
+			return err
+		}
+		if event.Event == "error" {
+			return errors.New("AI_STREAM_FAILED")
+		}
+		if event.Event == "done" {
+			return onEvent(LLMStreamEvent{Type: "end", TraceID: trace, FinishReason: payload.FinishReason})
+		}
+		return nil
+	})
+	var failure *hostcontract.InvocationFailure
+	if errors.As(err, &failure) {
+		return &HTTPError{StatusCode: failure.StatusCode, ErrorCode: failure.ErrorCode, ReasonCode: failure.ReasonCode, TraceID: failure.TraceID, RequestID: failure.RequestID, Details: failure.Details.Map()}
+	}
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/api/v1/ai/llm/stream", bytes.NewReader(raw))
-	if err != nil {
-		return err
+	if !complete {
+		return errors.New("AI_STREAM_INCOMPLETE")
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "text/event-stream")
-	authorization, err := c.authorization.Authorization(ctx)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Authorization", authorization)
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-		return DecodeHTTPError(resp.StatusCode, resp.Header, raw)
-	}
-	return decodeLLMSSE(resp.Body, onEvent)
+	return nil
 }
 
 func (c *Client) LLMSessionStream(ctx context.Context, sessionID string, onEvent func(LLMStreamEvent) error) error {

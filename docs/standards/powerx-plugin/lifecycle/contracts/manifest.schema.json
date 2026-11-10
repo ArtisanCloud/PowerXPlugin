@@ -80,7 +80,10 @@
     },
     "id": {
       "type": "string",
-      "pattern": "^com\\.powerx\\.plugin\\.[a-z0-9\\-]+$"
+      "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$",
+      "not": {
+        "pattern": "^com\\.powerx\\.plugin(?:\\.|$)|^com\\.powerx\\.plugins$|[^a-z0-9.-]"
+      }
     },
     "name": {
       "type": "string",

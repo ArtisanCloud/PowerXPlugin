@@ -18,7 +18,9 @@
 | `ListDepartments` | 凭证 tenant | UUID 部门目录 | `IAM_FORBIDDEN`、`IAM_UPSTREAM_DEPENDENCY` |
 | `ListRoles` | 凭证 tenant | UUID 角色目录 | `IAM_FORBIDDEN`、`IAM_UPSTREAM_DEPENDENCY` |
 | `ListPermissions` | 凭证 tenant | UUID 权限目录 | `IAM_FORBIDDEN`、`IAM_UPSTREAM_DEPENDENCY` |
-| `AuthorizationCheck` | `member_uuid`/`user_uuid`、正式 resource/action | `allowed` 与稳定 `reason_code` | 身份/调用者失败为 401/403；业务拒绝为 `200 allowed:false` |
+| `AuthorizationCheck` | `member_uuid`/`user_uuid`、插件 ID 与正式权限码；Core 的 `iam.member/read` 保留 | 带主体与权限范围的 `allowed`、稳定 `reason_code` | 身份/调用者失败为 401/403；业务拒绝为 `200 allowed:false` |
+
+插件权限查询的当前合同、字段校验、运行时接线和联调边界见 [Framework 对齐说明](plugin-authorization-framework.md) 与 [Core 权威合同](plugin-service-authorization.md)。插件查询必须显式传入 `plugin_id` 和 `permission_code`；可选 resource/action 仅作一致性核对，不用于推导插件或业务权限码。
 
 Core 尚未发布分页 `ListMembers` 或 tenant metadata 读取接口；delegated adapter 对这两项必须明确返回依赖能力未配置，不能返回空集合。
 

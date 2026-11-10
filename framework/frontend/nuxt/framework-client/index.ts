@@ -1,6 +1,6 @@
 export { usePluginApi } from "./api";
 export type { PluginApi, PluginApiOptions } from "./api";
-export { classifyPowerXApiAuthError, readPowerXApiErrorCode } from './api-errors';
+export { classifyPowerXApiAuthError, readPowerXApiErrorCode, readPowerXFailure, isPowerXSessionInvalidFrame } from './api-errors';
 export type { PowerXApiErrorResponse, PowerXApiAuthError, PowerXApiAuthErrorKind } from './api-errors';
 export {
   exitPowerXHostFullscreen,
@@ -8,6 +8,7 @@ export {
   PowerXBridgeClient,
   requestPowerXHostFullscreen,
   requestPowerXHostAuthToken,
+  reportPowerXHostSessionInvalid,
   togglePowerXHostFullscreen,
 } from "./bridge";
 export type {
@@ -23,9 +24,9 @@ export type {
   PowerXThemeKey,
 } from "./bridge";
 export { getPowerXFrameBridge, isPowerXEmbedded } from './bridge';
-export type { PowerXAuthMessage, PowerXAuthClearedPayload, PowerXFrameBridgeClient, PowerXNavigationRequest } from './bridge';
-export { getPowerXHostSession, PowerXHostSession, PowerXHostSessionError, normalizeBearerToken } from './host-session';
-export type { PowerXHostIdentity, PowerXHostSessionSnapshot, PowerXHostSessionState, PowerXHostSessionAdapter, HostSessionStatus } from './host-session';
+export type { PowerXAuthMessage, PowerXAuthClearedPayload, PowerXFrameBridgeClient, PowerXNavigationRequest, PowerXSessionInvalidReport } from './bridge';
+export { getPowerXHostSession, PowerXHostSession, PowerXHostSessionError, PowerXHostContextError, normalizeBearerToken } from './host-session';
+export type { PowerXHostIdentity, PowerXHostSessionSnapshot, PowerXHostSessionState, PowerXHostSessionAdapter, HostSessionStatus, HostSessionClearScope } from './host-session';
 export { createPowerXRouterNavigator, resolvePowerXRouterPath } from './navigation';
 export type { PowerXRouterAdapter } from './navigation';
 export {
@@ -96,3 +97,6 @@ export { createImageDerivativesClient, validateImageDerivatives, findImageDeriva
 export type { ImageDerivatives, ImageDerivativeItem, ImageDerivativeStatus, ImageDerivativesClientOptions, ImageDerivativeWatchOptions } from './image-derivatives';
 export { businessNotificationCardContract, businessNotificationCardContractV2, validateBusinessCardPresentation, upsertNotificationByRevision } from './notifications';
 export type { BusinessCardReference, BusinessCardPresentation, BusinessCardPresentationV2, BusinessCardPresentationSnapshot, CardRendition, CardRenditionStatus, BusinessCardPresentationSource, NotificationNavigation, NotificationAction, NotificationPayload, NotificationUpdatedEvent, NotificationReadReceiptInput, NotificationReadReceipt, InvalidateCardInput, InvalidateCardResult } from './notifications';
+
+export * from './ai-connection';
+export * from './ai-model-catalog';

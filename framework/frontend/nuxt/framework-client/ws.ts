@@ -1,5 +1,6 @@
 import { getPowerXHostSession, PowerXHostSessionError } from './host-session';
 import { isPowerXEmbedded } from './bridge';
+import { isPowerXSessionInvalidFrame } from './api-errors';
 export interface PluginWsOptions {
   pluginId: string;
   apiBaseURL?: string;
@@ -10,6 +11,7 @@ export interface PluginWsOptions {
   token?: string;
   tenantUuid?: string;
   memberUuid?: string;
+  onSessionError?: (error: unknown) => void;
 }
 
 export interface PluginWsClient {
@@ -130,12 +132,25 @@ export function createPluginWsClient(options: PluginWsOptions): PluginWsClient {
   return {
     buildURL,
     connect: () => {
+      const session = isPowerXEmbedded(options.insidePowerX) ? getPowerXHostSession(options.pluginId) : null;
+      const snapshot = session?.getReadySnapshot();
       const socket = new WebSocket(buildURL());
-      if (isPowerXEmbedded(options.insidePowerX)) {
-        const session = getPowerXHostSession(options.pluginId);
-        const snapshot = session.getReadySnapshot()!;
-        const unsubscribe = session.subscribe(() => { if (!session.isCurrent(snapshot)) { socket.close(1000, 'AUTH_SESSION_CHANGED'); unsubscribe(); } });
-        socket.addEventListener('close', unsubscribe, { once: true });
+      if (session && snapshot) {
+        const invalid = (event: MessageEvent) => {
+          if (!session.isCurrent(snapshot)) return;
+          let payload: any;
+          try { payload = JSON.parse(String(event.data)); } catch { return; }
+          if (payload?.type !== 'error' || !isPowerXSessionInvalidFrame(payload)) return;
+          event.stopImmediatePropagation?.();
+          try { session.reportSessionInvalid(snapshot, 'IAM_CONTEXT_USER_SESSION_INVALID'); }
+          catch (error) { options.onSessionError?.(error); }
+        };
+        socket.addEventListener('message', invalid);
+        let unsubscribe = () => {};
+        let closed = false;
+        socket.addEventListener('close', () => { closed = true; unsubscribe(); socket.removeEventListener('message', invalid); }, { once: true });
+        unsubscribe = session.subscribe(() => { if (!session.isCurrent(snapshot)) socket.close(1000, 'AUTH_SESSION_CHANGED'); });
+        if (closed) unsubscribe();
       }
       return socket;
     },
@@ -360,9 +375,15 @@ export function createPluginWsBusClient(
     ws.onmessage = (event) => {
       if (hostSnapshot && !hostSession!.isCurrent(hostSnapshot)) return;
       if (!event?.data) return;
-      try {
-        const msg = JSON.parse(String(event.data)) as PluginWsBusMessage;
+      let msg: PluginWsBusMessage;
+      try { msg = JSON.parse(String(event.data)) as PluginWsBusMessage; } catch { return; }
+      {
         const msgType = String(msg?.type || "").toLowerCase();
+        if (msgType === 'error' && hostSession && hostSnapshot && isPowerXSessionInvalidFrame(msg)) {
+          try { hostSession.reportSessionInvalid(hostSnapshot, 'IAM_CONTEXT_USER_SESSION_INVALID'); }
+          catch (error) { state.status = 'error'; emitStatus(); options.onSessionError?.(error); }
+          return;
+        }
         logInfo("inbound", {
           type: msgType || "unknown",
           topic: String(msg?.topic || "").trim(),
@@ -400,8 +421,6 @@ export function createPluginWsBusClient(
           emitStatus();
         }
         options.onEvent?.(msg);
-      } catch {
-        // Ignore malformed payloads from custom gateways.
       }
     };
   };

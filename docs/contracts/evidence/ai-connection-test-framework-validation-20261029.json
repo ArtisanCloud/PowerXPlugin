@@ -1,0 +1,248 @@
+{
+  "checked_at": "2026-10-29T04:29:02.005525+00:00",
+  "status": "FRAMEWORK_CONTROLLED_VALIDATION_PASSED_LIVE_INSTALLATION_PENDING",
+  "framework_base_commit": "32aaf0bd33ecda9860384484b55aa1d092ad27fc",
+  "changes_committed": false,
+  "published": false,
+  "core_contract_source": {
+    "source_repository": "ArtisanCloud/PowerX",
+    "source_commit": "97ae4d43e0d0e48516d8ffe46bbd7bc388aab0ad",
+    "source_worktree_uncommitted": true,
+    "snapshot_date": "2026-10-29",
+    "sha256": {
+      "ai-settings-connection-test.md": "a5669058c84a150a1d0eef12a95f6ea25a883dfd59d0c0ac7d527df5c24403bc",
+      "ai-connection-test.v1.openapi.yaml": "a34a629f64122d1bc606e7769f0de10716afadf42b2691355e29c517c5e59a3c",
+      "fixtures/ai-connection-test.v1.json": "6c1097684fef0d9bad5d775f59de38dcc3e262c3b4e1c96691b373832dbd76b7"
+    }
+  },
+  "binding": {
+    "capability_id": "com.corex.ai.connection.test",
+    "preferred_protocol": "core_internal",
+    "method": "INVOKE",
+    "endpoint": "core://ai/connection",
+    "operation": "test_connection",
+    "actor": "service_actor",
+    "contract_version": 1,
+    "fallback_allowed": false
+  },
+  "implemented": {
+    "go_sdk": "passed",
+    "skeleton_runtime_and_http_bridge": "passed",
+    "nuxt_client_and_settings_page": "passed",
+    "manifest_required_capability": "passed",
+    "scaffold_and_embedded_cli_templates": "passed",
+    "cli_exported_contracts": "passed",
+    "dotnet": "not_implemented_not_counted_as_delivered"
+  },
+  "tests": {
+    "go": {
+      "status": "passed",
+      "packages": 7,
+      "passed_test_events_including_subtests": 153,
+      "targets": [
+        "./framework/backend/go/runtime/aisettings",
+        "./skeleton/backend/go-gin/internal/services/runtimeexample",
+        "./skeleton/backend/go-gin/internal/services/ai_settings",
+        "./skeleton/backend/go-gin/internal/transport/http/admin/ai_settings",
+        "./tools/cli/internal/contracts",
+        "./tools/cli/internal/templates",
+        "./skeleton/backend/go-gin/cmd/plugin"
+      ]
+    },
+    "race": {
+      "status": "passed",
+      "packages": 4,
+      "targets": [
+        "./framework/backend/go/runtime/aisettings",
+        "./skeleton/backend/go-gin/internal/services/runtimeexample",
+        "./skeleton/backend/go-gin/internal/services/ai_settings",
+        "./skeleton/backend/go-gin/internal/transport/http/admin/ai_settings"
+      ]
+    },
+    "vet": {
+      "status": "passed",
+      "packages": 4
+    },
+    "frontend_unit": {
+      "status": "passed",
+      "files": 3,
+      "tests": 14
+    },
+    "typescript_strict": "passed",
+    "nuxt_build": "passed",
+    "root_npm_test": "passed",
+    "template_consistency": "passed",
+    "browser": {
+      "status": "passed",
+      "cases": 20,
+      "backend": "controlled_api_fixtures",
+      "path": "/_p/com.powerx.plugins.base/admin/settings/ai-settings",
+      "themes": [
+        "light",
+        "dark"
+      ],
+      "system_themes": [
+        "light",
+        "dark"
+      ],
+      "viewports": [
+        [
+          1440,
+          1000
+        ],
+        [
+          390,
+          844
+        ]
+      ],
+      "theme_viewport_combinations": 8,
+      "contrast_threshold": 4.5,
+      "contrast_states": [
+        "default",
+        "hover",
+        "focus",
+        "disabled"
+      ],
+      "cases_cover": [
+        "local_business_runtime_powerx_probe_without_model_or_prompt",
+        "provider_probe_after_model_discovery_failure",
+        "authorization_failure_and_explicit_retry",
+        "zero_generation_and_zero_save_requests_from_probe",
+        "distinct_trial_failure_and_connection_result",
+        "draft_preservation_across_sections_scopes_and_narrow_navigation",
+        "typed_tasks_and_idempotent_trial_retries",
+        "catalog_contract_failure_visibility",
+        "vlm_analysis_and_image_requirements"
+      ]
+    },
+    "api_key_and_sts": {
+      "status": "controlled_http_passed",
+      "api_prefixes": [
+        "/api/v1",
+        "/custom/v2"
+      ],
+      "assertions": [
+        "authoritative_typed_fixture_body",
+        "core_internal_completed_no_fallback",
+        "optional_native_model_not_opaque_model_key",
+        "missing_fields_and_generation_claims_rejected",
+        "upstream_status_machine_codes_details_trace_request_id_and_raw_body_preserved",
+        "single_request_no_automatic_retry"
+      ]
+    },
+    "local_ollama_probe": {
+      "status": "controlled_http_passed",
+      "method": "GET",
+      "path": "/api/tags",
+      "max_seconds": 10,
+      "max_body_bytes": 2097152,
+      "redirects": "rejected",
+      "model_required": false,
+      "generation_submitted": false
+    },
+    "full_manifest_align_guard": {
+      "status": "failed_existing_unrelated_catalog_sync_issue",
+      "command": "node .codex/skills/ci/manifest-align/scripts/manifest-align-check.mjs --fix",
+      "error": "exposure missing capability com.powerx.plugins.base.parcel.volume",
+      "cause": "Existing parcel descriptor uses metadata.protocols.http; existing catalog synchronization removes its manually maintained exposure and schema references.",
+      "unrelated_generated_changes": "restored_to_pre_run_content",
+      "new_required_capability": "preserved_in_skeleton_and_both_templates",
+      "generated_manifestcheck": "passed",
+      "log_stream": "stdout only; final stderr error captured in this evidence record"
+    }
+  },
+  "package": {
+    "bundle": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-ai-settings-20261022-81226a83a8ade24b",
+    "profile": "ai-settings",
+    "published": false,
+    "changes_committed": false,
+    "base_commit": "32aaf0bd33ecda9860384484b55aa1d092ad27fc",
+    "source_sha256": {
+      "go": "a64914411aceb494c5148c3ea4cc6bebdfb926e57a1ab6dfc29aa0fe4ecd08cf",
+      "nuxt": "30b5d140eecf02d8429855670e7e6c9b04d40af3c557dafb16c174f20b8e8d40",
+      "generator": "ed21c0b2f7384ffacb32f80f0e22da825da6c0057cf0614b4a7458faaabf91d4",
+      "contracts": "159e30d15d62a053a1b4cfb9257b816b18e0bee11fa72fa49d5a7b1604b000e1",
+      "ai_contracts": "5b85e74bcce609b8939687c43b86e0fd2ad4bdb1b30fba184a3d54ade9d5ae8f"
+    },
+    "go_module": "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go",
+    "go_sdk_version": "v0.0.27-dev.aisettings.a64914411aceb494",
+    "go_proxy": "file:///private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-ai-settings-20261022-81226a83a8ade24b/go-proxy",
+    "nuxt_client_version": "0.0.14-dev.aisettings.30b5d140eecf02d8",
+    "nuxt_client_ref": "file:/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-ai-settings-20261022-81226a83a8ade24b/artisan-cloud-plugin-framework-client-0.0.14-dev.aisettings.30b5d140eecf02d8.tgz",
+    "nuxt_client_tarball": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-ai-settings-20261022-81226a83a8ade24b/artisan-cloud-plugin-framework-client-0.0.14-dev.aisettings.30b5d140eecf02d8.tgz",
+    "generator_version": "v0.0.0-aisettings.ed21c0b2f7384ffa",
+    "generator_binary": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-ai-settings-20261022-81226a83a8ade24b/px-plugin",
+    "consumer": {
+      "path": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-ai-settings-20261022-81226a83a8ade24b/generated-consumer",
+      "go_work": "off",
+      "local_replace": false,
+      "four_bindings": "passed",
+      "manifest_validation": "passed",
+      "backend_build": "passed",
+      "shared_fixtures": "passed",
+      "packed_typescript": "passed"
+    },
+    "artifact_sha256": {
+      "px-plugin": "3026b476ecb40856f2bdb549b1eaedb97dcef913da22b18817abc03a1d822506",
+      "artisan-cloud-plugin-framework-client-0.0.14-dev.aisettings.30b5d140eecf02d8.tgz": "dfb4637415fc721c9251366ccdcebec60de7ce61610d6a228bc511bae2ffbc54",
+      "go-proxy/github.com/!artisan!cloud/!power!x!plugin/framework/backend/go/@v/v0.0.27-dev.aisettings.a64914411aceb494.zip": "fed187785c3d75d99e7f7951d1ee43c1206ff8674bec371a32f6d089f5086058"
+    }
+  },
+  "validation_artifacts": {
+    "directory": "artifacts/framework-release-ai-settings-20261022-81226a83a8ade24b/validation",
+    "files_sha256": {
+      "go.jsonl": "1b0581071f8bf8badc77f22f3a2d9bfb4639190dd2ffd1264fc2d36bd941a313",
+      "race.log": "213b2f439ec00f5f5cee6429e85140a37a5a0aa686bf475a4a8d3556f78db7ea",
+      "vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "unit.log": "60aa9e5e0a13e84e44ed40d73fdbe236001c187ab5a1e5f65c2c8f55156f8cdf",
+      "typescript.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "nuxt-build.log": "9d37549bf61876b8565bae760115bf7607f874f1b71b7098800dc575805fdef5",
+      "browser.log": "a0289a9cdc1ed224925aeec5599571a6f0cec48916c62e225fbe38d1f6d41de0",
+      "contracts.log": "637a388ce733db4a52482fb46da9f8fd1e36085fcb753fbd5bf9c41535de3d3c",
+      "template-check.log": "8bdb0af2ee1826f47f0e8e3d64d46fd652cd8e9eae0bc78da3dd20f67db858ca",
+      "manifest-align.log": "489b93ab5ce1a024e02642a851c7a2c30c43470787c326cf6aae7f208cc43b5e",
+      "temporary-service.json": "16024618a33315500103f41a0beb8bc06e0d241f617b210e5e0d2b0504ceeba9"
+    },
+    "screenshots_sha256": {
+      "validation/screenshots/ai-settings-actions-connec-a690f-al-dark-system-dark-desktop-chromium/connection.png": "8daa2f7b0bf485f6a785e57c86787f4e9ae74af291b7af87082c1656d37fa358",
+      "validation/screenshots/ai-settings-actions-connec-adcce--light-system-light-desktop-chromium/connection.png": "ff76dbf6eb015def4daf5c035b2d0432d647d3ef5736b39fdf19a64934c04cbd",
+      "validation/screenshots/ai-settings-actions-connec-f3c31-al-dark-system-light-narrow-chromium/connection.png": "465b6b14aaf801e893abb45270fdfc5e8cd60ff5122461adf131083a250af152",
+      "validation/screenshots/ai-settings-actions-connec-d3cf5-ual-dark-system-dark-narrow-chromium/connection.png": "0c77c0fb2e61fd7c67f2e39523f63bb86e8acdfac8c249da5361f36b94a7ed80",
+      "validation/screenshots/ai-settings-actions-connec-0dce8-l-light-system-dark-desktop-chromium/connection.png": "92faf7ed4860d6b31203637f42b5e93b29e130911bf9e0e22065cc3c3a76b0e6",
+      "validation/screenshots/ai-settings-actions-connec-dade5-al-light-system-dark-narrow-chromium/connection.png": "67af723b67054bccbaee11e1a40eae96777445f4d9216265b820b835913c1e17",
+      "validation/screenshots/ai-settings-actions-connec-363f7-l-light-system-light-narrow-chromium/connection.png": "ec15894112d5352b1eed125f7bef2827c280e599dea94483e841ce9a803b9aa6",
+      "validation/screenshots/ai-settings-actions-connec-3fd3b-l-dark-system-light-desktop-chromium/connection.png": "f3a2e29f56e6d083d572f268ff1ba776d06f0d326cee047f07106f949a8a4182"
+    }
+  },
+  "runtime_cleanup": {
+    "pid": 38398,
+    "pgid": 38398,
+    "launcher_pid": 38392,
+    "port": 3157,
+    "command": "PORT=3157 HOST=127.0.0.1 node .output/server/index.mjs",
+    "cwd": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/skeleton/web-admin/nuxt",
+    "prior_processes": [
+      {
+        "pid": 16954,
+        "pgid": 16954,
+        "stopped": true
+      }
+    ],
+    "stopped": true,
+    "port_released": true
+  },
+  "runtime_boundary": {
+    "user_owned_services_restarted": false,
+    "core_source_modified": false,
+    "grants_changed": false,
+    "real_api_key_probe": "not_performed",
+    "installed_sts_probe": "not_performed",
+    "real_provider_probe": "not_performed"
+  },
+  "remaining_acceptance": [
+    "Load new Framework backend and frontend code in the user-owned plugin process.",
+    "Run updated Core build with published capability, tenant registration and API Key grant or STS allowed_capabilities.",
+    "Verify read-only probe and error diagnostics against real API Key Host and installed STS independently.",
+    "Publish coordinated SDK and CLI versions only through a separately authorized release."
+  ]
+}

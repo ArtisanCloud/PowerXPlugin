@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	fwmanifest "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
 	"os"
 
 	"github.com/powerx-plugin/cli/cmd"
@@ -17,7 +18,16 @@ func main() {
 		cmd.Version = version
 	}
 	if err := cmd.Execute(os.Args[1:]); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
+		var identity *fwmanifest.IdentityError
+		if errors.As(err, &identity) {
+			locale := os.Getenv("LC_ALL")
+			if locale == "" {
+				locale = os.Getenv("LANG")
+			}
+			fmt.Fprintf(os.Stderr, "%s: %s\n", identity.Code, fwmanifest.FormatPluginIDError(err, locale))
+		} else {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+		}
 		code := 1
 		var coded interface{ ExitCode() int }
 		if errors.As(err, &coded) {

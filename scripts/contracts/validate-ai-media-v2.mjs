@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import YAML from 'yaml';
 
 export function validateAIMediaV2Contracts(root) {
   const contract = path.join(root, 'docs/contracts');
@@ -15,7 +16,19 @@ export function validateAIMediaV2Contracts(root) {
   const fixture = fs.readFileSync(path.join(contract, 'fixtures/ai-media-v2.json'));
   const sdkFixture = fs.readFileSync(path.join(root, 'framework/backend/go/runtime/powerx/ai/testdata/ai-media-v2.json'));
   if (!fixture.equals(sdkFixture)) throw new Error('AI_MEDIA_SDK_FIXTURE_MISMATCH');
-  for (const file of [...requiredSources, 'ai-media-v2-source.json', 'fixtures/ai-media-v2-registration.json']) {
+  const limits = snapshot.framework_model_limits_fixture;
+  if (limits?.owner !== 'Framework' || limits.file !== 'fixtures/ai-media-model-limits.v1.json') throw new Error('AI_MEDIA_MODEL_LIMITS_SOURCE_INVALID');
+  const limitsRaw = fs.readFileSync(path.join(contract, limits.file));
+  if (crypto.createHash('sha256').update(limitsRaw).digest('hex') !== limits.sha256) throw new Error('AI_MEDIA_MODEL_LIMITS_DIGEST_INVALID');
+  if (!limitsRaw.equals(fs.readFileSync(path.join(root, 'framework/backend/go/runtime/powerx/ai/testdata/ai-media-model-limits.v1.json')))) throw new Error('AI_MEDIA_MODEL_LIMITS_SDK_MISMATCH');
+  const fields = ['max_image_bytes', 'max_total_image_bytes', 'max_image_pixels'];
+  const operation = YAML.parse(fs.readFileSync(path.join(contract, 'ai-media-v2.openapi.yaml'), 'utf8')).components.schemas.ModelOperation;
+  if (fields.some(field => operation.properties[field]?.type !== 'integer' || operation.properties[field]?.format !== 'int64' || operation.required.includes(field))) throw new Error('AI_MEDIA_MODEL_LIMITS_SCHEMA_INVALID');
+  const samples = JSON.parse(limitsRaw);
+  const cases = Object.fromEntries(samples.cases.map(sample => [sample.name, sample.limits]));
+  if (samples.fixture_owner !== 'Framework' || samples.contract_version !== 2 || !cases.declared || !cases.undeclared || !cases.explicit_zero || !cases.provider_specific || fields.some(field => !(cases.declared[field] > 0) || Object.hasOwn(cases.undeclared, field) || cases.explicit_zero[field] !== 0 || !(cases.provider_specific[field] > 0) || cases.provider_specific[field] === cases.declared[field])) throw new Error('AI_MEDIA_MODEL_LIMITS_FIXTURE_INVALID');
+  if (fields.some(field => samples.catalog_result.items[0].operations.image_generation[field] !== cases.declared[field])) throw new Error('AI_MEDIA_MODEL_LIMITS_FIXTURE_INVALID');
+  for (const file of [...requiredSources, 'ai-media-v2-source.json', 'fixtures/ai-media-v2-registration.json', limits.file]) {
     const source = fs.readFileSync(path.join(contract, file));
     const embedded = fs.readFileSync(path.join(root, 'tools/cli/internal/contracts/data/media-contracts', file));
     if (!source.equals(embedded)) throw new Error(`AI_MEDIA_CLI_CONTRACT_MISMATCH:${file}`);

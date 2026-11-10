@@ -18,6 +18,12 @@ export function useEmbeddedAuth() {
   const delegatedIAM = useState('auth.delegatedIAM', () => config.public?.providerMode === 'delegated');
   const localIAMEnabled = useState('auth.localIAMEnabled', () => !delegatedIAM.value);
   const message = () => app.$i18n.t('hostSession.required');
+  const failureMessage = (code?: string | null) => app.$i18n.t(
+    code === 'PLUGIN_BRIDGE_SESSION_TERMINATION_REQUIRED' || code === 'PLUGIN_BRIDGE_V2_REQUIRED' ? 'hostSession.terminationUnavailable'
+      : code === 'IAM_CONTEXT_USER_SESSION_INVALID' ? 'hostSession.verificationPending'
+      : code === 'IAM_CONTEXT_UNAVAILABLE' || code === 'AUTH_SESSION_UNAVAILABLE' ? 'hostSession.upstreamUnavailable'
+      : code?.startsWith('IAM_CONTEXT_PROOF_') ? 'hostSession.identityProofRejected'
+      : 'hostSession.requestFailed');
   const rememberAuthError = (text?: string) => { error.value = text || message(); };
   const initAuth = () => {
     if (!session || initialized.value) return;
@@ -29,27 +35,27 @@ export function useEmbeddedAuth() {
       refreshToken.value = null;
       isAuthenticated.value = Boolean(snapshot);
       if (snapshot) error.value = '';
-      else if (state.error) rememberAuthError();
+      else if (state.error) rememberAuthError(failureMessage(state.error));
     });
     app.vueApp.onUnmount(() => { unsubscribe(); initialized.value = false; });
   };
   const ensureFreshToken = async () => {
     if (!session) return null;
     try { return (await session.ensureSnapshot()).accessToken; }
-    catch (cause) { if (!session.getReadySnapshot()) rememberAuthError(); throw cause; }
+    catch (cause) { if (!session.getReadySnapshot()) rememberAuthError(failureMessage(session.getState().error)); throw cause; }
   };
   const managed = () => { throw new PowerXHostSessionError('AUTH_SESSION_HOST_MANAGED'); };
-  const clearAuth = () => { session?.invalidate('PLUGIN_AUTH_REQUIRED'); user.value = null; };
+  const clearAuth = () => { session?.invalidate('PLUGIN_AUTH_REQUIRED', 'identity'); user.value = null; };
   return {
     isAuthenticated: readonly(isAuthenticated), user: readonly(user), token, refreshToken, expiresAt,
     getToken: () => session?.getReadySnapshot()?.accessToken || null,
     isTokenExpired: () => !session?.getReadySnapshot(), ensureFreshToken, initAuth,
     setAuth: managed, logout: managed, clearAuth,
-    failClosed: (text?: string) => { session?.invalidate('PLUGIN_AUTH_CONTEXT_FAILED'); rememberAuthError(text); },
+    failClosed: (text?: string) => { session?.invalidate('PLUGIN_AUTH_CONTEXT_FAILED', 'identity'); rememberAuthError(text); },
     rememberAuthError, consumeAuthError: () => error.value, delegatedError: readonly(error),
     clearDelegatedError: () => { error.value = ''; },
     restoreFromStorage: async () => {
-      try { return (await session!.ensureSnapshot({ recovery: true })).accessToken; } catch (cause) { if (!session?.getReadySnapshot()) rememberAuthError(); throw cause; }
+      try { return (await session!.ensureSnapshot({ recovery: true })).accessToken; } catch (cause) { if (!session?.getReadySnapshot()) rememberAuthError(failureMessage(session?.getState().error)); throw cause; }
     },
     hostManagedAuth: readonly(ref(true)),
     localIAMEnabled: readonly(localIAMEnabled), delegatedIAM: readonly(delegatedIAM),

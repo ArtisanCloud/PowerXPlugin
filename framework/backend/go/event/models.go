@@ -20,9 +20,21 @@ type Event struct {
 	Topic   Topic           `json:"topic" yaml:"topic"`
 	Meta    Meta            `json:"meta" yaml:"meta"`
 	Payload json.RawMessage `json:"payload" yaml:"payload"`
+	// Reliability is supplied by the durable outbox, never inferred from trace
+	// or request IDs. It is transport input and does not change the business envelope.
+	Reliability *ReliableIdentity `json:"-" yaml:"-"`
+}
+
+type ReliableIdentity struct {
+	EventID        string
+	IdempotencyKey string
+}
+
+type ReliablePublish struct {
+	Identity ReliableIdentity
+	Event    Event
 }
 
 type Subscription struct {
 	Topic Topic `json:"topic" yaml:"topic"`
 }
-

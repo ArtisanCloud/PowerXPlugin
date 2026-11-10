@@ -5,7 +5,16 @@ import (
 	"time"
 )
 
+const ContractVersion = "taskqueue.v2"
+
+type Lease struct {
+	ReceiptUUID string    `json:"receipt_uuid"`
+	Fence       uint64    `json:"fence"`
+	ExpiresAt   time.Time `json:"expires_at"`
+}
+
 type Message struct {
+	Lease          *Lease            `json:"lease,omitempty"`
 	ID             string            `json:"id"`
 	TenantKey      string            `json:"tenant_key"`
 	SubscriberID   string            `json:"subscriber_id"`
@@ -31,6 +40,8 @@ type DequeueRequest struct {
 }
 
 type AckRequest struct {
+	Outcome      string            `json:"outcome"`
+	ReceiptUUID  string            `json:"receipt_uuid"`
 	TenantKey    string            `json:"tenant_key"`
 	SubscriberID string            `json:"subscriber_id"`
 	MessageID    string            `json:"message_id"`
@@ -38,6 +49,7 @@ type AckRequest struct {
 }
 
 type NackRequest struct {
+	ReceiptUUID  string            `json:"receipt_uuid"`
 	TenantKey    string            `json:"tenant_key"`
 	SubscriberID string            `json:"subscriber_id"`
 	MessageID    string            `json:"message_id"`
@@ -52,7 +64,15 @@ type RetryRequest struct {
 	Reason  string    `json:"reason,omitempty"`
 }
 
+type RenewRequest struct {
+	TenantKey    string `json:"tenant_key"`
+	SubscriberID string `json:"subscriber_id"`
+	MessageID    string `json:"message_id"`
+	ReceiptUUID  string `json:"receipt_uuid"`
+}
+
 type Queue interface {
+	Renew(context.Context, RenewRequest) (Lease, error)
 	Enqueue(ctx context.Context, req EnqueueRequest) error
 	Dequeue(ctx context.Context, req DequeueRequest) ([]Message, error)
 	Ack(ctx context.Context, req AckRequest) error

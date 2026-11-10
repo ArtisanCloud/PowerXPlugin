@@ -47,6 +47,7 @@ export default config
 declare module 'nuxt/schema' {
   interface PublicRuntimeConfig {
     powerx: {
+      pluginId?: string
       apiBase: string
       capabilityEndpoint: string
     }

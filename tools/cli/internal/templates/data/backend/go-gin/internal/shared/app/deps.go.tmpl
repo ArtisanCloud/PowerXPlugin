@@ -35,6 +35,7 @@ import (
 	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
 	contactfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/contactfw"
 	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
+	fweventfabric "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/eventfabric"
 	fwintegration "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/integration"
 	fwknowledge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/knowledge"
 	fwmedia "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/media"
@@ -129,6 +130,7 @@ type Deps struct {
 	OperationsMetrics            *opsmetrics.Metrics
 	AdminConsoleMetrics          *adminmetrics.Metrics
 	EventEmitter                 fweventbridge.Emitter
+	ReliableEvents               *fweventfabric.Runtime
 	WSBusHub                     fwwsbus.LocalHub
 	RealtimeDescriptors          []frameworkrealtime.Descriptor
 	ProviderMode                 fwprovider.Mode

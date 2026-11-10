@@ -1,0 +1,99 @@
+{
+  "validated_at": "2026-11-08T12:32:44.378474+00:00",
+  "scope": "Framework shared streaming tenant transport fix and isolated Core interoperability; no release or installed plugin acceptance",
+  "branch": "025-framework-business-regression",
+  "sdk_source": "current local working tree; unreleased; the isolated Core modfile explicitly replaces the SDK with this source",
+  "source_sha256": {
+    "framework/backend/go/runtime/powerx/hostcontract/invocation_stream.go": "5f09e3f13374ac99029296e83f940d8e7906689ec2b70265425ae9e0f73ae35a",
+    "framework/backend/go/gateway/stream_contract_test.go": "4a025842d9b60c246d274d171b04835db8744a63d965220855a612baadca2b02",
+    "framework/backend/go/gateway/stream_tenant_contract_test.go": "338bdd71da1f50f782ba0409cf6e2b26b441427737a8aa28b1abbabc689d5a4b",
+    "framework/backend/go/gateway/realtime_stream_contract_test.go": "67cd17d4310d9c01eb6e3d131c60781927ff5d9ebf61edd2a4a50903f80ebd19",
+    "framework/backend/go/runtime/wsbus/README.md": "7accb8fa252c20428e9944c668afb45d39876da2c4bb895d80978eb2832c16a1",
+    "scripts/contracts/verify-realtime-stream-core.py": "ef09b3f6a11f962d93ef995e079db84911fbaa280e8a14d337888d64096c5d59",
+    "scripts/contracts/testdata/realtime-stream-core_test.go": "8e71cb14004110ae66aa6eb95b3d21ca740e7e9977f91cced62c9bae1bf3b670"
+  },
+  "validation": {
+    "regression_before_fix": "failed for tenant header emission and credential-provider calls before invalid tenant rejection",
+    "go_race": "passed: gateway, internal/integration/gateway, runtime/powerx/hostcontract, runtime/powerx/capability, runtime/wsbus",
+    "go_vet": "passed for the same five packages",
+    "core_interop_command": "python3 scripts/contracts/verify-realtime-stream-core.py /path/to/PowerX/backend",
+    "core_interop": "passed: 12 subtests; both public clients through actual Core API Key middleware, tenant guard and realtime invoker",
+    "core_cases": [
+      "ready",
+      "wrong_credential",
+      "cross_tenant",
+      "missing_grant",
+      "live_revocation",
+      "cancel"
+    ],
+    "sdk_recovery_cases": [
+      "last delivered cursor on reconnect",
+      "no tenant headers on resumed request",
+      "deduplication",
+      "terminal revocation",
+      "expired cursor does not reset",
+      "unsubscribe closes upstream"
+    ],
+    "npm_test": "passed",
+    "npm_lint": "command passed; configured lint script is a placeholder (Lint checks pending configuration)",
+    "git_diff_check": "passed",
+    "core_log": "/tmp/powerx-realtime-core-fixed-20261108.log",
+    "core_log_sha256": "f0eb23463886a1b9897be93e3cde2ef0fbd445d2cf372eb51f1ac217247157ac",
+    "core_traces": [
+      "465fb4a6-dff1-495a-bfac-7c77f6e6f459",
+      "544b7837-947e-401f-8c53-9e62765012aa",
+      "69fa0a68-05af-4040-a252-929987dfb1f9",
+      "9a42cab6-f261-4e7b-940e-1ded43c4982e",
+      "f29ae981-984c-4be8-9e7a-aea764f8e5de",
+      "fc18f33d-2f91-4403-9015-f7ca45bf5f51"
+    ],
+    "fixture_processes_exited": [
+      46540
+    ],
+    "fixture_http_redis_ports_verified_closed": [
+      "127.0.0.1:51102",
+      "127.0.0.1:51103",
+      "127.0.0.1:51108",
+      "127.0.0.1:51109",
+      "127.0.0.1:51113",
+      "127.0.0.1:51114",
+      "127.0.0.1:51118",
+      "127.0.0.1:51119",
+      "127.0.0.1:51123",
+      "127.0.0.1:51124",
+      "127.0.0.1:51128",
+      "127.0.0.1:51129",
+      "127.0.0.1:51133",
+      "127.0.0.1:51134",
+      "127.0.0.1:51138",
+      "127.0.0.1:51139",
+      "127.0.0.1:51143",
+      "127.0.0.1:51144",
+      "127.0.0.1:51148",
+      "127.0.0.1:51149",
+      "127.0.0.1:51153",
+      "127.0.0.1:51154",
+      "127.0.0.1:51158",
+      "127.0.0.1:51159"
+    ]
+  },
+  "known_core_gap": {
+    "typed_error": "REALTIME_INVALID_ARGUMENT",
+    "typed_status": 400,
+    "http_status": 502,
+    "scope_denied": true,
+    "core_production_code_changed": false
+  },
+  "acceptance": {
+    "synthetic_api_keys": true,
+    "sqlite_in_memory": true,
+    "miniredis": true,
+    "transport_header_rewriting": false,
+    "sts_issuance": false,
+    "sdk_published": false,
+    "ai_craft_upgraded": false,
+    "installed_plugin_browser_events": false,
+    "user_services_modified": false,
+    "production_database_or_grants_modified": false
+  }
+}

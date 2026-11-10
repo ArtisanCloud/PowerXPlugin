@@ -191,3 +191,9 @@
 - 完成正序／倒序两次整批、8 次独立运行（24 次通过的用例执行），额外注入 HTTP 拒绝后意外写入故障，确认判失败且 3 条登记资源全部清理；已有同租户和其他租户对象不变，最终 active_templates=0。
 - 浏览器 6 项通过，含页面真实 8 条整批；CLI 重复 `--case` 的 8 条批次通过；Go race 检查通过；两个独立生成插件包含同一目录与故障验收并通过；191 项前端单测、Nuxt build、双模板同步检查通过。完整证据见 [acceptance.md](evidence/acceptance.md)。
 - 临时服务与子进程已退出并核对端口释放；日常 8078／3131 服务保持原进程。用户日常后端需按原启动方式重新启动，才能加载这次新增的 Go 场景；不将本地验收等同于日常实例已更新。
+
+## T045 续作前置检查（2026-10-19）
+
+- 用户要求继续完成后，重新运行只读 live 前置检查，退出 2，返回 `REGRESSION_LIVE_ENV_REQUIRED`；8 项必要环境配置均缺失，独立报告保存于 `artifacts/regression/live-readiness-2026-10-19.json`。
+- 磁盘后端配置仅有 controlled profile，没有 live profile、专用租户或资源绑定；未调用业务接口或修改运行环境，未操作现有服务。
+- T045 仍待已有专用环境的配置及测试凭据，保持 56/57；本次实际检查结果见 [live-integration.md](evidence/live-integration.md#续作前置检查2026-10-19)。

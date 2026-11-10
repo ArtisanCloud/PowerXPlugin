@@ -58,20 +58,20 @@ func NewBundle(proxy delegatedProxy) (fwiamadapters.Bundle, error) {
 }
 
 func (a *Adapter) Authorize(ctx context.Context, req fwiamcontracts.AuthorizationRequest) (*fwiamcontracts.AuthorizationDecision, error) {
-	r, err := a.proxy.CheckDirectoryAuthorization(ctx, authproxy.DirectoryAuthorizationRequest{
-		MemberUUID: req.MemberUUID,
-		UserUUID:   req.UserUUID,
-		Resource:   req.Resource,
-		Action:     req.Action,
-		TraceID:    req.TraceID,
+	source, ok := a.proxy.(interface {
+		AuthorizationProvider() fwiamcontracts.AuthzService
 	})
+	if !ok || source.AuthorizationProvider() == nil {
+		return nil, fwiamerrors.New(fwiamerrors.CodeAuthorizationUnsupported, fwiamerrors.CodeAuthorizationUnsupported)
+	}
+	result, err := source.AuthorizationProvider().Authorize(ctx, req)
 	if err != nil {
-		return nil, mapDirectoryError(err)
+		return nil, err
 	}
-	if r == nil {
-		return nil, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "delegated authorization response is empty")
+	if result == nil {
+		return nil, fwiamerrors.New(fwiamerrors.CodeAuthorizationResponseInvalid, fwiamerrors.CodeAuthorizationResponseInvalid)
 	}
-	return &fwiamcontracts.AuthorizationDecision{Allowed: r.Allowed, ReasonCode: r.ReasonCode, Resource: req.Resource, Action: req.Action, TenantUUID: req.TenantUUID, UserUUID: req.UserUUID, MemberUUID: req.MemberUUID, Mode: string(fwiamcontracts.IAMAdapterModeDelegated), TraceID: req.TraceID}, nil
+	return result, nil
 }
 
 func (a *Adapter) ResolveIdentity(ctx context.Context, bearerToken string) (*fwiamcontracts.IdentityContext, error) {

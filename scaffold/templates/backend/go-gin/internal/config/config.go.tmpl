@@ -105,18 +105,21 @@ type Config struct {
 
 // EventBridgeConfig 控制事件桥接（本地 emitter / TaskBus emitter / 双写）的行为。
 type EventBridgeConfig struct {
-	Enabled         bool   `yaml:"enabled" json:"enabled"`
-	Mode            string `yaml:"mode" json:"mode"` // local|taskbus|dual（为空时按 enabled 推断）
-	FallbackToLocal bool   `yaml:"fallback_to_local" json:"fallback_to_local"`
-	LocalQueueSize  int    `yaml:"local_queue_size" json:"local_queue_size"`
-	TaskBusProvider string `yaml:"taskbus_provider" json:"taskbus_provider"` // host|redis
-	RedisURL        string `yaml:"redis_url" json:"redis_url"`
-	RedisStream     string `yaml:"redis_stream" json:"redis_stream"`
-	RedisGroup      string `yaml:"redis_group" json:"redis_group"`
-	RedisConsumer   string `yaml:"redis_consumer" json:"redis_consumer"`
-	RedisMaxLen     int64  `yaml:"redis_max_len" json:"redis_max_len"`
-	SourcePlugin    string `yaml:"source_plugin" json:"source_plugin"`
-	PayloadVersion  string `yaml:"payload_version" json:"payload_version"`
+	TopicBindings    map[string]string `yaml:"topic_bindings" json:"topic_bindings"`
+	PublishTopicKeys []string          `yaml:"publish_topic_keys" json:"publish_topic_keys"`
+	ConsumeTopicKeys []string          `yaml:"consume_topic_keys" json:"consume_topic_keys"`
+	Enabled          bool              `yaml:"enabled" json:"enabled"`
+	Mode             string            `yaml:"mode" json:"mode"` // local|taskbus|dual（为空时按 enabled 推断）
+	FallbackToLocal  bool              `yaml:"fallback_to_local" json:"fallback_to_local"`
+	LocalQueueSize   int               `yaml:"local_queue_size" json:"local_queue_size"`
+	TaskBusProvider  string            `yaml:"taskbus_provider" json:"taskbus_provider"` // host|redis
+	RedisURL         string            `yaml:"redis_url" json:"redis_url"`
+	RedisStream      string            `yaml:"redis_stream" json:"redis_stream"`
+	RedisGroup       string            `yaml:"redis_group" json:"redis_group"`
+	RedisConsumer    string            `yaml:"redis_consumer" json:"redis_consumer"`
+	RedisMaxLen      int64             `yaml:"redis_max_len" json:"redis_max_len"`
+	SourcePlugin     string            `yaml:"source_plugin" json:"source_plugin"`
+	PayloadVersion   string            `yaml:"payload_version" json:"payload_version"`
 }
 
 // WSBusConfig 控制 WS Bus 发布订阅的后端实现。

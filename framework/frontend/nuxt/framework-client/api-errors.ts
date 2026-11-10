@@ -17,6 +17,26 @@ export interface PowerXApiAuthError {
   code?: string;
 }
 
+/** Extract structured fields without interpreting error messages or close reasons. */
+export function readPowerXFailure(error: unknown): { code?: string; status?: number } {
+  const value = record(error);
+  const response = record(value?.response);
+  const status = response?.status ?? value?.status ?? value?.statusCode;
+  const code = readPowerXApiErrorCode({ _data: response?._data ?? value?.data ?? value })
+    ?? (typeof value?.code === 'string' ? value.code : undefined);
+  return { code, status: typeof status === 'number' ? status : undefined };
+}
+
+/** Only structured error frames may report a terminal user session failure. */
+export function isPowerXSessionInvalidFrame(payload: unknown): boolean {
+  const frame = record(payload);
+  if (!frame) return false;
+  const failure = record(frame.payload) || frame;
+  const { code, status } = readPowerXFailure(failure);
+  const httpStatus = frame.status ?? status;
+  return code === 'IAM_CONTEXT_USER_SESSION_INVALID' && (httpStatus === undefined || httpStatus === 401);
+}
+
 function record(value: unknown): Record<string, unknown> | undefined {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>

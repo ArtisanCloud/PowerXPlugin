@@ -1034,7 +1034,9 @@
       "modelDescription": "Choose a provider and model, then configure the connection.",
       "parametersDescription": "Adjust the request parameters for the current model.",
       "saveScope": "Saves only this environment, source, and modality.",
-      "save": "Save configuration"
+      "save": "Save configuration",
+      "trialFailed": "Trial failed",
+      "trialPassed": "Trial completed"
     },
     "columns": {
       "name": "Name",
@@ -1069,7 +1071,7 @@
     "noMatchingModels": "No matching models",
     "baseURL": "Base URL",
     "credentialReference": "Credential reference",
-    "credentialReferenceDescription": "Only a secret-manager reference is stored; API key plaintext is neither stored nor returned.",
+    "credentialReferenceDescription": "Use a server-configured credential reference. Keys are resolved only on the server and are neither entered nor returned here.",
     "temperature": "Temperature",
     "maxTokens": "Max tokens",
     "topP": "Top P",
@@ -1135,7 +1137,7 @@
     },
     "testing": {
       "inProgress": "Test in progress",
-      "prompt": "Test input",
+      "prompt": "Trial input",
       "defaultPrompt": "Please reply briefly.",
       "image": "Image reference",
       "imageType": "Image format",
@@ -1143,7 +1145,7 @@
         "image_url": "Image URL",
         "image_base64": "Base64 image"
       },
-      "generationCost": "Both test actions submit a real generation task and may incur provider charges.",
+      "generationCost": "A trial submits a real generation task and may incur provider charges.",
       "attemptRetained": "Retries retain this request and idempotency key. Starting a new test creates another attempt and may incur another charge.",
       "newAttempt": "Start a new test",
       "taskAccepted": "Generation task accepted. Check its task status.",
@@ -1159,7 +1161,7 @@
         "cancelled": "Cancelled"
       },
       "blocked": {
-        "powerxRuntimeRequired": "The runtime is local. Test Core text models through the PowerX runtime channel.",
+        "powerxRuntimeRequired": "The business runtime is local. Core model trials require the PowerX runtime selected at startup. Connection testing remains available separately.",
         "runtimePending": "Checking the runtime channel.",
         "unsupported": "Testing this capability is not yet supported here.",
         "inputRequired": "Select a model and enter test content.",
@@ -1168,8 +1170,67 @@
         "unsupportedInput": "This operation does not support the selected input format.",
         "localUnsupported": "The local adapter does not implement this generation capability.",
         "localProfileRequired": "A configured local model is required; text tests also need a valid Ollama endpoint.",
-        "imageRequired": "Vision analysis requires an image."
-      }
+        "imageRequired": "Vision analysis requires an image.",
+        "providerRequired": "Select a provider.",
+        "probeUnavailable": "Connection testing for this source is unavailable in the current runtime configuration.",
+        "localProbeUnsupported": "The local adapter does not implement a read-only probe for this provider."
+      },
+      "connectionDescription": "Check the API endpoint and authentication without sending trial content or invoking a model.",
+      "connectionNoAuth": "Endpoint reachable. No API key is required.",
+      "connectionVerified": "Endpoint and API key verified.",
+      "connectionEnvironment": "Verified environment: {environment}",
+      "connectionModelUnverified": "Model access and generation capability have not been verified.",
+      "connectionFailed": "Connection verification failed. Check the technical diagnostics."
+    },
+    "online": {
+      "update": "Update online models",
+      "refreshCore": "Refresh model list",
+      "title": "Local online model catalog",
+      "scope": "{provider} · {environment} · {modality}",
+      "description": "Fetch using the current endpoint and a server-owned credential reference. This does not save the form, switch the active model, generate content or download models. Save the configuration after selecting a model.",
+      "loading": "Fetching and saving the catalog. Please wait.",
+      "summary": "Saved {total} models: {matched} matched and {pending} awaiting confirmation.",
+      "source": "Source: {source} · {protocol}",
+      "updatedAt": "Last updated: {time}",
+      "results": "Catalog results",
+      "matched": "Matched ({count})",
+      "pending": "Pending ({count})",
+      "matchedHint": "Matched models can appear under their declared modalities. A catalog match does not establish successful inference.",
+      "pendingHint": "Models with unknown capabilities are not added automatically. Confirm only models known to support the current text or embedding modality.",
+      "search": "Search model identifiers or names",
+      "selectVisible": "Select visible results",
+      "assign": "Add to {modality} candidates ({count})",
+      "mediaContractRequired": "Media models require an explicit operation contract. Names do not establish generation capabilities.",
+      "empty": "No models in this section.",
+      "close": "Close",
+      "failed": "Online catalog update failed",
+      "failedHint": "Your selection and previous catalog are retained. Check the technical details, fix the connection, credentials or permissions, and retry manually.",
+      "adminRequired": "Updating the catalog requires tenant administrator access.",
+      "unsupported": "Online discovery is unavailable for this provider. Its declared local catalog remains available.",
+      "endpointRequired": "Enter a service endpoint first.",
+      "coreHint": "This reads Core candidates. A PowerX administrator manages online updates and pending classifications; refresh this list afterwards.",
+      "openCore": "Manage catalog in PowerX",
+      "coreAddressRequired": "The PowerX console address is not configured. Ask the deployment administrator to configure it to enable this link.",
+      "match": {
+        "local_catalog": "Exact local catalog match",
+        "provider_declared": "Provider-declared capability",
+        "manual": "Administrator-confirmed classification"
+      },
+      "errors": {
+        "generic": "The online catalog could not be updated. Check the endpoint, network and technical details.",
+        "AI_CREDENTIAL_REQUIRED": "Enter a credential reference configured on the server.",
+        "AI_CREDENTIAL_UNAVAILABLE": "The credential reference or its server environment variable is unavailable.",
+        "AI_CREDENTIAL_SCOPE_MISMATCH": "This credential does not match the current tenant, environment, provider or endpoint.",
+        "AI_MODEL_SYNC_AUTH_FAILED": "The provider rejected these credentials or denied access to its model catalog.",
+        "AI_MODEL_SYNC_STALE": "The catalog changed. Refresh it before confirming classifications.",
+        "AI_MODEL_SYNC_CONNECTION_CHANGED": "The connection identity changed. Refresh the catalog using the current connection.",
+        "AI_MODEL_SYNC_ADMIN_REQUIRED": "The current user cannot manage the local model catalog.",
+        "AI_MODEL_SYNC_UNSUPPORTED": "This provider does not have a supported online catalog protocol.",
+        "AI_LOCAL_CATALOG_MIGRATION_REQUIRED": "The local catalog table has not been migrated. Ask the deployment administrator to run this database migration."
+      },
+      "unknownCapability": "Undeclared capability",
+      "declaredCatalog": "As declared in the local catalog",
+      "selectedMissing": "The current model is absent from these candidates. Your saved configuration is unchanged; select a model available on this connection before saving."
     }
   },
   "providerMode": {
@@ -2919,7 +2980,9 @@
     "serviceCredentialRejected": "The plugin backend service credential is invalid. Check STS or API Key configuration and grants.",
     "upstreamUnavailable": "The identity service is unavailable. Check Core dependencies and retry.",
     "requestFailed": "Request identity validation failed. Check the API error code and Trace; the current session is unchanged.",
-    "loading": "Synchronizing and validating the PowerX session…"
+    "loading": "Synchronizing and validating the PowerX session…",
+    "terminationUnavailable": "This PowerX host does not support session verification. Upgrade the host and reload.",
+    "verificationPending": "PowerX must verify the current login. Follow the host instructions."
   },
   "regression": {
     "title": "Business regression",

@@ -77,10 +77,10 @@ build: ## 构建后端（本机平台）
 	  mkdir -p $(ABS_BUILD_DIR); \
 	  mkdir -p "$(GO_BUILD_CACHE)"; \
 	  rm -f $(ABS_BUILD_DIR)/plugin $(ABS_BUILD_DIR)/migrate; \
-	  GOCACHE="$(GO_BUILD_CACHE)" go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/plugin ./cmd/plugin; \
+	  GOCACHE="$(GO_BUILD_CACHE)" go build -C $(ABS_BACKEND_DIR) -trimpath -ldflags "-X $(GO_MODULE)/internal/shared/app.PluginVersion=$(VERSION)" -o $(ABS_BUILD_DIR)/plugin ./cmd/plugin; \
 	  if [ -d "$(ABS_BACKEND_DIR)/cmd/database" ]; then \
 	    echo "   构建 migrate（如存在）..."; \
-	    GOCACHE="$(GO_BUILD_CACHE)" go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/migrate ./cmd/database; \
+	    GOCACHE="$(GO_BUILD_CACHE)" go build -C $(ABS_BACKEND_DIR) -trimpath -ldflags "-X $(GO_MODULE)/internal/shared/app.PluginVersion=$(VERSION)" -o $(ABS_BUILD_DIR)/migrate ./cmd/database; \
 	  else \
 	    echo "   跳过 migrate（未找到 cmd/database）"; \
 	  fi; \
@@ -119,10 +119,10 @@ build-linux: ## 构建后端（Linux amd64）
 	  mkdir -p $(ABS_BUILD_DIR); \
 	  mkdir -p "$(GO_BUILD_CACHE)"; \
 	  rm -f $(ABS_BUILD_DIR)/plugin $(ABS_BUILD_DIR)/migrate; \
-	  GOOS=linux GOARCH=$(TARGET_ARCH) GOCACHE="$(GO_BUILD_CACHE)" go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/plugin ./cmd/plugin; \
+	  GOOS=linux GOARCH=$(TARGET_ARCH) GOCACHE="$(GO_BUILD_CACHE)" go build -C $(ABS_BACKEND_DIR) -trimpath -ldflags "-X $(GO_MODULE)/internal/shared/app.PluginVersion=$(VERSION)" -o $(ABS_BUILD_DIR)/plugin ./cmd/plugin; \
 	  if [ -d "$(ABS_BACKEND_DIR)/cmd/database" ]; then \
 	    echo "   构建 migrate（Linux/$(TARGET_ARCH)）..."; \
-	    GOOS=linux GOARCH=$(TARGET_ARCH) GOCACHE="$(GO_BUILD_CACHE)" go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/migrate ./cmd/database; \
+	    GOOS=linux GOARCH=$(TARGET_ARCH) GOCACHE="$(GO_BUILD_CACHE)" go build -C $(ABS_BACKEND_DIR) -trimpath -ldflags "-X $(GO_MODULE)/internal/shared/app.PluginVersion=$(VERSION)" -o $(ABS_BUILD_DIR)/migrate ./cmd/database; \
 	  else \
 	    echo "   跳过 migrate（未找到 cmd/database）"; \
 	  fi; \

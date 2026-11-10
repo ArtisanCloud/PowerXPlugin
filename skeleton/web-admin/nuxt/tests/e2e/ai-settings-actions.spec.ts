@@ -3,20 +3,22 @@ import { seedAuthStorage } from './_utils';
 import { readFileSync } from 'node:fs';
 const locale = JSON.parse(readFileSync(new URL('../../i18n/locales/zh.json', import.meta.url), 'utf8'));
 const fixture = JSON.parse(readFileSync(new URL('../../../../../docs/contracts/fixtures/ai-media-v2.json', import.meta.url), 'utf8'));
+const connectionFixture = JSON.parse(readFileSync(new URL('../../../../../docs/contracts/fixtures/ai-connection-test.v1.json', import.meta.url), 'utf8'));
 const settingsCatalog = JSON.parse(readFileSync(new URL('../../../../../docs/contracts/fixtures/ai-settings-catalog.v1.json', import.meta.url), 'utf8'));
 
-async function setup(page: Page, mode: 'local' | 'delegated' = 'delegated', failFirst = false) {
-  const calls: any[] = [], saves: any[] = [], errors: string[] = [];
+async function setup(page: Page, mode: 'local' | 'delegated' = 'delegated', failFirst = false, theme?: { system: 'light' | 'dark'; manual: 'light' | 'dark' }) {
+  const probes: any[] = [], calls: any[] = [], saves: any[] = [], errors: string[] = [];
   let refreshed = 0;
   page.on('pageerror', error => errors.push(error.message));
   await seedAuthStorage(page);
+  if (theme) { await page.emulateMedia({ colorScheme: theme.system }); await page.addInitScript(value => localStorage.setItem('powerx-color-mode', value), theme.manual); }
   await page.context().addCookies([{ name: 'px_lang', value: 'zh', url: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3147' }]);
   await page.route('**/api/v1/**', async route => {
     const request = route.request(), url = new URL(request.url()), path = url.pathname;
     const reply = (data: unknown, status = 200) => route.fulfill({ status, json: { success: true, data } });
     if (request.method() === 'OPTIONS') { await route.fulfill({ status: 204 }); return; }
     if (path.endsWith('/admin/user/auth/me/context')) { await reply({ is_root: true, user: { user_uuid: '00000000-0000-4000-8000-000000000001', display_name: 'fixture.user', status: 1 }, current_tenant_uuid: '40000000-0000-4000-8000-000000000001', tenants: [{ tenant_uuid: '40000000-0000-4000-8000-000000000001', name: 'fixture.tenant' }], members: [], roles: [], permissions: [] }); return; }
-    if (path.endsWith('/ai-settings/mode')) { await reply({ mode, local_available: mode === 'local', delegated_available: mode === 'delegated' }); return; }
+    if (path.endsWith('/ai-settings/mode')) { await reply({ mode, local_available: mode === 'local', delegated_available: mode === 'delegated', connection_probes: { local: true, powerx: true } }); return; }
     if (path.endsWith('/ai-settings/model-profiles')) { await reply({ items: [] }); return; }
     if (path.endsWith('/ai-settings/local-setting')) {
       if (request.method() === 'PUT') saves.push(request.postDataJSON());
@@ -37,7 +39,13 @@ async function setup(page: Page, mode: 'local' | 'delegated' = 'delegated', fail
       model.operations = { [capability]: { ...model.operations.image_generation, input_types: ['text', 'image_url'], defaults: {} } };
       await reply({ contract_version: 2, items: [model] }); return;
     }
-    if (path.endsWith('/test-connection') || path.endsWith('/quick-call')) {
+    if (path.endsWith('/test-connection')) {
+      const body = request.postDataJSON(); probes.push(body);
+      const result = structuredClone(connectionFixture.expected_result); result.modality = body.modality; result.verification.provider = body.provider;
+      if (body.provider !== 'ollama') Object.assign(result.verification, { probe: 'models', api_key_verified: true, authentication: 'api_key' });
+      await reply(result); return;
+    }
+    if (path.endsWith('/quick-call')) {
       const body = request.postDataJSON(); calls.push({ path, body });
       if (failFirst && calls.length === 1) { await route.fulfill({ status: 503, json: { error_code: 'integration.invoke_failed', reason_code: 'AI_ENV_NOT_CONFIGURED', trace_id: 'fixture.trace' } }); return; }
       if (body.modality === 'vlm') { await reply({ contract_version: 2, type: 'analysis', text: 'fixture.analysis', provider: 'fixture.provider', model: 'fixture.model', trace_id: 'fixture.trace' }); return; }
@@ -51,9 +59,9 @@ async function setup(page: Page, mode: 'local' | 'delegated' = 'delegated', fail
     }
     await route.fulfill({ status: 503, json: { reason_code: 'E2E_UNMOCKED_ENDPOINT' } });
   });
-  await page.goto('/admin/settings/ai-settings');
+  await page.goto('/_p/com.powerx.plugins.base/admin/settings/ai-settings');
   await expect(page.getByTestId('ai-settings-catalog-source')).toBeVisible();
-  return { calls, saves, errors };
+  return { calls, probes, saves, errors };
 }
 async function showTests(page: Page) {
   const trigger = page.getByTestId('ai-settings-open-test');
@@ -73,11 +81,11 @@ test('generation retry retains its attempt, tasks stay typed and old refreshes c
   await selectCore(page);
   await page.getByTestId('ai-settings-modality-image').click();
   await showTests(page);
-  await expect(page.getByTestId('ai-test-connection')).toBeEnabled();
-  await page.getByTestId('ai-test-connection').click();
+  await expect(page.getByTestId('ai-test-quick')).toBeEnabled();
+  await page.getByTestId('ai-test-quick').click();
   await expect(page.getByTestId('ai-test-result')).toHaveText(locale.aiSettings.testing.failed);
   await page.getByTestId('ai-settings-section-parameters').click();
-  await expect(page.getByTestId('ai-settings-status')).toHaveText(locale.aiSettings.workspace.testFailed);
+  await expect(page.getByTestId('ai-settings-status')).toHaveText(locale.aiSettings.workspace.trialFailed);
   await showTests(page);
   await page.getByTestId('ai-test-quick').click();
   await expect(page.getByTestId('ai-test-task-status')).toHaveText(locale.aiSettings.testing.taskStatus.queued);
@@ -191,7 +199,8 @@ test('configuration keeps its draft across sections, scopes and mobile navigatio
   await expect(page.getByTestId('ai-settings-modality-llm')).toBeHidden();
   await picker.click();
   await page.getByRole('option', { name: locale.aiSettings.modalities.vlm, exact: true }).click();
-  await expect(endpoint).toHaveCount(0);
+  await expect(endpoint).toBeVisible();
+  await endpoint.fill('http://127.0.0.1:11436');
   await picker.click();
   await page.getByRole('option', { name: locale.aiSettings.modalities.llm, exact: true }).click();
   await expect(endpoint).toHaveValue('http://127.0.0.1:11435');
@@ -271,4 +280,85 @@ test('a legacy generative catalog cannot appear as the PowerX AI Settings direct
   await expect(page.getByTestId('ai-test-connection')).toBeDisabled();
   expect(state.calls).toHaveLength(0);
   expect(state.errors).toEqual([]);
+});
+
+test('local business runtime can probe a Core connection without a model or trial content', async ({ page }) => {
+  const state = await setup(page, 'local');
+  await selectCore(page);
+  await page.getByTestId('ai-settings-provider').click();
+  await page.getByRole('option', { name: settingsCatalog.providers.providers.find((p: any) => p.id === 'ollama').name, exact: true }).click();
+  await showTests(page);
+  await page.locator('textarea[data-testid="ai-test-prompt"], [data-testid="ai-test-prompt"] textarea').fill('');
+  await expect(page.getByTestId('ai-test-connection')).toBeEnabled();
+  await expect(page.getByTestId('ai-test-quick')).toBeDisabled();
+  await page.getByTestId('ai-test-connection').click();
+  await expect(page.getByTestId('ai-connection-result')).toHaveText(locale.aiSettings.testing.connectionNoAuth);
+  expect(state.probes).toEqual([{ source: 'powerx', modality: 'llm', provider: 'ollama' }]);
+  expect(state.calls).toEqual([]);
+  expect(state.saves).toEqual([]);
+  expect(state.errors).toEqual([]);
+});
+
+test('Core probe authorization failures stay diagnostic and do not prevent a manual retry', async ({ page }) => {
+  const state = await setup(page, 'local'); await selectCore(page); await showTests(page);
+  let calls = 0, allow = false;
+  await page.route('**/ai-settings/test-connection', async route => {
+    calls++;
+    if (!allow) { await route.fulfill({ status: 403, json: { error_code: 'fixture.denied', reason_code: 'registry.capability_forbidden', trace_id: 'fixture.trace', request_id: 'fixture.request' } }); return; }
+    const body = route.request().postDataJSON(), result = structuredClone(connectionFixture.expected_result);
+    result.verification.provider = body.provider; await route.fulfill({ json: { success: true, data: result } });
+  });
+  await page.getByTestId('ai-test-connection').click();
+  await expect(page.getByTestId('ai-connection-result')).toHaveText(locale.aiSettings.testing.connectionFailed);
+  await expect(page.getByTestId('ai-test-connection')).toBeEnabled();
+  expect(calls).toBe(1); expect(state.calls).toHaveLength(0);
+  allow = true; await page.getByTestId('ai-test-connection').click();
+  await expect(page.getByTestId('ai-connection-result')).toHaveText(locale.aiSettings.testing.connectionNoAuth);
+  expect(calls).toBe(2); expect(state.errors).toEqual([]);
+});
+
+for (const manual of ['light', 'dark'] as const) for (const system of ['light', 'dark'] as const) for (const narrow of [false, true]) {
+  test(`connection panel remains usable and readable: manual ${manual}, system ${system}, ${narrow ? 'narrow' : 'desktop'}`, async ({ page }, info) => {
+    await page.setViewportSize(narrow ? { width: 390, height: 844 } : { width: 1440, height: 1000 });
+    const state = await setup(page, 'local', false, { manual, system }); await selectCore(page); await showTests(page);
+    await expect(page.locator('html')).toHaveClass(manual === 'dark' ? /dark/ : /light/);
+    await expect(page.getByTestId('ai-test-connection')).toBeEnabled();
+    await expect(page.getByTestId('ai-test-quick')).toBeDisabled();
+    await page.getByTestId('ai-test-connection').click();
+    await expect(page.getByTestId('ai-connection-result')).toBeVisible();
+    const selectors = ['[data-testid="ai-test-connection"]', '[data-testid="ai-test-quick"]', '[data-testid="ai-connection-result"]', '.ai-settings-test-panel h3', '.ai-settings-test-panel .ai-settings-copy'];
+    async function contrast() {
+      const values = await page.evaluate((selectors) => {
+        const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1; const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+        const rgba = (color: string) => { ctx.clearRect(0,0,1,1); ctx.fillStyle = color; ctx.fillRect(0,0,1,1); const v = ctx.getImageData(0,0,1,1).data; return [v[0]!,v[1]!,v[2]!,v[3]!/255]; };
+        const background = (el: Element | null): number[] => {
+          if (!el) return [255,255,255]; const c = rgba(getComputedStyle(el).backgroundColor), parent = background(el.parentElement);
+          return c.slice(0,3).map((v,i) => v*c[3]! + parent[i]!*(1-c[3]!));
+        };
+        const luminance = (c: number[]) => c.slice(0,3).map(v => v/255).map(v => v <= .04045 ? v/12.92 : ((v+.055)/1.055)**2.4).reduce((n,v,i) => n+v*[.2126,.7152,.0722][i]!,0);
+        return selectors.flatMap(selector => Array.from(document.querySelectorAll(selector)).filter(el => el.getBoundingClientRect().width > 0).map(el => {
+          const style = getComputedStyle(el), bg = background(el), color = rgba(style.color), fg = color.slice(0,3).map((v,i) => v*color[3]!+bg[i]!*(1-color[3]!)), a = luminance(fg), b = luminance(bg);
+          return { selector, ratio: (Math.max(a,b)+.05)/(Math.min(a,b)+.05) };
+        }));
+      }, selectors);
+      for (const value of values) expect(value.ratio, value.selector).toBeGreaterThanOrEqual(4.5);
+    }
+    await contrast(); await page.getByTestId('ai-test-connection').hover(); await contrast(); await page.getByTestId('ai-test-connection').focus(); await contrast();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    await page.screenshot({ path: info.outputPath('connection.png'), fullPage: true });
+    expect(state.calls).toHaveLength(0); expect(state.errors).toEqual([]);
+  });
+}
+
+test('a failed model discovery does not disable a configured provider connection probe', async ({ page }) => {
+  const state = await setup(page, 'local');
+  await page.route('**/ai-settings/catalog/models*', async route => {
+    if (new URL(route.request().url()).searchParams.get('source') !== 'powerx') { await route.fallback(); return; }
+    await route.fulfill({ status: 503, json: { reason_code: 'fixture.discovery_failed' } });
+  });
+  await selectCore(page); await expect(page.getByTestId('ai-settings-catalog-error')).toBeVisible(); await showTests(page);
+  await expect(page.getByTestId('ai-test-connection')).toBeEnabled();
+  await page.getByTestId('ai-test-connection').click();
+  await expect(page.getByTestId('ai-connection-result')).toBeVisible();
+  expect(state.probes).toHaveLength(1); expect(state.calls).toHaveLength(0); expect(state.errors).toEqual([]);
 });

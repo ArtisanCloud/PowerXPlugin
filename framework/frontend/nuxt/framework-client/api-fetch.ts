@@ -213,6 +213,7 @@ export function createPowerXApiFetchClient(options: CreatePowerXApiFetchClientOp
         return response;
       } catch (error: any) {
         connection?.dispose();
+        if (normalized?.signal?.aborted) throw new PowerXHostSessionError('AUTH_REQUEST_ABORTED');
         if (snapshot && !session!.isSameSession(snapshot)) throw new PowerXHostSessionError('AUTH_SESSION_CHANGED');
         if (session && snapshot && classifyPowerXApiAuthError(error?.response).kind === 'user-session-expired' && attempt === 0 && !normalized?.hostSnapshot && !prepared.skipAuth && !normalized?.signal?.aborted) {
           const current = session.getReadySnapshot();
@@ -224,7 +225,10 @@ export function createPowerXApiFetchClient(options: CreatePowerXApiFetchClientOp
         if (!normalized?.hostSnapshot) await options.onAuthError?.({ response: error?.response, request, prepared });
         if (snapshot && !session!.isCurrent(snapshot)) throw new PowerXHostSessionError('AUTH_SESSION_CHANGED');
         const failure = classifyPowerXApiAuthError(error?.response);
-        if (session && snapshot && (failure.kind === 'user-session-invalid' || failure.kind === 'user-session-expired')) session.invalidate('PLUGIN_AUTH_REQUIRED');
+        if (session && snapshot && !normalized?.hostSnapshot) {
+          if (failure.code === 'IAM_CONTEXT_USER_SESSION_INVALID' && error?.response?.status === 401) session.reportSessionInvalid(snapshot, failure.code);
+          else if (failure.kind === 'user-session-invalid' || failure.kind === 'user-session-expired') session.invalidate('PLUGIN_AUTH_REQUIRED', 'identity');
+        }
         throw error;
       } finally { connection?.dispose(); }
     }

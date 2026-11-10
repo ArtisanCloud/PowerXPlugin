@@ -11,7 +11,7 @@
         </div>
         <div class="flex items-center gap-2">
           <UButton data-testid="ai-settings-reset" icon="i-heroicons-arrow-path" color="neutral" variant="ghost" @click="reset">{{ t('common.reset') }}</UButton>
-          <UButton data-testid="ai-settings-save" :class="primaryButtonClass" icon="i-heroicons-cloud-arrow-up" :loading="saving" :disabled="coreSelectionInvalid" @click="saveSettings">{{ t('aiSettings.workspace.save') }}</UButton>
+          <UButton data-testid="ai-settings-save" :class="primaryButtonClass" icon="i-heroicons-cloud-arrow-up" :loading="saving" :disabled="coreSelectionInvalid || localSelectionInvalid" @click="saveSettings">{{ t('aiSettings.workspace.save') }}</UButton>
         </div>
       </header>
 
@@ -95,10 +95,20 @@
                 <div class="ai-settings-fields grid gap-4">
                   <UFormField :label="t('aiSettings.provider')"><USelect data-testid="ai-settings-provider" v-model="providerSelection" :items="providerOptions" :ui="{ placeholder: 'ai-settings-selection-placeholder' }" :placeholder="t('aiSettings.notSelected')" :loading="providersLoading" :disabled="providersLoading || (powerxLLMCatalog && Boolean(catalogError))" class="w-full" /></UFormField>
                   <UFormField v-if="appOptions.length" :label="t('aiSettings.app')"><USelect v-model="draft.app" :items="appOptions" class="w-full" /></UFormField>
-                  <UFormField :label="t('aiSettings.model')"><USelectMenu data-testid="ai-settings-model" :key="modelSelectorKey" v-model="modelSelection" :items="modelOptions" value-key="value" :placeholder="t('aiSettings.notSelected')" :loading="modelsLoading" :disabled="providersLoading || modelsLoading || !selectedProvider || (powerxLLMCatalog && Boolean(catalogError))" :search-input="{ placeholder: t('aiSettings.searchModel') }" :ui="{ content: 'ai-settings-model-menu', empty: 'text-toned', placeholder: 'ai-settings-selection-placeholder' }" class="w-full"><template #empty="{ searchTerm }">{{ t(searchTerm ? 'aiSettings.noMatchingModels' : 'aiSettings.noModelsInCatalog') }}</template></USelectMenu></UFormField>
-                  <UFormField v-if="catalogSource === 'local' && providerMode.mode === 'local' && modality === 'llm'" :label="t('aiSettings.baseURL')" class="ai-settings-field-wide"><UInput data-testid="ai-settings-endpoint" v-model="draft.endpoint" placeholder="http://127.0.0.1:11434" class="w-full" /></UFormField>
+                  <div class="min-w-0 space-y-2">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                      <span class="text-sm font-medium text-highlighted">{{ t('aiSettings.model') }}</span>
+                      <UButton v-if="catalogSource === 'local'" data-testid="ai-settings-online-models" color="neutral" variant="outline" size="xs" icon="i-heroicons-cloud-arrow-down" :disabled="Boolean(onlineBlocked) || modelsLoading || providersLoading" @click="onlineOpen = true">{{ t('aiSettings.online.update') }}</UButton>
+                      <UButton v-else data-testid="ai-settings-refresh-models" color="neutral" variant="outline" size="xs" icon="i-heroicons-arrow-path" :loading="modelsLoading" :disabled="!selectedProvider || modelsLoading || providersLoading" @click="loadCatalogModels(true)">{{ t('aiSettings.online.refreshCore') }}</UButton>
+                    </div>
+                    <UFormField :aria-label="t('aiSettings.model')"><USelectMenu :aria-label="t('aiSettings.model')" data-testid="ai-settings-model" :key="modelSelectorKey" v-model="modelSelection" :items="modelOptions" value-key="value" :placeholder="t('aiSettings.notSelected')" :loading="modelsLoading" :disabled="providersLoading || modelsLoading || !selectedProvider || (powerxLLMCatalog && Boolean(catalogError))" :search-input="{ placeholder: t('aiSettings.searchModel') }" :ui="{ content: 'ai-settings-model-menu', empty: 'text-toned', placeholder: 'ai-settings-selection-placeholder' }" class="w-full"><template #empty="{ searchTerm }">{{ t(searchTerm ? 'aiSettings.noMatchingModels' : 'aiSettings.noModelsInCatalog') }}</template></USelectMenu></UFormField>
+                    <p v-if="catalogSource === 'local' && !modelsLoading && !catalogError && loadedCatalogScope === modelCatalogScope() && draft.modelKey && !catalogModels.some(item => item.id === draft.modelKey)" class="ai-settings-copy text-xs">{{ t('aiSettings.online.selectedMissing') }}</p>
+                    <p v-if="catalogSource === 'local' && onlineBlocked" class="ai-settings-copy text-xs">{{ t(`aiSettings.online.${onlineBlocked}`) }}</p>
+                    <template v-if="catalogSource === 'powerx'"><p class="ai-settings-copy text-xs">{{ t('aiSettings.online.coreHint') }}</p><UButton data-testid="ai-settings-open-core" :to="coreSettingsURL || undefined" target="_blank" rel="noopener noreferrer" color="neutral" variant="link" size="xs" :disabled="!coreSettingsURL">{{ t('aiSettings.online.openCore') }}</UButton><p v-if="!coreSettingsURL" class="ai-settings-copy text-xs">{{ t('aiSettings.online.coreAddressRequired') }}</p></template>
+                  </div>
+                  <UFormField v-if="catalogSource === 'local'" :label="t('aiSettings.baseURL')" class="ai-settings-field-wide"><UInput data-testid="ai-settings-endpoint" v-model="draft.endpoint" @blur="localConnectionBlur" :placeholder="selectedProvider?.auth?.defaults?.base_url || ''" class="w-full" /></UFormField>
                   <p v-if="powerxLLMCatalog" data-testid="ai-settings-core-managed" class="ai-settings-copy ai-settings-field-wide text-xs">{{ t('aiSettings.coreConnectionManaged') }}</p>
-                  <UFormField v-if="requiresCredentialReference" :label="t('aiSettings.credentialReference')" class="ai-settings-field-wide" :description="t('aiSettings.credentialReferenceDescription')"><UInput v-model="draft.credentialRef" autocomplete="off" class="w-full" /></UFormField>
+                  <UFormField v-if="requiresCredentialReference" :label="t('aiSettings.credentialReference')" class="ai-settings-field-wide" :description="t('aiSettings.credentialReferenceDescription')"><UInput data-testid="ai-settings-credential-ref" v-model="draft.credentialRef" @blur="localConnectionBlur" autocomplete="off" class="w-full" /></UFormField>
                 </div>
               </fieldset>
 
@@ -142,6 +152,8 @@
           </template>
         </USlideover>
       </div>
+      <UAlert v-if="onlineDiagnostic" class="ai-settings-catalog-alert" data-testid="ai-online-page-error" role="alert" color="warning" variant="soft" :title="t('aiSettings.online.failed')" :description="t('aiSettings.online.failedHint')" :ui="{ description: 'text-inherit opacity-100' }"><template #description><p>{{ t('aiSettings.online.failedHint') }}</p><details class="mt-2"><summary>{{ t('aiSettings.testing.diagnostic') }}</summary><pre class="mt-2 max-h-32 overflow-auto whitespace-pre-wrap break-all text-xs">{{ onlineDiagnostic }}</pre></details></template></UAlert>
+      <AIOnlineModelCatalog v-if="onlineOpen" :key="onlineScope" :input="onlineInput" :provider-name="selectedProvider?.name || draft.provider" @close="onlineOpen = false" @updated="loadCatalogModels(true)" @failure="onlineDiagnostic = $event" @started="onlineDiagnostic = ''" />
       <p class="ai-settings-copy text-xs">{{ t('aiSettings.workspace.saveScope') }}</p>
     </div>
   </UContainer>
@@ -150,8 +162,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import AISettingsTestPanel from './AISettingsTestPanel.vue';
-import { isMediaTaskTerminal, validateMediaTask, type MediaTask, type MediaModelOperation } from '@artisan-cloud/plugin-framework-client';
-import { settingsMediaCapabilities, settingsTestBlocked, settingsTestAttempt, type SettingsAttempt } from '~/utils/aiSettingsTesting';
+import AIOnlineModelCatalog from './AIOnlineModelCatalog.vue';
+import { useUserStore } from '~/stores/user';
+import type { LocalOnlineCatalogInput } from '@artisan-cloud/plugin-framework-client';
+import { createAIConnectionClient, type AIConnectionTestResult, type AIConnectionTestInput, type AIConnectionModality, isMediaTaskTerminal, validateMediaTask, type MediaTask, type MediaModelOperation } from '@artisan-cloud/plugin-framework-client';
+import { settingsMediaCapabilities, settingsTestBlocked, settingsConnectionBlocked, settingsTestAttempt, type SettingsAttempt } from '~/utils/aiSettingsTesting';
 import { useAIMediaApi } from '~/composables/api/useAIMedia';
 import { useApiClient } from '~/composables/api/_client';
 import { defaultProviderMode, normalizeProviderMode } from '~/composables/api/useProviderMode';
@@ -171,6 +186,9 @@ const primaryButtonClass = [
 const { t } = useI18n();
 const toast = useToast();
 const { client } = useApiClient();
+const userStore = useUserStore();
+const runtimeConfig = useRuntimeConfig();
+const onlineOpen = ref(false), onlineDiagnostic = ref('');
 const saving = ref(false);
 const workspaceElement = ref<HTMLElement | null>(null);
 const wideWorkspace = ref(false);
@@ -200,6 +218,11 @@ function navigateTabs(event: KeyboardEvent, group: 'modality' | 'section') {
 }
 const testing = ref<'connection' | 'quick' | ''>('');
 const runtimeReady = ref(false);
+const connectionProbes = ref({ local: false, powerx: false });
+const connectionApi = createAIConnectionClient({ request: (path, options) => client(path, options) });
+type ConnectionState = { result?: AIConnectionTestResult; failed: boolean; diagnostic: string };
+const connectionStates = reactive<Record<string, ConnectionState>>({});
+const connectionState = computed(() => connectionStates[JSON.stringify([contextKey(), draft.provider, catalogSource.value === 'local' ? draft.endpoint : ''])] ||= { failed: false, diagnostic: '' });
 const mediaApi = useAIMediaApi();
 type TestState = { prompt: string; image: string; imageType: string; text: string; passed: boolean; diagnostic: string; task?: MediaTask; attempt?: SettingsAttempt<Record<string, unknown>> };
 const testStates = reactive<Record<string, TestState>>({});
@@ -212,6 +235,7 @@ const catalogProviders = ref<CatalogProvider[]>([]);
 const catalogModels = ref<CatalogModel[]>([]);
 const catalogError = ref('');
 const catalogDiagnostic = ref('');
+const catalogReason = ref('');
 const providersLoading = ref(false);
 const modelsLoading = ref(false);
 const loadedProvidersScope = ref('');
@@ -219,13 +243,20 @@ const loadedCatalogScope = ref('');
 const coreCatalogEnvironment = ref('');
 let providersRequest = 0;
 let modelsRequest = 0;
-function modelCatalogScope() { return `${contextKey()}:${draft.provider}:${draft.app}`; }
+function modelCatalogScope() { return JSON.stringify([contextKey(), draft.provider, draft.app, ...(catalogSource.value === 'local' ? [draft.endpoint, draft.credentialRef] : [])]); }
 const providerMode = ref(defaultProviderMode());
 const environment = ref('development');
 const catalogSource = ref<'local' | 'powerx'>('local');
 const modality = ref<Modality>('llm');
 const powerxLLMCatalog = computed(() => catalogSource.value === 'powerx' && modality.value === 'llm');
 const draft = reactive({ provider: '', app: '', modelKey: '', endpoint: '', credentialRef: '', temperature: 0.7, maxTokens: 4096, topP: 1, stream: true, mediaParams: {} as Record<string, any> });
+const onlineInput = computed<LocalOnlineCatalogInput>(() => ({ environment: environment.value as 'development' | 'production', modality: modality.value, provider: draft.provider, app: draft.app, endpoint: draft.endpoint, credential_ref: draft.credentialRef }));
+const onlineScope = computed(() => JSON.stringify([userStore.currentTenantUuid, catalogSource.value, onlineInput.value]));
+const onlineSupported = computed(() => ['ollama', 'openai', 'openrouter', 'deepseek', 'moonshot', 'huggingface', 'openai_compatible', 'qwen-cn', 'qwen-intl', 'anthropic', 'google'].includes(draft.provider));
+const onlineBlocked = computed(() => catalogReason.value === 'AI_LOCAL_CATALOG_MIGRATION_REQUIRED' ? 'errors.AI_LOCAL_CATALOG_MIGRATION_REQUIRED' : !userStore.isCurrentTenantAdmin ? 'adminRequired' : !onlineSupported.value ? 'unsupported' : !draft.endpoint.trim() ? 'endpointRequired' : '');
+const coreSettingsURL = computed(() => {
+  try { const base = String(runtimeConfig.public.powerxConsoleBase || ''); if (!base) return ''; const url = new URL(base); if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) return ''; return new URL('settings/ai', url.href.replace(/\/$/, '') + '/').href; } catch { return ''; }
+});
 const environmentOptions = computed(() => [{ label: t('aiSettings.environments.development'), value: 'development' }, { label: t('aiSettings.environments.production'), value: 'production' }]);
 const catalogSourceOptions = computed(() => [{ label: t('aiSettings.catalogSources.local'), value: 'local' }, { label: t('aiSettings.catalogSources.powerx'), value: 'powerx' }]);
 const modalities = computed(() => [{ value: 'llm' as const, label: t('aiSettings.modalities.llm'), icon: 'i-heroicons-bars-3-bottom-left' }, { value: 'vlm' as const, label: t('aiSettings.modalities.vlm'), icon: 'i-heroicons-eye' }, { value: 'image' as const, label: t('aiSettings.modalities.image'), icon: 'i-heroicons-photo' }, { value: 'embedding' as const, label: t('aiSettings.modalities.embedding'), icon: 'i-heroicons-square-3-stack-3d' }, { value: 'audio_tts' as const, label: t('aiSettings.modalities.audioTTS'), icon: 'i-heroicons-speaker-wave' }, { value: 'audio_asr' as const, label: t('aiSettings.modalities.audioASR'), icon: 'i-heroicons-microphone' }, { value: 'video' as const, label: t('aiSettings.modalities.video'), icon: 'i-heroicons-video-camera' }, { value: 'model3d' as const, label: t('aiSettings.modalities.model3d'), icon: 'i-heroicons-cube' }, { value: 'rerank' as const, label: t('aiSettings.modalities.rerank'), icon: 'i-heroicons-arrows-up-down' }]);
@@ -244,12 +275,12 @@ const mediaCapability = computed(() => settingsMediaCapabilities[modality.value]
 const modelOptions = computed(() => {
   if (powerxLLMCatalog.value && loadedCatalogScope.value !== modelCatalogScope()) return [];
   const options = catalogModels.value.map((item) => ({ label: item.label, value: item.id, disabled: item.available === false || (catalogSource.value === 'powerx' && Boolean(mediaCapability.value) && item.operations?.[mediaCapability.value!]?.available !== true) }));
-  if (!powerxLLMCatalog.value && draft.modelKey && !options.some((item) => item.value === draft.modelKey)) options.unshift({ label: draft.modelKey, value: draft.modelKey });
+  if (!powerxLLMCatalog.value && draft.modelKey && !options.some((item) => item.value === draft.modelKey)) options.unshift({ label: draft.modelKey, value: draft.modelKey, disabled: true });
   return options;
 });
 // USelect caches its option collection while it is open. Recreate it when the
 // catalog scope changes so a local profile value never narrows the Core list.
-const modelSelectorKey = computed(() => `${modality.value}:${draft.provider}:${draft.app}:${catalogModels.value.length}`);
+const modelSelectorKey = computed(() => JSON.stringify([modelCatalogScope(), catalogModels.value.map(item => [item.id, item.label])]));
 const selectedModel = computed(() => {
   if (powerxLLMCatalog.value && loadedCatalogScope.value !== modelCatalogScope()) return undefined;
   const catalogModel = catalogModels.value.find((item) => item.id === draft.modelKey);
@@ -260,21 +291,23 @@ const selectedModel = computed(() => {
   return draft.modelKey ? { id: draft.modelKey, label: draft.modelKey } : undefined;
 });
 const statusLabel = computed(() => testing.value ? t('aiSettings.testing.inProgress')
-  : testState.value.diagnostic ? t('aiSettings.workspace.testFailed')
+  : connectionState.value.failed ? t('aiSettings.testing.connectionFailed')
+  : testState.value.diagnostic ? t('aiSettings.workspace.trialFailed')
   : testState.value.task ? t(`aiSettings.testing.taskStatus.${testState.value.task.status}`)
-  : testState.value.passed ? t('aiSettings.workspace.connectionPassed') : t('aiSettings.states.not_verified'));
+  : connectionState.value.result ? t(connectionState.value.result.verification.authentication === 'not_required' ? 'aiSettings.testing.connectionNoAuth' : 'aiSettings.testing.connectionVerified')
+  : testState.value.passed ? t('aiSettings.workspace.trialPassed') : t('aiSettings.states.not_verified'));
 const statusTone = computed(() => {
-  if (testing.value) return 'info';
-  if (testState.value.diagnostic || testState.value.task?.status === 'failed') return 'error';
-  if (testState.value.task?.status === 'succeeded' || testState.value.passed) return 'success';
+  if (connectionState.value.failed || testState.value.diagnostic || testState.value.task?.status === 'failed') return 'error';
   if (testState.value.task?.status === 'cancelled') return 'neutral';
-  return testState.value.task ? 'info' : 'warning';
+  if (testState.value.task && !isMediaTaskTerminal(testState.value.task)) return 'info';
+  return connectionState.value.result || testState.value.passed || testState.value.task?.status === 'succeeded' ? 'success' : testing.value ? 'info' : 'warning';
 });
 const statusIcon = computed(() => ({ error: 'i-heroicons-exclamation-circle', success: 'i-heroicons-check-circle', info: 'i-heroicons-clock', warning: 'i-heroicons-exclamation-circle', neutral: 'i-heroicons-minus-circle' })[statusTone.value]);
 const coreSelectionInvalid = computed(() => powerxLLMCatalog.value && (providersLoading.value || modelsLoading.value || Boolean(catalogError.value) || loadedProvidersScope.value !== contextKey() || loadedCatalogScope.value !== modelCatalogScope() || !selectedProvider.value || !selectedModel.value));
+const localSelectionInvalid = computed(() => catalogSource.value === 'local' && (modelsLoading.value || Boolean(catalogError.value) || loadedCatalogScope.value !== modelCatalogScope() || !catalogModels.value.some(item => item.id === draft.modelKey)));
 const providerSelection = computed<string | undefined>({
   get: () => powerxLLMCatalog.value && (loadedProvidersScope.value !== contextKey() || !selectedProvider.value) ? undefined : draft.provider || undefined,
-  set: value => { draft.provider = value ?? ''; },
+  set: value => { if (draft.provider !== (value ?? '')) draft.credentialRef = ''; draft.provider = value ?? ''; },
 });
 const modelSelection = computed<string | undefined>({
   get: () => powerxLLMCatalog.value && !selectedModel.value ? undefined : draft.modelKey || undefined,
@@ -295,7 +328,7 @@ watch([() => draft.modelKey, mediaOperation] as const, ([key, operation]) => {
   mediaParameterModel = key;
 });
 function mediaDefaults() { return { ...draft.mediaParams }; }
-async function saveSettings() { if (coreSelectionInvalid.value) return; saving.value = true; try { await client('admin/ai-settings/local-setting', { method: 'PUT', body: requestBody() }); toast.add({ title: t('common.success'), description: t('aiSettings.saveSucceeded'), color: 'success' }); } catch { toast.add({ title: t('common.error'), description: t('aiSettings.saveFailed'), color: 'error' }); } finally { saving.value = false; } }
+async function saveSettings() { if (coreSelectionInvalid.value || localSelectionInvalid.value) return; saving.value = true; try { await client('admin/ai-settings/local-setting', { method: 'PUT', body: requestBody() }); toast.add({ title: t('common.success'), description: t('aiSettings.saveSucceeded'), color: 'success' }); } catch { toast.add({ title: t('common.error'), description: t('aiSettings.saveFailed'), color: 'error' }); } finally { saving.value = false; } }
 const blockedReason = computed(() => settingsTestBlocked({
   ready: runtimeReady.value, modality: modality.value, delegated: providerMode.value.mode === 'delegated', source: catalogSource.value,
   modelKey: draft.modelKey, provider: draft.provider, endpoint: draft.endpoint, prompt: testState.value.prompt,
@@ -303,12 +336,17 @@ const blockedReason = computed(() => settingsTestBlocked({
   available: catalogModels.value.some(item => item.id === draft.modelKey && item.available !== false), operation: mediaOperation.value,
   localVision: profiles.value.some(item => (item.model_key || item.name) === draft.modelKey && item.modalities?.includes('vlm')),
 }));
+const connectionBlockedReason = computed(() => settingsConnectionBlocked({
+  ready: runtimeReady.value, source: catalogSource.value, provider: draft.provider, endpoint: draft.endpoint,
+  adapterAvailable: connectionProbes.value[catalogSource.value],
+  providersReady: loadedProvidersScope.value === contextKey(),
+}));
 const testPanelProps = computed(() => ({
   currentTitle: currentTitle.value,
   providerLabel: selectedProvider.value?.name || t('aiSettings.notSelected'),
   modelLabel: selectedModel.value?.label || t('aiSettings.notSelected'),
   modality: modality.value, generation: generation.value, blockedReason: blockedReason.value,
-  testing: testing.value, imageTypeOptions: imageTypeOptions.value, state: testState.value,
+  connectionBlockedReason: connectionBlockedReason.value, connection: connectionState.value, testing: testing.value, imageTypeOptions: imageTypeOptions.value, state: testState.value,
 }));
 const testPanelActions = {
   connection: testConnection, quick: quickCall,
@@ -319,21 +357,21 @@ function diagnostics(error: any) {
   return JSON.stringify({ status: error?.statusCode || error?.status || error?.response?.status, error_code: data.error_code,
     reason_code: data.reason_code || error?.reasonCode, trace_id: data.trace_id, request_id: data.request_id, details: data.details });
 }
-async function runTest(action: 'connection' | 'quick') {
+async function runTest() {
   if (blockedReason.value || testing.value || testState.value.task) return;
   const state = testState.value;
   const selectedModality = modality.value;
   const inputs: Array<Record<string, string>> = [{ role: 'user', type: 'text', content: state.prompt }];
   if (selectedModality === 'vlm') inputs.push(state.imageType === 'image_url' ? { role: 'user', type: state.imageType, url: state.image } : { role: 'user', type: state.imageType, content: state.image });
   const body = { ...requestBody(), inputs };
-  testing.value = action; state.text = ''; state.diagnostic = ''; state.passed = false;
+  testing.value = 'quick'; state.text = ''; state.diagnostic = ''; state.passed = false;
   try {
     let submission: Record<string, unknown> = body;
     if (generation.value) {
       state.attempt = settingsTestAttempt(state.attempt, body, () => crypto.randomUUID());
       submission = state.attempt.body;
     }
-    const out: any = await client(`admin/ai-settings/${action === 'connection' ? 'test-connection' : 'quick-call'}`, { method: 'POST', body: submission });
+    const out: any = await client('admin/ai-settings/quick-call', { method: 'POST', body: submission });
     const data = out?.data;
     if (['image', 'video', 'audio_tts'].includes(selectedModality)) {
       const task = validateMediaTask(data);
@@ -347,8 +385,18 @@ async function runTest(action: 'connection' | 'quick') {
   } catch (error) { state.text = t('aiSettings.testing.failed'); state.diagnostic = diagnostics(error); }
   finally { testing.value = ''; }
 }
-function testConnection() { return runTest('connection'); }
-function quickCall() { return runTest('quick'); }
+async function testConnection() {
+  if (connectionBlockedReason.value || testing.value) return;
+  const state = connectionState.value;
+  const input: AIConnectionTestInput = catalogSource.value === 'powerx'
+    ? { source: 'powerx', modality: modality.value as AIConnectionModality, provider: draft.provider }
+    : { source: 'local', modality: modality.value as AIConnectionModality, provider: draft.provider, endpoint: draft.endpoint, environment: environment.value as 'development' | 'production' };
+  testing.value = 'connection'; state.failed = false; state.result = undefined; state.diagnostic = '';
+  try { state.result = await connectionApi.testConnection(input); }
+  catch (error) { state.failed = true; state.diagnostic = diagnostics(error); }
+  finally { testing.value = ''; }
+}
+function quickCall() { return runTest(); }
 function newTestAttempt() { if (!testing.value && (!testState.value.task || isMediaTaskTerminal(testState.value.task))) { testState.value.attempt = undefined; testState.value.task = undefined; testState.value.text = ''; testState.value.diagnostic = ''; testState.value.passed = false; } }
 async function updateTask(cancel: boolean) {
   const state = testState.value, task = state.task;
@@ -367,7 +415,10 @@ function settingsCatalogEnvelope(data: any) {
   return data?.contract_version === 1 && data?.catalog_kind === 'ai_settings' && data?.modality === 'llm' && typeof data?.env === 'string' && data.env.trim();
 }
 function catalogFailure(error: unknown) {
+  const failure = error as any, data = failure?.data || failure?.response?._data || {};
+  catalogReason.value = data.reason_code || data.error_code || failure?.reasonCode || '';
   catalogError.value = t(powerxLLMCatalog.value ? 'aiSettings.coreCatalogUnavailableDescription' : 'aiSettings.catalogUnavailableDescription');
+  if (catalogSource.value === 'local' && catalogReason.value === 'AI_LOCAL_CATALOG_MIGRATION_REQUIRED') catalogError.value = t('aiSettings.online.errors.AI_LOCAL_CATALOG_MIGRATION_REQUIRED');
   catalogDiagnostic.value = diagnostics(error);
 }
 async function loadCatalog() {
@@ -399,15 +450,20 @@ async function loadCatalog() {
     if (request === providersRequest) providersLoading.value = false;
   }
 }
-async function loadCatalogModels() {
+function localConnectionBlur(event: FocusEvent) {
+  const target = event.relatedTarget as HTMLElement | null;
+  if (catalogSource.value !== 'local' || loadedCatalogScope.value === modelCatalogScope() || target?.closest('[data-testid="ai-settings-online-models"]')) return;
+  void loadCatalogModels(true);
+}
+async function loadCatalogModels(preserve = false) {
+  if (catalogSource.value === 'local' && !draft.endpoint) draft.endpoint = selectedProvider.value?.auth?.defaults?.base_url || '';
   const scope = modelCatalogScope(), request = ++modelsRequest;
-  loadedCatalogScope.value = '';
-  catalogModels.value = [];
+  if (!preserve) { loadedCatalogScope.value = ''; catalogModels.value = []; }
   modelsLoading.value = false;
   if (!draft.provider || loadedProvidersScope.value !== contextKey()) return;
   modelsLoading.value = true;
   try {
-    const out: any = await client('admin/ai-settings/catalog/models', { method: 'GET', query: { modality: modality.value, provider: draft.provider, app: draft.app, source: catalogSource.value }, silentAuthError: true });
+    const out: any = await client('admin/ai-settings/catalog/models', { method: 'GET', query: { modality: modality.value, provider: draft.provider, app: draft.app, source: catalogSource.value, ...(catalogSource.value === 'local' ? { environment: environment.value, endpoint: draft.endpoint, credential_ref: draft.credentialRef } : {}) }, silentAuthError: true });
     if (scope !== modelCatalogScope() || request !== modelsRequest) return;
     const data = out?.data ?? out;
     if (!Array.isArray(data?.items)) throw { reasonCode: 'AI_SETTINGS_CATALOG_RESPONSE_INVALID' };
@@ -418,9 +474,10 @@ async function loadCatalogModels() {
       if (data.contract_version !== 2) throw { reasonCode: 'AI_CATALOG_RESPONSE_INVALID' };
       catalogModels.value = data.items.map((item: any) => ({ ...item, id: item.model_key }));
     } else catalogModels.value = data.items;
-    if (!catalogModels.value.some(item => item.id === draft.modelKey)) draft.modelKey = powerxLLMCatalog.value ? '' : catalogModels.value.find(item => item.available !== false)?.id || '';
+    if (!preserve && !catalogModels.value.some(item => item.id === draft.modelKey)) draft.modelKey = powerxLLMCatalog.value ? '' : catalogModels.value.find(item => item.available !== false)?.id || '';
     catalogError.value = '';
     catalogDiagnostic.value = '';
+    catalogReason.value = '';
     loadedCatalogScope.value = scope;
     if (catalogSource.value === 'local' && !draft.endpoint) draft.endpoint = selectedProvider.value?.auth?.defaults?.base_url || '';
   } catch (error) {
@@ -431,13 +488,14 @@ async function loadCatalogModels() {
   }
 }
 async function refreshCatalog() {
+  catalogReason.value = '';
   catalogError.value = '';
   catalogDiagnostic.value = '';
   if (await loadCatalog()) await loadCatalogModels();
 }
 const contexts = new Map<string, typeof draft>();
 let activeContext = '';
-function contextKey() { return `${catalogSource.value}:${environment.value}:${modality.value}`; }
+function contextKey() { return `${userStore.currentTenantUuid || ''}:${catalogSource.value}:${environment.value}:${modality.value}`; }
 async function refreshProfile() {
   const key = contextKey();
   if (activeContext && activeContext !== key) contexts.set(activeContext, { ...draft, mediaParams: { ...draft.mediaParams } });
@@ -447,11 +505,12 @@ async function refreshProfile() {
   else await loadSavedSetting();
   if (key === contextKey()) await refreshCatalog();
 }
-watch([modality, catalogSource, environment], () => { void refreshProfile(); });
+watch(onlineScope, () => { onlineOpen.value = false; onlineDiagnostic.value = ''; });
+watch([modality, catalogSource, environment, () => userStore.currentTenantUuid], () => { void refreshProfile(); });
 watch(() => draft.provider, () => { draft.app = ''; const endpoint = selectedProvider.value?.auth?.defaults?.base_url; if (endpoint) draft.endpoint = endpoint; void loadCatalogModels(); });
 watch(() => draft.app, () => { void loadCatalogModels(); });
 
-onMounted(async () => { try { const [mode, modelResponse] = await Promise.all([client<any>('admin/ai-settings/mode', { method: 'GET', silentAuthError: true }), client<any>('admin/ai-settings/model-profiles', { method: 'GET', silentAuthError: true })]); providerMode.value = normalizeProviderMode(mode?.data); const data = modelResponse?.data ?? modelResponse ?? {}; profiles.value = Array.isArray(data.items) ? data.items : []; runtimeReady.value = true; reset(); await refreshProfile(); } catch { toast.add({ title: t('common.error'), description: t('aiSettings.loadFailed'), color: 'error' }); } });
+onMounted(async () => { try { const [mode, modelResponse] = await Promise.all([client<any>('admin/ai-settings/mode', { method: 'GET', silentAuthError: true }), client<any>('admin/ai-settings/model-profiles', { method: 'GET', silentAuthError: true })]); providerMode.value = normalizeProviderMode(mode?.data); connectionProbes.value = { local: mode?.data?.connection_probes?.local === true, powerx: mode?.data?.connection_probes?.powerx === true }; const data = modelResponse?.data ?? modelResponse ?? {}; profiles.value = Array.isArray(data.items) ? data.items : []; runtimeReady.value = true; reset(); await refreshProfile(); } catch { toast.add({ title: t('common.error'), description: t('aiSettings.loadFailed'), color: 'error' }); } });
 </script>
 
 <style>

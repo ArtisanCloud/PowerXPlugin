@@ -1,0 +1,44 @@
+{
+  "fixture_owner": "Framework",
+  "contract": "ai_local_model_catalog.v1",
+  "input": {
+    "environment": "development",
+    "modality": "llm",
+    "provider": "ollama",
+    "app": "",
+    "endpoint": "http://127.0.0.1:11434",
+    "credential_ref": ""
+  },
+  "result": {
+    "contract_version": 1,
+    "uuid": "44444444-4444-4444-8444-444444444444",
+    "environment": "development",
+    "provider": "ollama",
+    "app": "",
+    "revision": "55555555-5555-4555-8555-555555555555",
+    "protocol": "ollama",
+    "source": "http://127.0.0.1:11434/api/tags",
+    "updated_at": "2026-10-30T00:00:00Z",
+    "models": [
+      {
+        "id": "private-chat:14b",
+        "label": "private-chat:14b",
+        "modalities": [
+          "llm",
+          "vlm"
+        ],
+        "match": "provider_declared",
+        "manual_modalities": []
+      },
+      {
+        "id": "private-embed:latest",
+        "label": "private-embed:latest",
+        "modalities": [
+          "embedding"
+        ],
+        "match": "provider_declared",
+        "manual_modalities": []
+      }
+    ]
+  }
+}

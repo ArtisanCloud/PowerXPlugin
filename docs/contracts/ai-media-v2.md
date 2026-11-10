@@ -98,6 +98,8 @@ make capability-seed CAPABILITY_SEED_CONFIG=etc/config.yaml CAPABILITY_SEED_FLAG
 
 本目录只返回已声明媒体 operation 的型号。LLM 使用既有 `ListLLMModels` 专用入口；不能把未声明媒体能力的 LLM 目录条目转换成可执行媒体型号。旧 CatalogModels/CatalogProviders 的 Admin REST 代理调用必须迁移，旧 payload 会明确失败。
 
+与 AI Settings 管理页一致的 LLM 配置候选目录使用独立的 `list_settings_providers`／`list_settings_models` 操作，正式合同见 [AI Settings 文本目录 v1](ai-settings-llm-catalog.v1.md)。它们复用相同的两项目录读取能力与固定 `core://ai/model-catalog` 绑定，返回 `catalog_kind=ai_settings, contract_version=1`；现有媒体操作仍返回 v2，不能混用请求字段或结果。
+
 v2 能力名为 `vision_understanding/image_generation/video_generation/speech_synthesis`。原有 `image_understanding` 仅作为请求筛选别名；旧 LLM 目录维持原声明。`model_key` 为 opaque key，必须原样回传；`app` 单独提供，禁止客户端自行拆冒号，供应商原生型号可以包含冒号。
 
 `operations[capability]` 包含：
@@ -105,8 +107,12 @@ v2 能力名为 `vision_understanding/image_generation/video_generation/speech_s
 - `parameter_schema`：JSON Schema 的 object/type/properties/enum/minimum/maximum/default 子集，`additionalProperties: false`。
 - `defaults`：该型号、该操作的有效默认参数；Framework 先据此建立表单。
 - `input_types/max_images/max_videos`：实际接入支持的输入集合及上限。
+- `max_image_bytes/max_total_image_bytes/max_image_pixels`：可选的参考图解码字节及像素限制；与图片数量共同生效，不能只检查数量。
+
 - `available/reason_code`：该操作在当前凭证下的可执行判断。
 - `async`：供应商适配器是否使用原生异步任务；Core 生成接口均返回 Core 任务。
+
+OpenAI GPT-Image-2 的参考图协议、限制及受控验收见 [参考图输入合同](openai-image-reference.md)。
 
 `configured` 表示目标租户具有有效的型号配置和可解封凭据；`available` 还要求当前调用主体具备相应生成授权。这是调用前的配置／授权判断，不承诺供应商实时成功或余额充足。调用时再次验证。
 

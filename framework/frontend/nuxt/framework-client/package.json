@@ -21,7 +21,9 @@
     "sse.ts",
     "ws.ts",
     "logger.ts",
-    "navigation.ts"
+    "navigation.ts",
+    "ai-connection.ts",
+    "ai-model-catalog.ts"
   ],
   "peerDependencies": {
     "nuxt": "^4.2.0"

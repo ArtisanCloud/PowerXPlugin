@@ -18,7 +18,14 @@
     "check:business-notification-card": "node scripts/contracts/validate-business-notification-card.mjs",
     "check:ai-media-v2-contract": "node scripts/contracts/validate-ai-media-v2.mjs && node --test scripts/contracts/validate-ai-media-v2.test.mjs",
     "check:realtime-transport": "bash scripts/contracts/validate-realtime-transport.sh",
-    "test": "node scripts/capabilities/run-from-package.mjs && npm run check:customer-auth-boundary && npm run check:framework-knowledge-boundary && npm run check:host-contract-lab && npm run check:iam-directory-boundary && npm run check:realtime-transport && npm run check:ai-media-v2-contract && npm run check:business-notification-card && npm run check:media-thumbnail64"
+    "test": "node scripts/capabilities/run-from-package.mjs && npm run check:customer-auth-boundary && npm run check:framework-knowledge-boundary && npm run check:host-contract-lab && npm run check:iam-directory-boundary && npm run check:realtime-transport && npm run check:ai-media-v2-contract && npm run check:business-notification-card && npm run check:media-thumbnail64 && npm run check:ai-connection-test && npm run check:ai-online-model-catalog && npm run check:plugin-authorization && npm run check:event-fabric && npm run check:session-termination",
+    "check:ai-connection-test": "node scripts/contracts/validate-ai-connection-test.mjs",
+    "check:ai-online-model-catalog": "node scripts/contracts/validate-ai-online-model-catalog.mjs",
+    "check:plugin-authorization": "node scripts/contracts/validate-plugin-authorization.mjs",
+    "check:event-fabric": "node scripts/contracts/validate-event-fabric.mjs",
+    "sync:plugin-id": "node scripts/contracts/sync-plugin-id.mjs",
+    "check:plugin-id": "node scripts/contracts/sync-plugin-id.mjs --check && node --test tests/packaging/plugin-id-contract.test.mjs",
+    "check:session-termination": "node scripts/contracts/validate-session-termination.mjs"
   },
   "dependencies": {
     "fast-glob": "^3.3.3",

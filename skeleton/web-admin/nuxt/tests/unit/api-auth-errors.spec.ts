@@ -16,7 +16,7 @@ const adapter = () => ({
   readContext: vi.fn(async () => ({})), validateContext: vi.fn(() => ({ tenantUuid, memberUuid })),
   commitContext: vi.fn(), clearContext: vi.fn(),
 });
-const windowStub = () => vi.stubGlobal('window', { location: { origin: 'https://host.test' } });
+const windowStub = () => vi.stubGlobal('window', { location: { origin: 'https://host.test' }, PowerXBridgeClient: { protocolVersion: 2, onAuthToken: vi.fn(), setNavigator: vi.fn(), requestAuth: vi.fn(), requestSync: vi.fn(), getLastSyncAt: () => 0, reportSessionInvalid: vi.fn() } });
 const failures = [
   { status: 401, code: 'IAM_CONTEXT_PROOF_REQUIRED', kind: 'identity-proof' },
   { status: 401, code: 'IAM_CONTEXT_PROOF_INVALID', kind: 'identity-proof' },

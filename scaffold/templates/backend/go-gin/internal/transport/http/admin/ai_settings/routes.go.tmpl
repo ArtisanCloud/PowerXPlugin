@@ -32,6 +32,7 @@ func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
 	group.GET("/local-setting", h.LocalSetting)
 	group.GET("/catalog/providers", h.CatalogProviders)
 	group.GET("/catalog/models", h.CatalogModels)
+	group.POST("/catalog/local-online", h.SyncLocalCatalog)
 	group.PUT("/local-setting", h.SaveLocalSetting)
 	group.POST("/test-connection", h.TestConnection)
 	group.POST("/quick-call", h.QuickCall)
@@ -111,11 +112,16 @@ func (h *Handler) CatalogModels(c *gin.Context) {
 		contracts.ResponseSuccess(c, out)
 		return
 	}
-	svc, _, ok := h.localService(c)
+	svc, tenant, ok := h.localService(c)
 	if !ok {
 		return
 	}
-	contracts.ResponseSuccess(c, gin.H{"items": svc.CatalogModels(modality, provider, c.Query("app"))})
+	items, err := svc.ListLocalCatalog(c.Request.Context(), tenant, localaisettings.OnlineCatalogInput{Environment: c.Query("environment"), Modality: modality, Provider: provider, App: c.Query("app"), Endpoint: c.Query("endpoint"), CredentialRef: c.Query("credential_ref")})
+	if err != nil {
+		mediaFailure(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{"items": items})
 }
 func mediaCapability(modality string) (string, bool) {
 	switch modality {
@@ -205,10 +211,9 @@ func (h *Handler) SaveLocalSetting(c *gin.Context) {
 	respondDelegated(c, item, err)
 }
 
-// Both actions execute the selected capability. Media generation returns a task,
-// never a synthetic connectivity result. Credentials are selected at startup.
-func (h *Handler) TestConnection(c *gin.Context) { h.invokeSettingTest(c) }
-func (h *Handler) QuickCall(c *gin.Context)      { h.invokeSettingTest(c) }
+// QuickCall executes the startup-bound business runtime; connection probes
+// have their own request and adapter selection in connection.go.
+func (h *Handler) QuickCall(c *gin.Context) { h.invokeSettingTest(c) }
 
 type Handler struct {
 	mode fwprovider.Mode
@@ -216,7 +221,10 @@ type Handler struct {
 }
 
 func (h *Handler) Mode(c *gin.Context) {
-	contracts.ResponseSuccess(c, h.diagnostics())
+	contracts.ResponseSuccess(c, struct {
+		admincommon.ProviderDiagnostics
+		ConnectionProbes map[string]bool `json:"connection_probes"`
+	}{h.diagnostics(), map[string]bool{"local": h != nil && h.deps != nil && h.deps.LocalAISettings != nil, "powerx": h != nil && h.deps != nil && h.deps.PowerXAISettings != nil}})
 }
 
 func (h *Handler) Summary(c *gin.Context) {

@@ -1,6 +1,6 @@
 import { getCurrentScope, onScopeDispose } from 'vue';
 import { useNuxtApp, useRuntimeConfig, useRouter } from '#imports';
-import { initPowerXBridge, getPowerXHostSession, createPowerXRouterNavigator, createFrameworkLogger } from '@artisan-cloud/plugin-framework-client';
+import { initPowerXBridge, getPowerXHostSession, createPowerXRouterNavigator, createFrameworkLogger, type HostSessionClearScope } from '@artisan-cloud/plugin-framework-client';
 import { useTheme } from '~/composables/useTheme';
 import { useUserStore } from '~/stores/user';
 import { useMe } from '~/composables/useMe';
@@ -16,8 +16,9 @@ export function setupHostBridgeAdapter(opts: { pluginId?: string; debug?: boolea
   const pluginId = opts.pluginId || String(config.public?.powerxPluginId || 'com.powerx.plugins.base');
   const session = getPowerXHostSession(pluginId);
   const logger = createFrameworkLogger('bridge.session');
-  const clearContext = () => {
+  const clearContext = (scope: HostSessionClearScope = 'session') => {
     user.clearUserState();
+    if (scope === 'identity') return;
     // These are this iframe application's stores, never the host application's stores.
     const pinia = app.$pinia;
     for (const store of Array.from(pinia._s.values())) {
@@ -46,10 +47,10 @@ export function setupHostBridgeAdapter(opts: { pluginId?: string; debug?: boolea
         throw cause;
       }
     },
-    navigator: createPowerXRouterNavigator(router, config.app.baseURL, window.location.origin),
+    navigator: createPowerXRouterNavigator(router, config.app.baseURL, window.location.origin, session),
   });
   const stopRequester = session.setRequester(request);
-  const stopState = session.subscribe(state => { if (state.status === 'cleared' || state.status === 'rejected') clearContext(); });
+  const stopState = session.subscribe(state => { if (state.status === 'cleared' || state.status === 'rejected') clearContext(state.clearScope); });
   let disposed = false;
   const dispose = () => {
     if (disposed) return;

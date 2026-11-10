@@ -1,0 +1,97 @@
+{
+  "contract": "ai-local-model-catalog.v1",
+  "scope": "authorized_local_plugin_database_targeted_migration",
+  "status": "pass",
+  "started_at": "2026-10-30T08:43:21Z",
+  "verified_at": "2026-10-30T08:43:57Z",
+  "command": {
+    "cwd": "skeleton/backend/go-gin",
+    "config_path": "skeleton/backend/etc",
+    "argv": [
+      "go",
+      "run",
+      "./cmd/database",
+      "migrate-ai-online-catalog"
+    ],
+    "environment_source": "startup_environment_of_existing_8078_process",
+    "exit_code": 0,
+    "success_marker": "ai_online_catalog_migrate_ok"
+  },
+  "target": {
+    "driver": "postgres",
+    "host": "localhost",
+    "port": 5432,
+    "database": "com_powerx_plugin_base",
+    "schema": "public"
+  },
+  "before": {
+    "local_ai_settings": {
+      "digest_scope": "all_rows",
+      "exists": true,
+      "model_key_max_length": 128,
+      "policies": [],
+      "rls_enabled": false,
+      "rls_forced": false,
+      "row_count": 2,
+      "rows_sha256": "0e2394bdb0d6b7bddacbb4d95bfb7eddd56095514ea49843daccb6270cf9c719"
+    },
+    "local_ai_online_catalogs": {
+      "exists": false
+    }
+  },
+  "after": {
+    "local_ai_settings": {
+      "digest_scope": "all_rows",
+      "exists": true,
+      "model_key_max_length": 512,
+      "policies": [],
+      "rls_enabled": false,
+      "rls_forced": false,
+      "row_count": 2,
+      "rows_sha256": "0e2394bdb0d6b7bddacbb4d95bfb7eddd56095514ea49843daccb6270cf9c719"
+    },
+    "local_ai_online_catalogs": {
+      "digest_scope": "all_rows",
+      "exists": true,
+      "policies": [
+        {
+          "name": "ai_online_tenant",
+          "using": "(tenant_uuid = (current_setting('app.tenant_uuid'::text, true))::uuid)",
+          "with_check": "(tenant_uuid = (current_setting('app.tenant_uuid'::text, true))::uuid)"
+        }
+      ],
+      "rls_enabled": true,
+      "rls_forced": true,
+      "row_count": 0,
+      "rows_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "checks": {
+    "added_tables": [
+      "local_ai_online_catalogs"
+    ],
+    "removed_tables": [],
+    "existing_ai_profile_rows_unchanged": true,
+    "existing_ai_profile_digest_unchanged": true,
+    "catalog_initially_empty": true,
+    "model_key_length": 512,
+    "rls_enabled": true,
+    "rls_forced": true
+  },
+  "boundaries": {
+    "user_services_restarted": false,
+    "user_8078_pid_before": 65105,
+    "user_8078_pid_after": 65105,
+    "general_migration_or_seed_run": false,
+    "inference_or_model_download_run": false,
+    "migration_role_superuser": true,
+    "rls_authorization_exercised_on_user_database": false,
+    "browser_acceptance": "pending_user_validation"
+  },
+  "source_sha256": {
+    "skeleton/backend/go-gin/cmd/database/migrate/ai_online_catalog.go": "8b43576d679dc7d44481edbc4f565cec33a2917195930da2bf85c6ee878c7816",
+    "skeleton/backend/go-gin/cmd/database/main.go": "23e58da61de57df83c2345680fba29c591de53e85dfaa1c836ff39a2912c59b0",
+    "skeleton/backend/go-gin/internal/entity/models/local_ai_online_catalog.go": "3c4c2eede823287f5ce52d138c22765c3d188e27704acf5fd58646be3ac98a7f",
+    "skeleton/backend/go-gin/internal/entity/models/local_ai_setting.go": "044557e12f2f3a4a7bb3e56b4e51c39dddf3d2fd0dfe0e62e30b70e090e41dc3"
+  }
+}

@@ -25,6 +25,9 @@ type ContractStatus = internal.ContractStatus
 // InvocationError 为标准化错误类型。
 type InvocationError = internal.InvocationError
 
+type StreamInput = internal.StreamInput
+type StreamEvent = internal.StreamEvent
+
 // Client 暴露 Gateway 调用能力。
 type Client = internal.Client
 

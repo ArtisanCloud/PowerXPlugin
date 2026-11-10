@@ -1,0 +1,346 @@
+{
+  "checked_at": "2026-10-30T08:10:56.199362+00:00",
+  "status": "SOURCE_AND_CONTROLLED_VALIDATION_PASSED_LIVE_OLLAMA_FULL_REFRESH_FAILED",
+  "framework_base_commit": "32aaf0bd33ecda9860384484b55aa1d092ad27fc",
+  "changes_committed": false,
+  "published": false,
+  "core_contract_source": {
+    "source_repository": "ArtisanCloud/PowerX",
+    "source_commit": "97ae4d43e0d0e48516d8ffe46bbd7bc388aab0ad",
+    "source_worktree_uncommitted": true,
+    "snapshot_date": "2026-10-30",
+    "sha256": {
+      "ai-online-model-catalog.md": "be84ec15626effb24a5bb8d1b752828b05494719c8a8746e3448282c08128efd",
+      "ai-settings-llm-catalog.v1.md": "5034b868a200b598002c17f038e3747cc2d5148eec79adfc77481de506b6d945"
+    },
+    "protocol_source": {
+      "path": "backend/internal/server/ai/modeldiscovery/client.go",
+      "sha256": "0fa1d8fd8f87c4ecdef6215865c42a2e04abf9acb41079b7e02585654d06a1a7",
+      "framework_adaptation": "runtime/ai/modeldiscovery; typed Framework errors, header trace preservation, strict model identifiers, no upstream error-text parsing"
+    }
+  },
+  "implementation": {
+    "go_discovery_sdk": "complete",
+    "local_tenant_catalog_store_and_credential_resolver": "complete",
+    "http_bridge_and_admin_guard": "complete",
+    "nuxt_client_and_page": "complete",
+    "skeleton_scaffold_cli_and_contract_export": "complete",
+    "dotnet": "not_implemented",
+    "fastapi": "not_implemented",
+    "additional_local_cloud_inference_drivers": "not_implemented_existing_runtime_boundary_preserved"
+  },
+  "tests": {
+    "go": {
+      "target_packages": 10,
+      "packages_with_tests_passed": 9,
+      "compiled_without_test_files": 1,
+      "passed_test_events_including_subtests": 178,
+      "packages": {
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/ai/modeldiscovery": "pass",
+        "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/ai_settings": "skip",
+        "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config": "pass",
+        "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/ai_settings": "pass",
+        "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/ai_settings": "pass",
+        "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/cmd/database": "pass",
+        "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/cmd/database/migrate": "pass",
+        "github.com/powerx-plugin/cli/internal/contracts": "pass",
+        "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/cmd/plugin": "pass",
+        "github.com/powerx-plugin/cli/internal/templates": "pass"
+      }
+    },
+    "race": {
+      "status": "passed",
+      "packages": 4
+    },
+    "vet": {
+      "status": "passed",
+      "packages": 8
+    },
+    "isolated_postgresql": {
+      "status": "passed_with_race",
+      "assertions": [
+        "idempotent_migration",
+        "model_key_column_widened_to_512",
+        "compare_and_swap_revision_conflict",
+        "tenant_filtering",
+        "RLS_enabled_and_forced",
+        "unprivileged_same_tenant_insert_allowed",
+        "unprivileged_cross_tenant_read_update_insert_rejected",
+        "scoped_rollback"
+      ]
+    },
+    "frontend_unit": {
+      "status": "passed",
+      "files": 4,
+      "tests": 18
+    },
+    "typescript_strict": "passed",
+    "nuxt_build": "passed",
+    "root_npm_test": "passed",
+    "template_consistency": "passed",
+    "browser": {
+      "status": "passed",
+      "cases": 36,
+      "api": "controlled_fixtures",
+      "local_online_cases": 16,
+      "existing_ai_settings_and_media_cases": 20,
+      "manual_themes": [
+        "light",
+        "dark"
+      ],
+      "system_themes": [
+        "light",
+        "dark"
+      ],
+      "viewports": [
+        [
+          1440,
+          1000
+        ],
+        [
+          390,
+          844
+        ]
+      ],
+      "theme_combinations_per_panel": 8,
+      "minimum_checked_text_contrast": 4.5,
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "selected",
+        "disabled",
+        "persistent_error_after_dialog_close"
+      ],
+      "assertions": [
+        "one_sync_per_explicit_open",
+        "no_automatic_inference_or_profile_save",
+        "native_tag_selected_and_saved_with_unchanged_parameters",
+        "versioned_manual_classification",
+        "explicit_retry_after_failure",
+        "old_response_cannot_overwrite_other_environment",
+        "missing_migration_disables_catalog_update_without_disabling_probe",
+        "unsupported_provider_and_non_admin_do_not_submit",
+        "PowerX_rereads_catalog_without_admin_sync",
+        "drafts_and_separate_probe_trial_regressions"
+      ]
+    },
+    "generated_consumer": {
+      "path": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-ai-settings-20261022-cc87e64fe4ca10be/generated-consumer",
+      "go_work": "off",
+      "local_replace": false,
+      "four_bindings": "passed",
+      "manifest_validation": "passed",
+      "backend_build": "passed",
+      "shared_fixtures": "passed",
+      "packed_typescript": "passed"
+    }
+  },
+  "credential_boundary": {
+    "keys": "server_environment_variables_only",
+    "references": "explicit_uuid_bindings",
+    "scope": [
+      "tenant_uuid",
+      "environment",
+      "provider",
+      "endpoint"
+    ],
+    "public_provider_defaults": [
+      "base_url"
+    ],
+    "key_changes_invalidate_old_dynamic_candidates": true,
+    "credentials_sent_to_frontend": false,
+    "credential_or_protocol_fallback": false
+  },
+  "live_local_acceptance": {
+    "tags": {
+      "checked_at": "2026-10-30T07:49:16.812686+00:00",
+      "method": "GET",
+      "endpoint": "http://127.0.0.1:11434/api/tags",
+      "status": 200,
+      "model_count": 4,
+      "model_ids_sha256": "d2806454194c5f1aa6945985249db32b78ae4e6031d784b7693b5018cd17ee6f",
+      "generation_submitted": false
+    },
+    "sdk_discovery": {
+      "active_settings_written": false,
+      "checked_at": "2026-10-30T07:12:17Z",
+      "details": {
+        "generation_submitted": false,
+        "model": "qwen3.5:cloud",
+        "protocol": "ollama",
+        "provider": "ollama",
+        "source": "http://127.0.0.1:11434/api/show",
+        "upstream_status": 410
+      },
+      "endpoint": "http://127.0.0.1:11434",
+      "generation_submitted": false,
+      "http_status": 502,
+      "provider": "ollama",
+      "reason_code": "AI_MODEL_DISCOVERY_UPSTREAM_FAILED",
+      "status": "failed"
+    },
+    "conclusion": "/api/tags returned 200 with four models; qwen3.5:cloud /api/show returned 410. Full refresh failed explicitly. No inference, downloads, model deletion, profile writes or user database migration were performed."
+  },
+  "runtime_cleanup": {
+    "preview": {
+      "pid": 95675,
+      "pgid": 95675,
+      "port": 3158,
+      "cwd": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/skeleton/web-admin/nuxt",
+      "command": "PORT=3158 HOST=127.0.0.1 node .output/server/index.mjs",
+      "previous_processes": [
+        {
+          "pid": 5329,
+          "pgid": 5329,
+          "stopped": true
+        },
+        {
+          "pid": 51404,
+          "pgid": 51404,
+          "stopped": true
+        },
+        {
+          "pid": 34355,
+          "pgid": 34355,
+          "stopped": true
+        }
+      ],
+      "process_group_before_stop": [
+        {
+          "pid": 95675,
+          "pgid": 95675,
+          "ppid": 1,
+          "command": "node"
+        }
+      ],
+      "stopped": true,
+      "port_released": true
+    },
+    "postgres": {
+      "data": "/tmp/px-ai-pg-87xok7xx/data",
+      "root": "/tmp/px-ai-pg-87xok7xx",
+      "port": 54099,
+      "pid": 37753,
+      "command": "pg_ctl -D /tmp/px-ai-pg-87xok7xx/data -o \"-h 127.0.0.1 -p 54099 -k /tmp/px-ai-pg-87xok7xx/socket\" -w start",
+      "dsn": "host=127.0.0.1 port=54099 user=ai_catalog_test dbname=postgres sslmode=disable",
+      "port_released": true,
+      "stopped": true,
+      "failed_start_attempt": {
+        "pid": 67413,
+        "port": 53908,
+        "stopped": true,
+        "reason": "unix_socket_path_too_long",
+        "port_released": true
+      },
+      "failed_start_attempts": [
+        {
+          "pid": 51396,
+          "attempted_port": 5432,
+          "stopped": true,
+          "reason": "restart_options_not_retained; bind_failed; no_user_process_changed"
+        }
+      ],
+      "previous_processes": [
+        {
+          "pid": 68833,
+          "stopped": true
+        },
+        {
+          "pid": 54004,
+          "stopped": true
+        }
+      ]
+    },
+    "user_services_restarted": false,
+    "user_database_migrated": false,
+    "core_source_changed": false,
+    "core_grants_changed": false,
+    "removed_own_unedited_intermediate_bundles": [
+      "framework-release-ai-settings-20261022-8c851e8bcc747ecc",
+      "framework-release-ai-settings-20261022-b874ceca877f8386"
+    ]
+  },
+  "package": {
+    "bundle": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-ai-settings-20261022-cc87e64fe4ca10be",
+    "profile": "ai-settings",
+    "published": false,
+    "changes_committed": false,
+    "base_commit": "32aaf0bd33ecda9860384484b55aa1d092ad27fc",
+    "source_sha256": {
+      "go": "a74d13887f3cd123a86f95b3612d65ed254e6a1ba72071e46c7fae7c0a16048e",
+      "nuxt": "9d2245a4ce0866acbafb25044b4fb22e6cc3c355253182b8fe70e6d7ef5814a5",
+      "generator": "627bff290d0068f66555c679b070298710fb15ec67490943deb7893da479f0d4",
+      "contracts": "159e30d15d62a053a1b4cfb9257b816b18e0bee11fa72fa49d5a7b1604b000e1",
+      "ai_contracts": "1f70e3349394313523ea0f48dd7f3a625dc1de482297e2ca2484325de18db75d"
+    },
+    "go_module": "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go",
+    "go_sdk_version": "v0.0.27-dev.aisettings.a74d13887f3cd123",
+    "go_proxy": "file:///private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-ai-settings-20261022-cc87e64fe4ca10be/go-proxy",
+    "nuxt_client_version": "0.0.14-dev.aisettings.9d2245a4ce0866ac",
+    "nuxt_client_ref": "file:/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-ai-settings-20261022-cc87e64fe4ca10be/artisan-cloud-plugin-framework-client-0.0.14-dev.aisettings.9d2245a4ce0866ac.tgz",
+    "nuxt_client_tarball": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-ai-settings-20261022-cc87e64fe4ca10be/artisan-cloud-plugin-framework-client-0.0.14-dev.aisettings.9d2245a4ce0866ac.tgz",
+    "generator_version": "v0.0.0-aisettings.627bff290d0068f6",
+    "generator_binary": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-ai-settings-20261022-cc87e64fe4ca10be/px-plugin",
+    "consumer": {
+      "path": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-ai-settings-20261022-cc87e64fe4ca10be/generated-consumer",
+      "go_work": "off",
+      "local_replace": false,
+      "four_bindings": "passed",
+      "manifest_validation": "passed",
+      "backend_build": "passed",
+      "shared_fixtures": "passed",
+      "packed_typescript": "passed"
+    },
+    "artifact_sha256": {
+      "px-plugin": "065593b6a2fb51238abc616ae7df2838436e0d59765f5a350b1f04dcde52c0dd",
+      "artisan-cloud-plugin-framework-client-0.0.14-dev.aisettings.9d2245a4ce0866ac.tgz": "872e924b72010b892f2a3b7341ad81b3aa037afc1a5539bfaf9d2ed2b5630b07",
+      "go-proxy/github.com/!artisan!cloud/!power!x!plugin/framework/backend/go/@v/v0.0.27-dev.aisettings.a74d13887f3cd123.zip": "1511d1a55735b888c6d941f00da3a73acfc0e15e4937516560dd24d0966d3166"
+    }
+  },
+  "validation_artifacts": {
+    "directory": "artifacts/framework-release-ai-settings-20261022-cc87e64fe4ca10be/validation",
+    "files_sha256": {
+      "go.jsonl": "50e4ab6cdf1362805b579977bfab079638ce10fa31798a910071253c8fc23a5f",
+      "race.log": "3107018027c584a3740f3b82855875eb84408ec1c5d020e766359bc70108c77b",
+      "vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "postgres-race.log": "e65738e7696fb093f47064c45e880d7de0fb3332984cc3f642c1eb59b6b12d8e",
+      "unit.log": "c8967b52bac5f49d1e449d6abac76f8676544e8e1011b5aa3165ac03de7639e2",
+      "typescript.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "nuxt-build.log": "3a097db128d5fb736c5b5463772f4ef2d432fd1426c4ea5abd962ab5c8b8eb6f",
+      "browser.log": "2702b0baa7c4bc4c0f737a706d3840ec7e29d5c11bb0f55b37f6db5af93895d4",
+      "contracts.log": "90d77a9e5f39d7089917c864b145e2b17e717ba5fd3602f280b7b2b0d1883c03",
+      "template-check.log": "8bdb0af2ee1826f47f0e8e3d64d46fd652cd8e9eae0bc78da3dd20f67db858ca",
+      "local-live-discovery.json": "4c4184822766f27d8d8982016510d4c12cf398d132d28e53072f2757c8815671",
+      "local-live-tags.json": "93f067e1da084334a5643daef68a908af5fdc32532b8816afd5b1a40374c7aa6",
+      "live-check.go": "3d0bf40662fa4f9b78e3d4f9334c00de1ad84b6462484b9e120637e251d6d33d",
+      "preview-process.json": "5fbd126a90f699897cd515f31d5b3da7acffdafdbaf3c60b9f848d4473b825c0",
+      "postgres-process.json": "fb8c87cdca2d096b58d5b8d617174000f2b299b0e421fce872ee5eb0c96ed3a1"
+    },
+    "screenshots_sha256": {
+      "validation/screenshots/ai-local-online-catalog-lo-bc869-le-dark-desktop-system-dark-chromium/online-models.png": "c122f7795587af1c74826cf2368f211d50a04f48c0715361f1643002fc9ee1e8",
+      "validation/screenshots/ai-local-online-catalog-lo-50555--light-desktop-system-light-chromium/online-models.png": "e920384154d15bdae090854c35fa62ea75819d10ec4c1f890cefd1743ba5cda3",
+      "validation/screenshots/ai-local-online-catalog-lo-59334-le-dark-narrow-system-light-chromium/online-models.png": "5599f7d323de798a9dd31a34e4bf332a3ff8aa5e963303e2dab9837067460cd3",
+      "validation/screenshots/ai-local-online-catalog-lo-dfdec-e-light-desktop-system-dark-chromium/online-models.png": "f6c6ad5bcc978640218165b42bbd822eae4217cf100f890039486cc479ad23e2",
+      "validation/screenshots/ai-local-online-catalog-lo-0242d-e-light-narrow-system-light-chromium/online-models.png": "d459f9e552b3d260e6d6438e35a005e391dae7c3a83e227deea440937a06c7cb",
+      "validation/screenshots/ai-local-online-catalog-lo-0c242-e-dark-desktop-system-light-chromium/online-models.png": "0fffbbcc12cf684c798a0e01b0d3c3bef3c6f62a48e3abea248d49cb31b356af",
+      "validation/screenshots/ai-local-online-catalog-lo-a7b2d-ble-dark-narrow-system-dark-chromium/online-models.png": "75e7a6d1c622599e5986bf111ee62e1b7d08e0e54b1b7969399c0990d8ca0a8c",
+      "validation/screenshots/ai-local-online-catalog-lo-59730-le-light-narrow-system-dark-chromium/online-models.png": "45c6a9b71d52c96041a00156d9bb4f18e3d92f4e84884cab9e16e828692ab828",
+      "validation/screenshots/ai-local-online-catalog-lo-bc869-le-dark-desktop-system-dark-chromium/online-models-error.png": "883b61e94ed56ba91fb5ed0770ed3bbdf9936ba892e090f0545a965e476ce773",
+      "validation/screenshots/ai-local-online-catalog-lo-50555--light-desktop-system-light-chromium/online-models-error.png": "89f9e5d1c8fe6cee3a45e35f3e4ee60fed23f6db6efdd134b8f22a1c61794ec4",
+      "validation/screenshots/ai-local-online-catalog-lo-59334-le-dark-narrow-system-light-chromium/online-models-error.png": "6ccd4440eb0c6885204af662e21805568ae58a23f856012c7ccd17d2bc295203",
+      "validation/screenshots/ai-local-online-catalog-lo-dfdec-e-light-desktop-system-dark-chromium/online-models-error.png": "45073a35815a6e3b33e45b174bafe172840ae049ee2314f2e1e39fd511b404bb",
+      "validation/screenshots/ai-local-online-catalog-lo-0242d-e-light-narrow-system-light-chromium/online-models-error.png": "251ab13235156226ab3d70f964db1ce0ed8ba2ea587c6d7c16f10838a414cbca",
+      "validation/screenshots/ai-local-online-catalog-lo-0c242-e-dark-desktop-system-light-chromium/online-models-error.png": "7e2f83ab807b9fde6bb1ef94085ea0bcc24d53e61633657e4edb562c7aed8092",
+      "validation/screenshots/ai-local-online-catalog-lo-a7b2d-ble-dark-narrow-system-dark-chromium/online-models-error.png": "6ccd4440eb0c6885204af662e21805568ae58a23f856012c7ccd17d2bc295203",
+      "validation/screenshots/ai-local-online-catalog-lo-59730-le-light-narrow-system-dark-chromium/online-models-error.png": "251ab13235156226ab3d70f964db1ce0ed8ba2ea587c6d7c16f10838a414cbca"
+    }
+  },
+  "remaining_acceptance": [
+    "Run the scoped migration against the selected plugin database after deployment review.",
+    "Load the matching backend and frontend code in the user-owned services.",
+    "Resolve the real qwen3.5:cloud metadata HTTP 410 before claiming full live Ollama catalog refresh.",
+    "Validate any real cloud credential binding and provider account separately; controlled fixtures do not establish live cloud access.",
+    "Public SDK/CLI publication and non-Go backend support are not included."
+  ]
+}

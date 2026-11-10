@@ -19,6 +19,8 @@ import (
 
 type Config struct {
 	BaseURL, BearerToken, APIKey, AuthScheme, STSClientID, STSClientSecret, STSTokenURL string
+	APIPrefix                                                                           string
+	StreamTimeout                                                                       time.Duration
 	Timeout                                                                             time.Duration
 }
 type tokenProvider interface {
@@ -34,10 +36,12 @@ type TokenProviderFunc func(context.Context) (string, error)
 func (f TokenProviderFunc) Token(ctx context.Context) (string, error) { return f(ctx) }
 
 type Client struct {
-	baseURL    string
-	http       *http.Client
-	token      tokenProvider
-	authScheme string
+	baseURL       string
+	http          *http.Client
+	token         tokenProvider
+	authScheme    string
+	apiPrefix     string
+	streamTimeout time.Duration
 }
 
 // Registry is the Framework boundary for tenant Capability Registry access.
@@ -54,10 +58,12 @@ type Registry interface {
 // capability contract's authorization and retry semantics.
 type HTTPError struct {
 	StatusCode int
+	ErrorCode  string
 	ReasonCode string
 	TraceID    string
 	RequestID  string
-	Body       string
+	Details    *hostcontract.InvocationFailureDetails
+	Body       string `json:"-"`
 }
 
 func (e *HTTPError) Error() string {
@@ -136,13 +142,34 @@ type InvokeInput struct {
 	Context           map[string]any `json:"context,omitempty"`
 }
 type InvokeResult struct {
-	TraceID      string         `json:"trace_id"`
-	Status       string         `json:"status"`
-	ProtocolUsed string         `json:"protocol_used"`
-	FallbackUsed bool           `json:"fallback_used"`
-	Payload      map[string]any `json:"payload,omitempty"`
-	Result       map[string]any `json:"result,omitempty"`
+	TraceID         string         `json:"trace_id"`
+	Status          string         `json:"status"`
+	ProtocolUsed    string         `json:"protocol_used"`
+	FallbackUsed    bool           `json:"fallback_used"`
+	Payload         map[string]any `json:"payload,omitempty"`
+	Result          map[string]any `json:"result,omitempty"`
+	routingEvidence bool
 }
+
+// HasRoutingEvidence distinguishes an explicit false fallback flag from a
+// missing field when a typed service contract requires routing confirmation.
+func (r *InvokeResult) HasRoutingEvidence() bool { return r != nil && r.routingEvidence }
+
+func (r *InvokeResult) UnmarshalJSON(raw []byte) error {
+	type wire InvokeResult
+	var value wire
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return err
+	}
+	*r = InvokeResult(value)
+	r.routingEvidence = len(fields["fallback_used"]) > 0 && string(fields["fallback_used"]) != "null"
+	return nil
+}
+
 type InvocationError struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
@@ -163,7 +190,7 @@ func NewClient(cfg Config, httpClient *http.Client) (*Client, error) {
 	if strings.TrimSpace(cfg.BaseURL) == "" {
 		return nil, errors.New("powerx capability base_url is required")
 	}
-	c := &Client{baseURL: strings.TrimRight(cfg.BaseURL, "/"), authScheme: "Bearer"}
+	c := &Client{baseURL: strings.TrimRight(cfg.BaseURL, "/"), authScheme: "Bearer", apiPrefix: cfg.APIPrefix, streamTimeout: cfg.StreamTimeout}
 	if httpClient != nil {
 		c.http = httpClient
 	} else {
@@ -202,7 +229,7 @@ func NewClientWithTokenProvider(cfg Config, provider TokenProvider, httpClient *
 	if provider == nil {
 		return nil, errors.New("powerx capability token provider is required")
 	}
-	c := &Client{baseURL: strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/"), token: provider, authScheme: "Bearer"}
+	c := &Client{baseURL: strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/"), token: provider, authScheme: "Bearer", apiPrefix: cfg.APIPrefix, streamTimeout: cfg.StreamTimeout}
 	if httpClient != nil {
 		c.http = httpClient
 	} else {
@@ -302,7 +329,15 @@ func (c *Client) do(ctx context.Context, method, path string, in, out any) error
 		}
 		body = bytes.NewReader(raw)
 	}
-	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
+	endpoint := c.baseURL + path
+	if strings.HasPrefix(path, "/api/v1/") {
+		var endpointErr error
+		endpoint, endpointErr = hostcontract.InvocationEndpoint(c.baseURL, c.apiPrefix, strings.TrimPrefix(path, "/api/v1"))
+		if endpointErr != nil {
+			return &HTTPError{StatusCode: 400, ErrorCode: "CAPABILITY_CONFIG_INVALID", ReasonCode: "CAPABILITY_CONFIG_INVALID"}
+		}
+	}
+	req, err := http.NewRequestWithContext(ctx, method, endpoint, body)
 	if err != nil {
 		return err
 	}
@@ -317,7 +352,9 @@ func (c *Client) do(ctx context.Context, method, path string, in, out any) error
 		return &HTTPError{StatusCode: 503, ReasonCode: "CAPABILITY_UPSTREAM_DEPENDENCY"}
 	}
 	req.Header.Set("Authorization", c.authScheme+" "+token)
-	resp, err := c.http.Do(req)
+	client := *c.http
+	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	resp, err := client.Do(req)
 	if err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -325,7 +362,10 @@ func (c *Client) do(ctx context.Context, method, path string, in, out any) error
 		return &HTTPError{StatusCode: 503, ReasonCode: "CAPABILITY_UPSTREAM_DEPENDENCY"}
 	}
 	defer resp.Body.Close()
-	raw, err := io.ReadAll(resp.Body)
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, hostcontract.MaxInvocationResponseBytes+1))
+	if len(raw) > hostcontract.MaxInvocationResponseBytes {
+		return &HTTPError{StatusCode: 502, ErrorCode: "CAPABILITY_RESPONSE_INVALID", ReasonCode: "CAPABILITY_RESPONSE_INVALID"}
+	}
 	if err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -333,19 +373,7 @@ func (c *Client) do(ctx context.Context, method, path string, in, out any) error
 		return &HTTPError{StatusCode: 502, ReasonCode: "CAPABILITY_UPSTREAM_DEPENDENCY"}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		var identity struct {
-			TraceID   string `json:"trace_id"`
-			RequestID string `json:"request_id"`
-		}
-		_ = json.Unmarshal(raw, &identity)
-		traceID, requestID := resp.Header.Get("X-Trace-ID"), resp.Header.Get("X-Request-ID")
-		if traceID == "" {
-			traceID = identity.TraceID
-		}
-		if requestID == "" {
-			requestID = identity.RequestID
-		}
-		return &HTTPError{StatusCode: resp.StatusCode, ReasonCode: hostcontract.ParseReasonCode(raw, "CAPABILITY_UPSTREAM_DEPENDENCY"), TraceID: traceID, RequestID: requestID, Body: string(raw)}
+		return capabilityFailure(hostcontract.DecodeInvocationFailure(resp.StatusCode, resp.Header, raw, "CAPABILITY_UPSTREAM_DEPENDENCY"), string(raw))
 	}
 	if err := hostcontract.DecodeData(raw, out); err != nil {
 		return &HTTPError{StatusCode: 502, ReasonCode: "CAPABILITY_UPSTREAM_DEPENDENCY"}

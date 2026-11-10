@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createAIMediaClient, createPluginSSEClient, mediaOperationDefaults, PluginSSEHTTPError, readSSEStream, type MediaTask, type PluginSSEStreamEvent } from '../../../../../framework/frontend/nuxt/framework-client';
 import fixture from '../../../../../docs/contracts/fixtures/ai-media-v2.json';
+import limitsFixture from '../../../../../docs/contracts/fixtures/ai-media-model-limits.v1.json';
+import type { MediaModelCatalog, MediaModelOperation } from '../../../../../framework/frontend/nuxt/framework-client';
 
 const task = (): MediaTask => structuredClone(fixture.task_result) as MediaTask;
 const status = (value: MediaTask): PluginSSEStreamEvent => ({ id: `${value.task_uuid}:${value.revision}`, event: 'status', data: JSON.stringify(value), payload: value, raw: '' });
@@ -8,6 +10,26 @@ const running = () => ({ ...task(), status: 'running', phase: 'waiting_provider'
 afterEach(() => vi.unstubAllGlobals());
 
 describe('AI media v2', () => {
+  it.each(limitsFixture.cases)('preserves model limits: $name', async sample => {
+    const catalog = structuredClone(limitsFixture.catalog_result) as MediaModelCatalog;
+    const operation = catalog.items[0]!.operations.image_generation!;
+    const keys = ['max_image_bytes', 'max_total_image_bytes', 'max_image_pixels'] as const;
+    for (const key of keys) delete operation[key];
+    Object.assign(operation, sample.limits);
+    const request = vi.fn(async () => ({ data: catalog }));
+    const client = createAIMediaClient({ request: request as any, stream: vi.fn() });
+    const result = await client.listModels({ capability: 'image_generation' });
+    const actual: MediaModelOperation = result.items[0]!.operations.image_generation!;
+    const bytes: number | undefined = actual.max_image_bytes;
+    expect(bytes).toBe(sample.limits.max_image_bytes);
+    for (const key of keys) {
+      expect(actual[key]).toBe(sample.limits[key]);
+      expect(Object.hasOwn(actual, key)).toBe(Object.hasOwn(sample.limits, key));
+    }
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(request).toHaveBeenCalledWith('admin/ai-settings/media/models', { method: 'GET', query: { capability: 'image_generation' } });
+  });
+
   it('uses typed catalog, declared defaults and stable attempt keys', async () => {
     const request = vi.fn(async (path: string, _options?: unknown) => ({ data: path.endsWith('/models') ? fixture.catalog_result : task() }));
     const client = createAIMediaClient({ request: request as any, stream: vi.fn() });

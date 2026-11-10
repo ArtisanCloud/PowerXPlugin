@@ -1034,7 +1034,9 @@
       "modelDescription": "选择服务提供商和模型，配置连接信息。",
       "parametersDescription": "调整当前模型的调用参数。",
       "saveScope": "仅保存当前环境、来源与模态的配置。",
-      "save": "保存配置"
+      "save": "保存配置",
+      "trialFailed": "试跑失败",
+      "trialPassed": "试跑已完成"
     },
     "columns": {
       "name": "名称",
@@ -1069,7 +1071,7 @@
     "noMatchingModels": "没有匹配的模型",
     "baseURL": "服务地址",
     "credentialReference": "凭据引用",
-    "credentialReferenceDescription": "仅保存由密钥服务托管的引用，不会保存或回显 API Key 明文。",
+    "credentialReferenceDescription": "填写服务端配置的凭据引用；密钥仅在服务端解析，不在页面填写或返回。",
     "temperature": "温度 (Temperature)",
     "maxTokens": "最大令牌数",
     "topP": "Top P",
@@ -1135,7 +1137,7 @@
     },
     "testing": {
       "inProgress": "测试进行中",
-      "prompt": "测试内容",
+      "prompt": "试跑内容",
       "defaultPrompt": "请简短回复。",
       "image": "图片引用",
       "imageType": "图片格式",
@@ -1143,7 +1145,7 @@
         "image_url": "图片 URL",
         "image_base64": "Base64 图片"
       },
-      "generationCost": "两个测试操作都会实际提交生成任务，可能产生供应商费用。",
+      "generationCost": "试跑会实际提交生成任务，可能产生供应商费用。",
       "attemptRetained": "重试将沿用本次请求和幂等键。开始新测试会创建新尝试，可能再次计费。",
       "newAttempt": "开始新测试",
       "taskAccepted": "生成任务已接收，请查看任务状态。",
@@ -1159,7 +1161,7 @@
         "cancelled": "已取消"
       },
       "blocked": {
-        "powerxRuntimeRequired": "当前为本地运行通道，底座文本模型需要在 PowerX 通道中测试。",
+        "powerxRuntimeRequired": "当前业务运行通道为本地；底座模型试跑需在启动时配置 PowerX 运行通道。连接检测仍可独立执行。",
         "runtimePending": "正在确认运行通道。",
         "unsupported": "当前设置页尚不支持此能力的测试。",
         "inputRequired": "请选择模型并填写测试内容。",
@@ -1168,8 +1170,67 @@
         "unsupportedInput": "当前能力不支持所选输入格式。",
         "localUnsupported": "本地适配器尚未实现此生成能力。",
         "localProfileRequired": "需要已配置的本地模型；文本测试还需有效的 Ollama 地址。",
-        "imageRequired": "视觉分析需要提供图片。"
-      }
+        "imageRequired": "视觉分析需要提供图片。",
+        "providerRequired": "请选择服务提供商。",
+        "probeUnavailable": "当前运行配置未提供此来源的连接检测客户端。",
+        "localProbeUnsupported": "本地适配器尚未实现此供应商的只读连接检测。"
+      },
+      "connectionDescription": "只检查 API 入口和鉴权，不发送试跑内容，不调用模型。",
+      "connectionNoAuth": "服务入口已连通，无需 API Key。",
+      "connectionVerified": "服务入口与 API Key 已验证。",
+      "connectionEnvironment": "实际检测环境：{environment}",
+      "connectionModelUnverified": "未验证具体型号的调用权限或生成能力。",
+      "connectionFailed": "连接检测失败，请查看技术诊断。"
+    },
+    "online": {
+      "update": "更新在线模型",
+      "refreshCore": "刷新模型列表",
+      "title": "本地在线模型目录",
+      "scope": "{provider} · {environment} · {modality}",
+      "description": "使用当前服务地址与服务端凭据引用获取目录。不会保存表单、切换活动模型、生成内容或下载模型；选好型号后再保存配置。",
+      "loading": "正在获取并保存目录，请稍候。",
+      "summary": "已保存 {total} 个型号，已匹配 {matched} 个，待确认 {pending} 个。",
+      "source": "获取地址：{source} · {protocol}",
+      "updatedAt": "最近更新：{time}",
+      "results": "目录结果",
+      "matched": "已匹配（{count}）",
+      "pending": "待确认（{count}）",
+      "matchedHint": "已匹配的型号可进入对应模态的选择列表，不代表模型已通过试跑。",
+      "pendingHint": "用途未知的型号不会自动加入列表。请仅将确认可用的型号加入当前文本或向量候选。",
+      "search": "搜索型号或名称",
+      "selectVisible": "选择当前结果",
+      "assign": "加入{modality}候选（{count}）",
+      "mediaContractRequired": "媒体型号需要明确的能力合同，不能按型号名称推测生成能力。",
+      "empty": "当前分区没有型号。",
+      "close": "关闭",
+      "failed": "在线目录更新失败",
+      "failedHint": "当前选择和已有目录已保留。查看技术详情，修正连接、凭据或权限后手动重试。",
+      "adminRequired": "更新目录需要当前租户管理员权限。",
+      "unsupported": "此供应商暂不支持在线获取，仍可使用已声明的本地目录。",
+      "endpointRequired": "请先填写服务地址。",
+      "coreHint": "此处读取 Core 的候选目录。在线获取和待确认型号分类由 PowerX 管理员完成，再刷新此列表。",
+      "openCore": "前往 PowerX 管理目录",
+      "coreAddressRequired": "尚未配置 PowerX 管理站地址，请由部署方配置后使用跳转入口。",
+      "match": {
+        "local_catalog": "精确匹配本地目录",
+        "provider_declared": "供应商明确声明能力",
+        "manual": "管理员确认分类"
+      },
+      "errors": {
+        "generic": "无法更新在线目录，请查看错误详情并检查服务地址与网络。",
+        "AI_CREDENTIAL_REQUIRED": "请填写服务端已配置的凭据引用。",
+        "AI_CREDENTIAL_UNAVAILABLE": "凭据引用不可用，或服务端对应密钥环境变量未配置。",
+        "AI_CREDENTIAL_SCOPE_MISMATCH": "凭据引用与当前租户、环境、供应商或服务地址不匹配。",
+        "AI_MODEL_SYNC_AUTH_FAILED": "供应商拒绝了凭据，或该凭据没有目录读取权限。",
+        "AI_MODEL_SYNC_STALE": "目录已变化，请重新更新后再确认分类。",
+        "AI_MODEL_SYNC_CONNECTION_CHANGED": "连接身份已变化，请使用当前连接重新更新目录。",
+        "AI_MODEL_SYNC_ADMIN_REQUIRED": "当前用户没有本地目录管理权限。",
+        "AI_MODEL_SYNC_UNSUPPORTED": "该供应商尚无支持的在线目录协议。",
+        "AI_LOCAL_CATALOG_MIGRATION_REQUIRED": "本地目录表尚未迁移，请由部署方执行本次数据库迁移。"
+      },
+      "unknownCapability": "未声明的能力",
+      "declaredCatalog": "按本地目录声明",
+      "selectedMissing": "当前型号不在这份候选目录中。配置尚未更改，请选择当前连接可用的型号后再保存。"
     }
   },
   "providerMode": {
@@ -2981,7 +3042,9 @@
     "serviceCredentialRejected": "插件后端的服务凭据失效。请检查 STS 或 API Key 配置与授权。",
     "upstreamUnavailable": "身份服务暂时不可用，请检查 Core 依赖状态后重试。",
     "requestFailed": "请求的身份验证失败。请检查接口错误码与 Trace；当前会话保持不变。",
-    "loading": "正在同步并验证 PowerX 会话…"
+    "loading": "正在同步并验证 PowerX 会话…",
+    "terminationUnavailable": "当前 PowerX 宿主不支持会话失效核验，请升级宿主后重新加载。",
+    "verificationPending": "当前登录需要由 PowerX 宿主核验，请按宿主提示处理。"
   },
   "regression": {
     "title": "业务回归",

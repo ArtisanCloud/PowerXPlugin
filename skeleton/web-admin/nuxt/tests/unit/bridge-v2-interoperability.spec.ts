@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { initPowerXBridge, PowerXHostSession, createPowerXRouterNavigator, getPowerXFrameBridge } from '../../../../../framework/frontend/nuxt/framework-client';
+import { initPowerXBridge, PowerXHostSession, createPowerXRouterNavigator, getPowerXFrameBridge, createPowerXApiFetchClient } from '../../../../../framework/frontend/nuxt/framework-client';
 import { createRouter, createMemoryHistory } from 'vue-router';
 
 const pluginId = 'com.example.session';
@@ -43,6 +43,31 @@ describe('core_v2_consumer_interoperability', () => {
     const f = setup(); const bridge = initPowerXBridge({ pluginId, onAuthToken: async () => { throw new Error('AUTH_MEMBER_CONTEXT_INVALID'); } });
     f.receive('sync'); f.receive('auth-token', f.auth()); await flush(); expect(f.packets.some(packet => packet.type === 'auth:rejected')).toBe(true); expect(f.packets.some(packet => packet.type === 'auth:applied')).toBe(false); bridge.stop();
   });
+  it('terminal_request_uses_core_consumer_sequence_and_no_private_credentials', async () => {
+    const f = setup(); const session = new PowerXHostSession(pluginId);
+    const adapter = { readContext: vi.fn(async () => ({})), validateContext: () => ({ tenantUuid: null, memberUuid: null }), commitContext: vi.fn(), clearContext: vi.fn() };
+    const bridge = initPowerXBridge({ pluginId, onAuthToken: message => session.apply(message, adapter) });
+    f.receive('sync'); f.receive('auth-token', f.auth(3)); await flush();
+    const error = { response: { status: 401, _data: { error: { details: { reason_code: 'IAM_CONTEXT_USER_SESSION_INVALID' } } } } };
+    const api = createPowerXApiFetchClient({ pluginId, insidePowerX: true, hostSession: session, baseURL: mount.replace('/admin/', '/api/v1'), fetcher: { create: () => vi.fn().mockRejectedValue(error) } }).client;
+    await Promise.allSettled([api.post('/orders', {}), api.get('/orders')]);
+    const reports = f.packets.filter(packet => packet.type === 'auth:required');
+    expect(reports).toEqual([{ source: 'plugin', type: 'auth:required', protocolVersion: 2, pluginId, instanceId: 'frame-1', sessionId: 'session-1', revision: 3, sequence: 3, code: 'IAM_CONTEXT_USER_SESSION_INVALID', target: origin }]);
+    expect(session.getReadySnapshot()).toBeNull(); bridge.stop();
+  });
+  it.each([401, 403, 503])('initial_context_failure_is_rejected_without_auth_applied_or_required_%s', async status => {
+    const f = setup(); const session = new PowerXHostSession(pluginId);
+    const original = { response: { status, _data: { error_code: 'IAM_CONTEXT_USER_SESSION_INVALID' } } };
+    const api = createPowerXApiFetchClient({ pluginId, insidePowerX: true, hostSession: session, baseURL: mount.replace('/admin/', '/api/v1'), fetcher: { create: () => vi.fn().mockRejectedValue(original) } }).client;
+    const bridge = initPowerXBridge({ pluginId, onAuthToken: message => session.apply(message, {
+      readContext: (snapshot, signal) => api.get('/admin/user/auth/me/context', { hostSnapshot: snapshot, signal }), validateContext: () => ({ tenantUuid: null, memberUuid: null }), commitContext: vi.fn(), clearContext: vi.fn(),
+    }) });
+    f.receive('sync'); f.receive('auth-token', f.auth()); await flush(); await flush();
+    const rejected = f.packets.filter(packet => packet.type === 'auth:rejected');
+    expect(rejected).toHaveLength(1); expect(rejected[0]).toMatchObject({ sessionId: 'session-1', revision: 1, sequence: 1, code: status === 401 ? 'IAM_CONTEXT_USER_SESSION_INVALID' : undefined });
+    expect(f.packets.some(packet => ['auth:applied', 'auth:required'].includes(packet.type))).toBe(false);
+    expect(session.getState().cause).toMatchObject({ statusCode: status, cause: original }); bridge.stop();
+  });
   it('rejects_forged_origin_window_plugin_instance_and_protocol', async () => {
     const f = setup(); const auth = vi.fn(); const sync = vi.fn(); const bridge = initPowerXBridge({ pluginId, onAuthToken: auth, onSync: sync }); f.receive('sync'); sync.mockClear();
     f.receive('auth-token', f.auth(), f.parent, 'https://other.test');
@@ -71,6 +96,14 @@ describe('core_v2_consumer_interoperability', () => {
     await new Promise(resolve => setTimeout(resolve, 0)); await flush();
     expect(router.currentRoute.value.path).toBe('/customers'); expect(router.currentRoute.value.query).toEqual({ name: 'hello world' }); expect(router.currentRoute.value.hash).toBe('#details');
     expect(f.packets.find(packet => packet.type === 'navigation:result')).toMatchObject({ requestId: 'nav-1', ok: true }); bridge.stop();
+  });
+  it('new_login_cancels_an_inflight_router_guard_before_commit', async () => {
+    const f=setup();const session=new PowerXHostSession(pluginId);const adapter={readContext:async()=>({}),validateContext:()=>({tenantUuid:null,memberUuid:null}),commitContext:vi.fn(),clearContext:vi.fn()};
+    await session.apply({...f.auth(),source:'powerx',type:'auth-token',protocolVersion:2,pluginId,instanceId:'frame-1'},adapter);
+    const router=createRouter({history:createMemoryHistory(mount),routes:[{path:'/intro',component:{}},{path:'/orders',component:{}}]});await router.push('/intro');
+    let release!:()=>void;const pending=new Promise<void>(resolve=>{release=resolve;});router.beforeEach(async()=>pending);
+    const navigate=createPowerXRouterNavigator(router,mount,origin,session);const result=navigate(mount+'orders?draft=local#editor',{signal:new AbortController().signal,requestId:'nav-identity',instanceId:'frame-1'});const rejected=expect(result).rejects.toThrow('PLUGIN_NAVIGATION_ABORTED');
+    await flush();await session.apply({...f.auth(2),sessionId:'login-2',source:'powerx',type:'auth-token',protocolVersion:2,pluginId,instanceId:'frame-1'},adapter);release();await rejected;expect(router.currentRoute.value.path).toBe('/intro');
   });
   it('retires_the_legacy_auth_receiver_instead_of_running_both', () => {
     const f = setup(); const stop = vi.fn(); f.win.__POWERX_FRAMEWORK_BRIDGE__ = { stop };

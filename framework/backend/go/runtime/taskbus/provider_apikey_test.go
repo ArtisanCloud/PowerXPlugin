@@ -2,62 +2,50 @@ package taskbus
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
+	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
-	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/event"
-	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/middleware"
 )
 
 func TestHostProviderExplicitAPIKeyAndNoCredentialFallback(t *testing.T) {
 	for _, status := range []int{200, 401, 403} {
 		t.Run(http.StatusText(status), func(t *testing.T) {
-			calls, tokenCalls := 0, 0
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			calls, tokens := 0, 0
+			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				calls++
-				if r.URL.Path != "/api/v1/admin/runtime/ws-bus/publish" || r.Header.Get("Authorization") != "ApiKey fixture-key" {
-					t.Error("TASKBUS_EXPLICIT_API_KEY_NOT_USED")
+				require.Equal(t, "/api/v1/tenant/invocations", r.URL.Path)
+				require.Equal(t, "ApiKey fixture-key", r.Header.Get("Authorization"))
+				if status != 200 {
+					w.WriteHeader(status)
+					return
 				}
-				var body struct {
-					Topic  string `json:"topic"`
-					Tenant string `json:"tenant_uuid"`
-					Trace  string `json:"trace_id"`
-				}
-				if json.NewDecoder(r.Body).Decode(&body) != nil || body.Topic != "fixture.event.v1" || body.Tenant != "00000000-0000-0000-0000-000000000001" || body.Trace != "fixture-trace" {
-					t.Error("TASKBUS_EVENT_IDENTITY_LOST")
-				}
-				w.WriteHeader(status)
-				if status == 200 {
-					_, _ = w.Write([]byte(`{"success":true,"data":{"ok":true}}`))
-				}
+				hostSuccess(w)
 			}))
-			defer server.Close()
-			p := NewHostProvider(HostProviderConfig{BaseURL: server.URL, AuthScheme: "apikey", APIKey: "fixture-key", TokenProvider: func(context.Context) (string, error) { tokenCalls++; return "fixture-sts", nil }})
-			emitter, err := p.NewEmitter()
-			if err != nil {
-				t.Fatal(err)
-			}
-			err = emitter.Emit(middleware.WithBearerToken(context.Background(), "fixture-user-token"), event.Event{Topic: "fixture.event.v1", Meta: event.Meta{TenantUUID: "00000000-0000-0000-0000-000000000001", RequestID: "fixture-request", TraceID: "fixture-trace"}, Payload: json.RawMessage(`{}`)})
-			if (err == nil) != (status == 200) || calls != 1 || tokenCalls != 0 {
-				t.Fatal("TASKBUS_AUTH_FAILED_OR_FELL_BACK", err, calls, tokenCalls)
-			}
+			defer s.Close()
+			cfg := fixtureHostConfig(s.URL)
+			cfg.AuthScheme = "apikey"
+			cfg.APIKey = "fixture-key"
+			cfg.TokenProvider = func(context.Context) (string, error) { tokens++; return "fixture-sts", nil }
+			emitter, err := NewHostProvider(cfg).NewEmitter()
+			require.NoError(t, err)
+			err = emitter.Emit(context.Background(), hostFixtureEvent())
+			require.Equal(t, status == 200, err == nil)
+			require.Equal(t, 1, calls)
+			require.Zero(t, tokens)
 		})
 	}
-	p := NewHostProvider(HostProviderConfig{BaseURL: "http://core.invalid", AuthScheme: "apikey", TokenProvider: func(context.Context) (string, error) { t.Fatal("TASKBUS_MISSING_KEY_USED_STS"); return "", nil }})
-	if _, err := p.NewEmitter(); err == nil {
-		t.Fatal("TASKBUS_MISSING_API_KEY_ACCEPTED")
-	}
+	cfg := fixtureHostConfig("http://core.invalid")
+	cfg.AuthScheme = "apikey"
+	cfg.TokenProvider = func(context.Context) (string, error) { t.Error("EVENT_FABRIC_CREDENTIAL_FALLBACK"); return "", nil }
+	_, err := NewHostProvider(cfg).NewEmitter()
+	require.Error(t, err)
 }
-
 func TestHostProviderFromAppPreservesAPIKeyConfiguration(t *testing.T) {
-	p := NewHostProviderFromApp(&bootstrap.App{Config: &bootstrap.Config{Gateway: bootstrap.GatewayConfig{BaseURL: "http://core.invalid", AuthScheme: "apikey", APIKey: "fixture-key"}}}, "fixture-plugin", "v1")
-	if p.cfg.AuthScheme != "apikey" || p.cfg.APIKey != "fixture-key" {
-		t.Fatal("APP_TASKBUS_CREDENTIAL_DROPPED")
-	}
-	if _, err := p.NewEmitter(); err != nil {
-		t.Fatal(err)
-	}
+	p := NewHostProviderFromApp(&bootstrap.App{Config: &bootstrap.Config{Gateway: bootstrap.GatewayConfig{BaseURL: "http://core.invalid", AuthScheme: "apikey", APIKey: "fixture-key"}}}, "fixture-plugin", "1")
+	require.Equal(t, "apikey", p.cfg.AuthScheme)
+	require.Equal(t, "fixture-key", p.cfg.APIKey)
+	_, err := p.NewEmitter()
+	require.Error(t, err)
 }

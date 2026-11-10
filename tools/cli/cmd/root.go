@@ -6,6 +6,7 @@ import (
 	"runtime/debug"
 	"strings"
 
+	"github.com/powerx-plugin/cli/internal/publisher"
 	"github.com/powerx-plugin/cli/internal/templates"
 )
 
@@ -28,12 +29,16 @@ func Execute(args []string) error {
 		return nil
 	case "init":
 		return runInit(args[1:])
+	case "plugin-id":
+		return runPluginID(args[1:])
 	case "package":
 		return runPackage(args[1:])
 	case "dist":
 		return runDist(args[1:])
 	case "publish":
 		return runPublish(args[1:])
+	case "publisher":
+		return runPublisher(args[1:])
 	case "dev":
 		return runDev(args[1:])
 	case "doctor":
@@ -59,10 +64,12 @@ Usage:
   px-plugin <command> [flags]
 
 Commands:
+  plugin-id check --id <id> | --manifest <path>
   init       Generate a new plugin project from scaffold templates
   package    Experimental packaging workflow
   dist       Experimental distribution workflow
   publish    Upload packaged plugin artefacts to a PowerX registry
+  publisher  %s
   dev        Development mode with file watching and hot reload
   doctor     Run toolchain/mTLS/Dev API diagnostics
   iam        Export or seed local IAM data for Standalone mode
@@ -132,7 +139,7 @@ Init examples:
 More help:
   docs/guides/develop/go-cli-dev-watch.md
   docs/guides/cli/go-cli-troubleshooting.md
-`, templates.BackendGoGin, templates.FrontendNuxt, backendList, frontendList,
+`, publisher.Text(publisherLocale(), "summary"), templates.BackendGoGin, templates.FrontendNuxt, backendList, frontendList,
 		templates.BackendGoGin, templates.FrontendNuxt,
 		templates.BackendGoGin, templates.FrontendNuxt, templates.FrontendNuxt)
 }

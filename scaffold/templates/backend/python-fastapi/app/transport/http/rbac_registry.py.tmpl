@@ -7,7 +7,7 @@ from app.middleware.rbac import Permission
 
 def build_rbac_entries(api_prefix: str, plugin_id: str | None = None) -> Dict[str, Permission]:
     prefix = api_prefix.rstrip("/") or "/api/v1"
-    plugin = (plugin_id or "").strip() or "com.powerx.plugins.base"
+    plugin = (plugin_id or "").strip() or "{{ .PluginID }}"
     entries: Dict[str, Permission] = {}
 
     entries.update(_rbac_templates(prefix))

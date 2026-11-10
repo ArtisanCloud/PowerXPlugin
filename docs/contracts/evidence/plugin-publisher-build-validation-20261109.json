@@ -1,0 +1,123 @@
+{
+  "schema": "powerx.plugin-publisher-build-validation/v1",
+  "validated_at": "2026-11-09T15:44:11.909589+00:00",
+  "source_commit": "32aaf0bd33ecda9860384484b55aa1d092ad27fc",
+  "branch": "025-framework-business-regression",
+  "worktree_uncommitted": true,
+  "published": false,
+  "global_cli_updated": false,
+  "profile": "make-dist-pure-go-js/v1",
+  "go_version": "go version go1.26.7 darwin/arm64",
+  "source_sha256": {
+    "tools/cli/internal/publisher/artifact.go": "0d2ca2ac4dd69fdba964ac90756f41b13e0434ffaaa84f022a13f3dcadc5e40b",
+    "tools/cli/internal/publisher/build.go": "6ec3612018332f3da593c127bd8b7031309f4a90c4aa7a29a6b2a930054bd2bd",
+    "tools/cli/internal/publisher/build_http_test.go": "d717d98cecd02280905edac67aef825563f9660b7b9633876200a21bcddf210e",
+    "tools/cli/internal/publisher/build_test.go": "f6cc48422adffd02aec222bf7bf43c4c2945a8632a2c78df3d624ce1b8d59383",
+    "tools/cli/internal/publisher/engine.go": "850243ab91903904948cb794679ee323b4a3248f57be9fc6f53651544e31379c",
+    "tools/cli/internal/publisher/engine_test.go": "6396c3692898e217bdb27bf3888c5f746d371e0f92bc7058a4909c7edb7c7506",
+    "tools/cli/internal/publisher/errors.go": "50575f2b197b3c3b278f1718cb864105ccfb59e79b88d34e539b02c6b173cd76",
+    "tools/cli/internal/publisher/fs_other.go": "e414580290345fe72ef9292cd808ce8e0dc2b042a78e215a910b2b22a4b747a0",
+    "tools/cli/internal/publisher/fs_unix.go": "a2a42e5fb1b8e93956b2fe3fef8ee1c3f101bd958f08a85de7d78113e0b349da",
+    "tools/cli/internal/publisher/locale.go": "ada9f5c91141c81c035bd8c2c0bd10c11818aa2c253d23dff912ec30bdac4924",
+    "tools/cli/internal/publisher/locales.json": "532d954869e92253a62e04ad9c3027a7cbf576aa5f0d348fa5897299ef47b351",
+    "tools/cli/internal/publisher/model.go": "9fa9150f55cdfed6c833e0321a5caf9dc8c9a955778491419f702b32c8d16356",
+    "tools/cli/internal/publisher/process_other.go": "0058665cfd9aa908389113d8c6c92f3c8557f9487f1ca0f99d10fff1c9c1c7ab",
+    "tools/cli/internal/publisher/process_unix.go": "0948152c418906d3172c6d569a1ef86a1e350ec7c1dffb734abe103677828f84",
+    "tools/cli/internal/publisher/server.go": "7b9d08140b1f18c3778386cd20da74be3dfc4ead91de36b1277f35b71cfe861a",
+    "tools/cli/internal/publisher/server_test.go": "78b9d6711860d04bfee1e39950e0369879d318a01951f5f09c79dd3db66668c4",
+    "tools/cli/internal/publisher/source.go": "9cfad69ebc7ef89d352051fb2650f8b189a68f853aa8b88039655d499c44029d",
+    "tools/cli/cmd/publisher.go": "8c38f2416a5f3c16daf7fff80613056a6ad501bdb5f68a0d9b6093fc233d676f",
+    "skeleton/make-files/build.mk": "eb788067060efbb0602f92e91d8533a1fe79d92c7dc1b5621a20dd8e003e9c5c",
+    "skeleton/backend/go-gin/internal/shared/app/consts.go": "e08612e9d665b71643ec89c36068a5ff080f0b3fb8636403d02e2b6e27367195",
+    "scripts/template-sync-config.yaml": "9d6897ff594d4dd215d6021d4246eb68c69577ea24d9793a3638de8f40a7a4ee",
+    "scaffold/templates/make-files/build.mk.tmpl": "2b1612c7525c596e3f4630480acfb538513d8da34865b1f9496589100925187f",
+    "tools/cli/internal/templates/data/make-files/build.mk.tmpl": "2b1612c7525c596e3f4630480acfb538513d8da34865b1f9496589100925187f",
+    "scaffold/templates/backend/go-gin/internal/shared/app/consts.go.tmpl": "eeadad08a9516466ec7115a6f1c5d19bf8c5b37731e7e3c4542bd10a3e4154fd",
+    "tools/cli/internal/templates/data/backend/go-gin/internal/shared/app/consts.go.tmpl": "eeadad08a9516466ec7115a6f1c5d19bf8c5b37731e7e3c4542bd10a3e4154fd"
+  },
+  "checks": {
+    "race": {
+      "passed": true,
+      "top_level_tests": 24,
+      "pass_records": 65,
+      "failed_records": 0
+    },
+    "vet": true,
+    "template_sync_check": true,
+    "skeleton_app_and_manifest_compile": true,
+    "linux_amd64_cli_compile": {
+      "passed": true,
+      "runtime_executed": false,
+      "sha256": "be4645da8faa87ffdb68ed7f0a9456c174e24f1556ec5d6f948d15e200da39ab"
+    },
+    "contract": {
+      "openapi_paths": 9,
+      "schema_references": 44,
+      "local_links_checked": 131,
+      "paired_documents_aligned": true,
+      "locale_errors_checked": 22
+    }
+  },
+  "controlled_build_fixture": {
+    "real_make_go_node_invoked": true,
+    "executor_platform_probe_injected_only_in_tests": true,
+    "not_real_linux_nuxt_runtime_acceptance": true,
+    "go_elf_actual_linked_version_verified_without_execution": true,
+    "go_binary_not_started": true,
+    "zip_resources_permissions_and_digest_verified": true,
+    "source_outputs_preserved": true,
+    "native_files_wrong_versions_stripped_symbols_secrets_and_missing_refs_rejected": true,
+    "artifact_tamper_and_symlink_rejected": true,
+    "http_and_cli_engine_shared": true,
+    "owned_process_groups_terminated": true,
+    "interrupted_records_not_replayed": true,
+    "build_events": [
+      {
+        "build_id": "81d6262b-fa4a-4b11-9496-468d96f20009",
+        "artifact_sha256": "0b50f5d710529b4f82ad3ae848f600e8d5df4cb47118180bb150590476200efa",
+        "parent_pid": "99159",
+        "group_id": "99253"
+      }
+    ]
+  },
+  "generated_cli_smoke": {
+    "kind": "generated-cli-native-admission",
+    "actual_executor": "darwin/arm64",
+    "linux_build_executed": false,
+    "market_contacted": false,
+    "business_service_started": false,
+    "published": false,
+    "cli_sha256": "49e16f3a6acfbdf96ec81b8c39f682143a1917b9713254e32c1d11be4158b180",
+    "service_pid": 8212,
+    "parent_pid": 8123,
+    "port": 62598,
+    "native_admission_exit_code": 2,
+    "rejected_before_task_creation": true,
+    "new_templates_consumer_verified": true,
+    "capabilities_match_executor": true,
+    "source_manifest_unchanged": true,
+    "service_exit_code": 0,
+    "port_released": true,
+    "bootstrap_file_removed": true,
+    "generated_consumer_removed": true
+  },
+  "boundaries": {
+    "actual_executor": "darwin/arm64",
+    "docker_daemon_available": false,
+    "docker_daemon_started": false,
+    "linux_nuxt_runtime_acceptance": false,
+    "market_contacted": false,
+    "market_functional_code_modified": false,
+    "core_modified": false,
+    "database_mutated": false,
+    "user_services_restarted_or_stopped": false,
+    "ui_implemented": false,
+    "M1_complete": false,
+    "F07_full_sdk_consumption_complete": false
+  },
+  "remaining": [
+    "native Linux/amd64 full Nuxt build/run acceptance",
+    "market P01 contract and F04 client",
+    "F05 page/proxy and full generated-package acceptance"
+  ]
+}

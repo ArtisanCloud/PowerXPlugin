@@ -1,22 +1,38 @@
-import type { PowerXAuthMessage, PowerXAuthTokenPayload } from './bridge';
+import { reportPowerXHostSessionInvalid, type PowerXAuthMessage, type PowerXAuthTokenPayload } from './bridge';
+import { readPowerXFailure } from './api-errors';
 
 export type HostSessionStatus = 'empty' | 'applying' | 'ready' | 'cleared' | 'rejected';
+export type HostSessionClearScope = 'identity' | 'session';
 export interface PowerXHostIdentity { readonly tenantUuid: string | null; readonly memberUuid: string | null; }
 export type PowerXHostSessionSnapshot = Readonly<PowerXAuthTokenPayload & { epoch: number; identity?: PowerXHostIdentity }>;
 export interface PowerXHostSessionState {
   status: HostSessionStatus;
   snapshot: PowerXHostSessionSnapshot | null;
   error: string | null;
+  cause?: unknown;
+  clearScope?: HostSessionClearScope;
 }
 export interface PowerXHostSessionAdapter<T> {
   readContext(snapshot: PowerXHostSessionSnapshot, signal: AbortSignal): Promise<T>;
   validateContext(context: T, snapshot: PowerXHostSessionSnapshot): PowerXHostIdentity;
   commitContext(context: T, snapshot: PowerXHostSessionSnapshot): void;
-  clearContext(): void;
+  clearContext(scope?: HostSessionClearScope): void;
+}
+export class PowerXHostContextError extends Error {
+  readonly code: string;
+  readonly statusCode?: number;
+  constructor(cause: unknown) {
+    const failure = readPowerXFailure(cause);
+    // Preserve the actual failure under cause; Core's consumer reads the safe
+    // top-level code rather than a conflicting nested/base error envelope.
+    let code = failure.code || 'PLUGIN_AUTH_CONTEXT_FAILED';
+    if (code === 'IAM_CONTEXT_USER_SESSION_INVALID' && failure.status !== 401) code = 'PLUGIN_AUTH_CONTEXT_FAILED';
+    super(cause instanceof Error ? cause.message : code, { cause }); this.name = 'PowerXHostContextError'; this.code = code; this.statusCode = failure.status;
+  }
 }
 export class PowerXHostSessionError extends Error {
   readonly statusCode: number;
-  constructor(public readonly code: string) { super(code); this.name = 'PowerXHostSessionError'; this.statusCode = code === 'AUTH_SESSION_HOST_MANAGED' ? 409 : 401; }
+  constructor(public readonly code: string) { super(code); this.name = 'PowerXHostSessionError'; this.statusCode = ['AUTH_SESSION_HOST_MANAGED', 'PLUGIN_BRIDGE_SESSION_TERMINATION_REQUIRED', 'PLUGIN_BRIDGE_V2_REQUIRED'].includes(code) ? 409 : 401; }
 }
 export const normalizeBearerToken = (token: string) => /^Bearer\s/i.test(token) ? token : `Bearer ${token}`;
 const failure = (code: string) => new PowerXHostSessionError(code);
@@ -24,7 +40,7 @@ const failure = (code: string) => new PowerXHostSessionError(code);
 type Waiter = {
   expected: PowerXHostSessionSnapshot | null; minimumSequence: number;
   resolve: (snapshot: PowerXHostSessionSnapshot) => void;
-  reject: (error: Error) => void; timer: ReturnType<typeof setTimeout>;
+  reject: (error: unknown) => void; timer: ReturnType<typeof setTimeout>;
 };
 
 /** One consumer per plugin frame. Never reads or writes host storage. */
@@ -39,7 +55,10 @@ export class PowerXHostSession {
   private requester: (() => void) | null = null;
   private requested = false;
   private applying: Promise<void> | null = null;
-  private clearIdentityContext: (() => void) | null = null;
+  private clearIdentityContext: ((scope?: HostSessionClearScope) => void) | null = null;
+  private lastSessionId = '';
+  private lastIdentity: PowerXHostIdentity | null = null;
+  private reports = new WeakSet<PowerXHostSessionSnapshot>();
   constructor(public readonly pluginId: string) {}
 
   getState(): Readonly<PowerXHostSessionState> { return { ...this.state }; }
@@ -67,14 +86,26 @@ export class PowerXHostSession {
     if (this.instanceId) this.invalidate('AUTH_SESSION_CHANGED');
     this.instanceId = instanceId; this.sequence = 0;
   }
-  invalidate(code = 'AUTH_SESSION_CHANGED'): void {
+  invalidate(code = 'AUTH_SESSION_CHANGED', clearScope: HostSessionClearScope = 'session'): void {
     this.epoch++; this.controller?.abort(); this.controller = null;
-    this.state = { status: 'cleared', snapshot: null, error: code };
+    this.state = { status: 'cleared', snapshot: null, error: code, clearScope };
+    if (clearScope === 'session') { this.lastSessionId = ''; this.lastIdentity = null; }
     const clear = this.clearIdentityContext; this.clearIdentityContext = null;
-    try { clear?.(); } finally { this.rejectWaiters(failure(code)); this.emit(); }
+    try { clear?.(clearScope); } finally { this.rejectWaiters(failure(code)); this.emit(); }
+  }
+  reportSessionInvalid(snapshot: PowerXHostSessionSnapshot, code: string): boolean {
+    if (code !== 'IAM_CONTEXT_USER_SESSION_INVALID' || !this.isCurrent(snapshot) || this.reports.has(snapshot) || this.state.status !== 'ready') return false;
+    this.reports.add(snapshot);
+    let reportError: unknown;
+    try { reportPowerXHostSessionInvalid({ sessionId: snapshot.sessionId, revision: snapshot.revision, code }); }
+    catch (error) { reportError = error; }
+    // A synchronous consumer/test adapter may already have delivered a newer login.
+    if (this.isCurrent(snapshot)) this.invalidate(readPowerXFailure(reportError).code || code, 'identity');
+    if (reportError) throw reportError;
+    return true;
   }
   private emit(): void { this.listeners.forEach(listener => listener(this.getState())); }
-  private rejectWaiters(error: Error): void {
+  private rejectWaiters(error: unknown): void {
     for (const waiter of this.waiters) { clearTimeout(waiter.timer); waiter.reject(error); }
     this.waiters.clear(); this.requested = false;
   }
@@ -95,13 +126,15 @@ export class PowerXHostSession {
     if (options.expected && !this.isSameSession(options.expected)) return Promise.reject(failure('AUTH_SESSION_CHANGED'));
     const ready = this.getReadySnapshot();
     if (ready && !options.force) return Promise.resolve(ready);
+    if (['IAM_CONTEXT_USER_SESSION_INVALID', 'PLUGIN_BRIDGE_SESSION_TERMINATION_REQUIRED', 'PLUGIN_BRIDGE_V2_REQUIRED'].includes(this.state.error || '')) return Promise.reject(this.state.cause || failure(this.state.error!));
     if (this.state.status === 'cleared' && !options.recovery) return Promise.reject(failure('PLUGIN_AUTH_REQUIRED'));
+    if (this.state.status === 'rejected' && !options.recovery) return Promise.reject(this.state.cause || failure(this.state.error || 'PLUGIN_AUTH_REQUIRED'));
     if (!this.requester) return Promise.reject(failure('PLUGIN_BRIDGE_UNAVAILABLE'));
     // Join a validation already in progress instead of requesting another copy.
     const minimumSequence = this.state.status === 'applying' ? this.sequence - 1 : this.sequence;
     return new Promise<PowerXHostSessionSnapshot>((resolve, reject) => {
       let waiter: Waiter;
-      const finish = (error?: Error, snapshot?: PowerXHostSessionSnapshot) => {
+      const finish = (error?: unknown, snapshot?: PowerXHostSessionSnapshot) => {
         clearTimeout(waiter.timer); this.waiters.delete(waiter);
         options.signal?.removeEventListener('abort', aborted);
         if (!this.waiters.size) this.requested = false;
@@ -135,17 +168,17 @@ export class PowerXHostSession {
     this.sequence = message.sequence;
     this.controller?.abort();
     if (message.type === 'auth-cleared') {
-      this.clearIdentityContext = () => adapter.clearContext();
+      this.clearIdentityContext = scope => adapter.clearContext(scope);
       this.invalidate('PLUGIN_AUTH_REQUIRED'); this.applying = null;
       return Promise.resolve();
     }
     if (typeof message.sessionId !== 'string' || !message.sessionId || !Number.isSafeInteger(message.revision) || message.revision < 1 || typeof message.accessToken !== 'string' || !message.accessToken || message.tokenType !== 'Bearer' || typeof message.scope !== 'string' || !(message.tenantUuid === null || typeof message.tenantUuid === 'string') || !Number.isFinite(message.expiresAt) || message.expiresAt <= Date.now()) {
-      this.clearIdentityContext = () => adapter.clearContext();
+      this.clearIdentityContext = scope => adapter.clearContext(scope);
       this.invalidate('PLUGIN_AUTH_TOKEN_INVALID');
       return Promise.reject(failure('PLUGIN_AUTH_TOKEN_INVALID'));
     }
-    if (this.state.snapshot?.sessionId !== message.sessionId) {
-      this.epoch++; adapter.clearContext();
+    if (this.lastSessionId !== message.sessionId) {
+      this.epoch++; adapter.clearContext('session'); this.lastSessionId = message.sessionId; this.lastIdentity = null;
       for (const waiter of this.waiters) if (waiter.expected) { clearTimeout(waiter.timer); waiter.reject(failure('AUTH_SESSION_CHANGED')); this.waiters.delete(waiter); }
     }
     const snapshot: PowerXHostSessionSnapshot = Object.freeze({
@@ -154,7 +187,7 @@ export class PowerXHostSession {
       accessToken: message.accessToken, tokenType: message.tokenType, expiresAt: message.expiresAt,
       expiresIn: message.expiresIn, scope: message.scope, tenantUuid: message.tenantUuid, epoch: this.epoch,
     });
-    this.clearIdentityContext = () => adapter.clearContext();
+    this.clearIdentityContext = scope => adapter.clearContext(scope);
     const controller = new AbortController(); this.controller = controller;
     this.state = { status: 'applying', snapshot, error: null }; this.emit();
     const applying = (async () => {
@@ -165,14 +198,17 @@ export class PowerXHostSession {
         if (!identity || !(identity.tenantUuid === null || typeof identity.tenantUuid === 'string') || !(identity.memberUuid === null || typeof identity.memberUuid === 'string') || (snapshot.tenantUuid && identity.tenantUuid !== snapshot.tenantUuid)) throw failure('AUTH_CONTEXT_IDENTITY_INVALID');
         if (!this.isCurrent(snapshot) || controller.signal.aborted) return;
         if (snapshot.expiresAt <= Date.now()) throw failure('PLUGIN_AUTH_TOKEN_EXPIRED');
-        const ready: PowerXHostSessionSnapshot = Object.freeze({ ...snapshot, identity: Object.freeze({ ...identity }) });
+        if (this.lastIdentity && (identity.tenantUuid !== this.lastIdentity.tenantUuid || identity.memberUuid !== this.lastIdentity.memberUuid)) { this.epoch++; adapter.clearContext('session'); }
+        this.lastIdentity = Object.freeze({ ...identity });
+        const ready: PowerXHostSessionSnapshot = Object.freeze({ ...snapshot, epoch: this.epoch, identity: this.lastIdentity });
         adapter.commitContext(context, ready);
         this.state = { status: 'ready', snapshot: ready, error: null }; this.emit(); this.settle();
       } catch (error) {
         if (!this.isCurrent(snapshot) || controller.signal.aborted) return;
-        this.state = { status: 'rejected', snapshot, error: 'PLUGIN_AUTH_CONTEXT_FAILED' };
-        adapter.clearContext(); this.rejectWaiters(failure('PLUGIN_AUTH_CONTEXT_FAILED')); this.emit();
-        throw error;
+        const rejected = new PowerXHostContextError(error);
+        this.state = { status: 'rejected', snapshot, error: rejected.code, cause: rejected, clearScope: 'identity' };
+        adapter.clearContext('identity'); this.rejectWaiters(rejected); this.emit();
+        throw rejected;
       } finally { if (this.controller === controller) this.applying = null; }
     })();
     this.applying = applying; return applying;

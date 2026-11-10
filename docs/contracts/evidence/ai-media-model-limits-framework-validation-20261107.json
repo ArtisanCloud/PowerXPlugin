@@ -1,0 +1,149 @@
+{
+  "date": "2026-11-07T06:01:35.136253+00:00",
+  "scope": "Framework optional AI Media v2 catalog model-limit fields, controlled transport and packaged consumer only",
+  "base_commit": "32aaf0bd33ecda9860384484b55aa1d092ad27fc",
+  "changes_committed": false,
+  "core_contract_source": {
+    "source_repository": "ArtisanCloud/PowerX",
+    "source_commit": "a1956aa3601786ed05a59236477ed3a67cfc7a67",
+    "source_worktree_uncommitted": true,
+    "snapshot_date": "2026-11-07",
+    "sha256": {
+      "ai-media-v2.md": "2f3fe00e18875f598cd5ff757783da599042097b4d185968d76b07bff55e5715",
+      "ai-media-v2.openapi.yaml": "d11653bcb861644532fbd6790b76e24c4006d4f7b40bcfd4d9c3a16ed4ce0f63",
+      "fixtures/ai-media-v2.json": "eb456d570a615ce449b4acfebf3dbcca210dd843216946ee3124aabdd98bc33c",
+      "fixtures/capability-version-upgrade-errors.v1.json": "ff70b10ec2099bf96fe026fe1b91d55306e8ef1a5e24942aafc4bb9504a57faf"
+    },
+    "framework_model_limits_fixture": {
+      "owner": "Framework",
+      "file": "fixtures/ai-media-model-limits.v1.json",
+      "sha256": "ae5f831fc15e0e8a310889252fe76f61775f08b71990812abb24c84bcb32db79"
+    }
+  },
+  "production_changes": {
+    "go": "MediaModelOperation adds three *int64 omitempty fields",
+    "nuxt": "MediaModelOperation adds three optional number fields; listModels unchanged",
+    "routing_auth_tasks_sse": "unchanged",
+    "defaults_or_business_validation": "none"
+  },
+  "checks": {
+    "sdk_race": {
+      "command": "go test -race -json ./runtime/powerx/ai -count=1",
+      "status": "passed",
+      "passed_test_records": 85,
+      "log": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-media-limits-20261107-cd82ebef07cc9bc1/sdk-race.jsonl"
+    },
+    "sdk_vet": "passed go vet ./runtime/powerx/ai",
+    "backend_forwarding": {
+      "command": "go test -race ./internal/transport/http/admin/ai_settings -run 'TestMedia|TestLocalMedia' -count=1",
+      "status": "passed",
+      "new_model_limit_cases": 8,
+      "credentials": [
+        "API Key",
+        "STS"
+      ],
+      "path": "actual SDK decode -> bound runtime -> /admin/ai-settings/media/models -> HTTP JSON"
+    },
+    "nuxt": {
+      "command": "node node_modules/vitest/dist/cli.js run tests/unit/framework-ai-media.spec.ts",
+      "status": "passed",
+      "tests": 10,
+      "new_limit_cases": 4
+    },
+    "cli_export": "passed go test ./internal/contracts -count=1",
+    "contract_check": {
+      "command": "npm run check:ai-media-v2-contract",
+      "status": "passed",
+      "tests": 8
+    },
+    "template_sync": "passed node scripts/sync-templates.mjs --check",
+    "packaged_consumer": {
+      "path": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-media-limits-20261107-cd82ebef07cc9bc1/generated-consumer",
+      "go_work": "off",
+      "local_replace": false,
+      "four_bindings": "passed",
+      "manifest_validation": "passed",
+      "backend_build": "passed",
+      "shared_fixtures": "passed",
+      "packed_typescript": "passed",
+      "packed_media_limits_runtime_and_types": "passed"
+    },
+    "tracked_source_inputs": "SDK fixture and CLI contract/template inputs selected by Git source rules; no ignored required embeds",
+    "source_matches_sdk_archive": true
+  },
+  "semantics": {
+    "declared_values": "preserved",
+    "undeclared": "nil/undefined and omitted on serialization",
+    "explicit_zero": "non-nil pointer / present optional number, serialized as zero",
+    "provider_specific_values": "preserved; no OpenAI defaults",
+    "operation_location": "operations.image_generation, never generation params"
+  },
+  "fixture_policy": {
+    "core_shared_fixture": "kept byte-for-byte with current Core; currently lacks limit samples",
+    "framework_fixture": "fixtures/ai-media-model-limits.v1.json",
+    "owner": "Framework",
+    "existing_upgrade_cases": "all 10 preserved; fourth Core digest retained"
+  },
+  "release": {
+    "bundle": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-media-limits-20261107-cd82ebef07cc9bc1",
+    "profile": "media-limits",
+    "published": false,
+    "changes_committed": false,
+    "base_commit": "32aaf0bd33ecda9860384484b55aa1d092ad27fc",
+    "source_sha256": {
+      "go": "4722f08af4c96ed03d62b66ba7be3ca3ea6046a4529ad4224fcc3e3502826885",
+      "nuxt": "13e2bf59f0b706f794e15d2fa0bbf239988652d07456d4be4402c67ef1444292",
+      "generator": "9801e6cfc36dc6bb2fcfb2ae4b5fbbfd4ef64b42c6db7d31c55f97633605580f",
+      "contracts": "159e30d15d62a053a1b4cfb9257b816b18e0bee11fa72fa49d5a7b1604b000e1",
+      "ai_contracts": "8df3845165845db1cf139937b018747c0f2cfaccbd20cb7e720c24295f7a0f80"
+    },
+    "go_module": "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go",
+    "go_sdk_version": "v0.0.31-dev.medialimits.4722f08af4c96ed0",
+    "go_proxy": "file:///private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-media-limits-20261107-cd82ebef07cc9bc1/go-proxy",
+    "nuxt_client_version": "0.0.15-dev.medialimits.13e2bf59f0b706f7",
+    "nuxt_client_ref": "file:/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-media-limits-20261107-cd82ebef07cc9bc1/artisan-cloud-plugin-framework-client-0.0.15-dev.medialimits.13e2bf59f0b706f7.tgz",
+    "nuxt_client_tarball": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-media-limits-20261107-cd82ebef07cc9bc1/artisan-cloud-plugin-framework-client-0.0.15-dev.medialimits.13e2bf59f0b706f7.tgz",
+    "generator_version": "v0.0.0-medialimits.9801e6cfc36dc6bb",
+    "generator_binary": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-media-limits-20261107-cd82ebef07cc9bc1/px-plugin",
+    "go_checksums": {
+      "sum": "h1:FCIRZtftTV6EED9y7f3um9SWJJ0xD6UGGwcgEk1KLUE=",
+      "go_mod_sum": "h1:Xmb97ZEMwaN9kaz32/7GHXR/oQESdc3ILbiCtOHh+2w="
+    },
+    "consumer": {
+      "path": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-release-media-limits-20261107-cd82ebef07cc9bc1/generated-consumer",
+      "go_work": "off",
+      "local_replace": false,
+      "four_bindings": "passed",
+      "manifest_validation": "passed",
+      "backend_build": "passed",
+      "shared_fixtures": "passed",
+      "packed_typescript": "passed",
+      "packed_media_limits_runtime_and_types": "passed"
+    },
+    "artifact_sha256": {
+      "px-plugin": "8fd70d12d6d8591e5e0dde7d5ff4aa5039c25de162c2520d9b6f61b75f248b78",
+      "artisan-cloud-plugin-framework-client-0.0.15-dev.medialimits.13e2bf59f0b706f7.tgz": "fae625552fd4b75cbe19c2c3335f5c3dea0ddcc0859d012536b4afee6665f39e",
+      "go-proxy/github.com/!artisan!cloud/!power!x!plugin/framework/backend/go/@v/v0.0.31-dev.medialimits.4722f08af4c96ed0.zip": "59c0796820c7958baf784ee2512d502f5f3f61b0dac0a6422c30ba65f24ea726"
+    },
+    "nuxt_client_integrity": "sha512-Nn0yHYgNSsPaHdRkt62+J4pZdG4yOqbIoeegSUr10El2W199yD8FCf4XO0X/c/aWoKT/oLD2D4Kc4xGn5B8hIg==",
+    "capability_protocol_changes": false
+  },
+  "artifact_log_sha256": {
+    "sdk-race.jsonl": "6534f0c1096f899a4a54ceae12a907f161b1e9c5998c470191e93ea2d77278f2",
+    "consumer-validation.log": "b547f40f65e9b52de30d46b3f55c2d86fb8877c6928eed27e396b43067370215",
+    "packed-client-validation.log": "daa93cafb57eaaa2af1bc0e6b3bc5d3c54ceffbaaa2fb39220fd3e39f91c1e12"
+  },
+  "remaining_acceptance": [
+    "MediaXStudio update its pinned Go/Nuxt Framework snapshot and checksum from the supplied artifacts",
+    "MediaXStudio implement per-model image bytes/total bytes/pixel validation and page messages",
+    "Live Core API Key and installed STS catalog verification; controlled tests are not live credentials/provider acceptance"
+  ],
+  "not_performed": [
+    "Core code/config/database/auth changes",
+    "user-service restart",
+    "MediaXStudio source or snapshot edits",
+    "actual model generation",
+    "commit/tag/push or public package publication"
+  ],
+  "temporary_services": "Only completed tests used httptest; no standalone service started"
+}

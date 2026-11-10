@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"io"
 	"net/http"
 	"strings"
@@ -54,7 +55,35 @@ type HostProviderConfig struct {
 	HTTPClient    *http.Client
 }
 
+// HostError preserves machine diagnostics without switching the transport.
+type HostError struct {
+	StatusCode               int
+	Code, TraceID, RequestID string
+}
+
+func (e *HostError) Error() string {
+	return fmt.Sprintf("TASK_QUEUE_HOST_ERROR status=%d code=%s trace=%s request=%s", e.StatusCode, e.Code, e.TraceID, e.RequestID)
+}
+func hostError(status int, raw []byte) error {
+	var v struct {
+		ErrorCode string `json:"error_code"`
+		Reason    string `json:"reason_code"`
+		Trace     string `json:"trace_id"`
+		Request   string `json:"request_id"`
+	}
+	_ = json.Unmarshal(raw, &v)
+	code := v.ErrorCode
+	if code == "" {
+		code = v.Reason
+	}
+	if code == "" {
+		code = "TASK_QUEUE_UPSTREAM_ERROR"
+	}
+	return &HostError{StatusCode: status, Code: code, TraceID: v.Trace, RequestID: v.Request}
+}
+
 type HostProvider struct {
+	workerID      string
 	baseURL       string
 	apiPrefix     string
 	authScheme    string
@@ -91,6 +120,7 @@ func NewHostProvider(cfg HostProviderConfig) (*HostProvider, error) {
 		httpClient = &http.Client{Timeout: timeout}
 	}
 	return &HostProvider{
+		workerID:      uuid.NewString(),
 		baseURL:       baseURL,
 		apiPrefix:     normalizeAPIPrefix(cfg.APIPrefix),
 		authScheme:    authScheme,
@@ -103,61 +133,143 @@ func NewHostProvider(cfg HostProviderConfig) (*HostProvider, error) {
 	}, nil
 }
 
-func (p *HostProvider) Enqueue(ctx context.Context, req EnqueueRequest) error {
-	_, err := p.do(ctx, http.MethodPost, "/admin/runtime/task-queue/enqueue", encodeMessageRequest(req), nil)
-	return err
-}
+const enqueueCapability = "com.corex.runtime.taskqueue.service_enqueue"
+const consumeCapability = "com.corex.runtime.taskqueue.service_consume"
 
-func (p *HostProvider) Dequeue(ctx context.Context, req DequeueRequest) ([]Message, error) {
-	var out struct {
-		Messages []hostMessage `json:"messages"`
+func (p *HostProvider) invoke(ctx context.Context, capability string, body map[string]any, out any) error {
+	body["contract_version"] = ContractVersion
+	var response struct {
+		Status   string          `json:"status"`
+		Protocol string          `json:"protocol_used"`
+		Fallback *bool           `json:"fallback_used"`
+		Result   json.RawMessage `json:"result"`
 	}
-	_, err := p.do(ctx, http.MethodPost, "/admin/runtime/task-queue/dequeue", map[string]any{
-		"tenant_key":      strings.TrimSpace(req.TenantKey),
-		"subscriber_id":   strings.TrimSpace(req.SubscriberID),
-		"max_items":       req.MaxItems,
-		"wait_timeout_ms": int64(req.WaitTimeout / time.Millisecond),
-	}, &out)
+	_, err := p.do(ctx, http.MethodPost, "/tenant/invocations", map[string]any{"capability_id": capability, "preferred_protocol": "core_internal", "payload": map[string]any{"body": body}}, &response)
+	if err != nil {
+		return err
+	}
+	if response.Status != "completed" || response.Protocol != "core_internal" || response.Fallback == nil || *response.Fallback || len(response.Result) == 0 {
+		return errors.New("TASK_QUEUE_RESPONSE_INVALID")
+	}
+	var contract struct {
+		Version string `json:"contract_version"`
+	}
+	if json.Unmarshal(response.Result, &contract) != nil || contract.Version != ContractVersion {
+		return errors.New("TASK_QUEUE_RESPONSE_INVALID")
+	}
+	if json.Unmarshal(response.Result, out) != nil {
+		return errors.New("TASK_QUEUE_RESPONSE_INVALID")
+	}
+	return nil
+}
+func (p *HostProvider) Enqueue(ctx context.Context, req EnqueueRequest) error {
+	if err := validateMessage(req.Message); err != nil {
+		return err
+	}
+	body := encodeMessageRequest(req)
+	body["operation"] = "enqueue"
+	body["tenant_key"] = req.Message.TenantKey
+	var out struct {
+		Accepted bool   `json:"accepted"`
+		ID       string `json:"message_id"`
+		Key      string `json:"idempotency_key"`
+	}
+	if err := p.invoke(ctx, enqueueCapability, body, &out); err != nil {
+		return err
+	}
+	if !out.Accepted || out.ID != req.Message.ID || out.Key != req.Message.IdempotencyKey {
+		return errors.New("TASK_QUEUE_ACCEPTANCE_INVALID")
+	}
+	return nil
+}
+func (p *HostProvider) Dequeue(ctx context.Context, req DequeueRequest) ([]Message, error) {
+	if req.MaxItems == 0 {
+		req.MaxItems = 1
+	}
+	if req.WaitTimeout == 0 {
+		req.WaitTimeout = time.Second * 3
+	}
+	var out struct {
+		Messages *[]hostMessage `json:"messages"`
+	}
+	err := p.invoke(ctx, consumeCapability, map[string]any{"operation": "dequeue", "tenant_key": req.TenantKey, "subscriber_id": req.SubscriberID, "worker_id": p.workerID, "max_items": req.MaxItems, "wait_timeout_ms": req.WaitTimeout.Milliseconds()}, &out)
 	if err != nil {
 		return nil, err
 	}
-	messages := make([]Message, 0, len(out.Messages))
-	for _, item := range out.Messages {
-		messages = append(messages, item.toMessage())
+	if out.Messages == nil {
+		return nil, errors.New("TASK_QUEUE_RESPONSE_INVALID")
+	}
+	messages := make([]Message, 0, len(*out.Messages))
+	for _, v := range *out.Messages {
+		msg, err := v.toMessage()
+		if err != nil {
+			return nil, err
+		}
+		if msg.TenantKey != req.TenantKey || msg.SubscriberID != req.SubscriberID || !validLease(msg.Lease) {
+			return nil, errors.New("TASK_QUEUE_RESPONSE_INVALID")
+		}
+		messages = append(messages, msg)
 	}
 	return messages, nil
 }
-
+func (p *HostProvider) settle(ctx context.Context, operation, tenant, subscriber, id, receipt string, extra map[string]any) error {
+	if receipt == "" {
+		return errors.New("TASK_QUEUE_RECEIPT_REQUIRED")
+	}
+	extra["operation"] = operation
+	extra["tenant_key"] = tenant
+	extra["subscriber_id"] = subscriber
+	extra["message_id"] = id
+	extra["receipt_uuid"] = receipt
+	var out struct {
+		Confirmed bool   `json:"confirmed"`
+		Receipt   string `json:"receipt_uuid"`
+	}
+	if err := p.invoke(ctx, consumeCapability, extra, &out); err != nil {
+		return err
+	}
+	if !out.Confirmed || out.Receipt != receipt {
+		return errors.New("TASK_QUEUE_CONFIRMATION_INVALID")
+	}
+	return nil
+}
 func (p *HostProvider) Ack(ctx context.Context, req AckRequest) error {
-	_, err := p.do(ctx, http.MethodPost, "/admin/runtime/task-queue/ack", req, nil)
-	return err
+	return p.settle(ctx, "ack", req.TenantKey, req.SubscriberID, req.MessageID, req.ReceiptUUID, map[string]any{"metadata": req.Metadata, "outcome": req.Outcome})
 }
-
 func (p *HostProvider) Nack(ctx context.Context, req NackRequest) error {
-	body := map[string]any{
-		"tenant_key":    strings.TrimSpace(req.TenantKey),
-		"subscriber_id": strings.TrimSpace(req.SubscriberID),
-		"message_id":    strings.TrimSpace(req.MessageID),
-		"reason":        strings.TrimSpace(req.Reason),
-		"metadata":      req.Metadata,
-	}
+	extra := map[string]any{"reason": req.Reason, "metadata": req.Metadata}
 	if !req.RetryAt.IsZero() {
-		body["retry_at"] = req.RetryAt.UTC().Format(time.RFC3339Nano)
+		extra["retry_at"] = req.RetryAt.UTC()
 	}
-	_, err := p.do(ctx, http.MethodPost, "/admin/runtime/task-queue/nack", body, nil)
-	return err
+	return p.settle(ctx, "nack", req.TenantKey, req.SubscriberID, req.MessageID, req.ReceiptUUID, extra)
+}
+func (p *HostProvider) Renew(ctx context.Context, req RenewRequest) (Lease, error) {
+	var out struct {
+		Lease *Lease `json:"lease"`
+	}
+	err := p.invoke(ctx, consumeCapability, map[string]any{"operation": "renew", "tenant_key": req.TenantKey, "subscriber_id": req.SubscriberID, "message_id": req.MessageID, "receipt_uuid": req.ReceiptUUID}, &out)
+	if err != nil {
+		return Lease{}, err
+	}
+	if !validLease(out.Lease) || out.Lease.ReceiptUUID != req.ReceiptUUID {
+		return Lease{}, errors.New("TASK_QUEUE_RESPONSE_INVALID")
+	}
+	return *out.Lease, nil
 }
 
+// Retry is a settlement of the current delivery, never a new enqueue.
 func (p *HostProvider) Retry(ctx context.Context, req RetryRequest) error {
-	body := encodeMessageRequest(EnqueueRequest{Message: req.Message})
-	if !req.RetryAt.IsZero() {
-		body["retry_at"] = req.RetryAt.UTC().Format(time.RFC3339Nano)
+	if req.Message.Lease == nil {
+		return errors.New("TASK_QUEUE_RECEIPT_REQUIRED")
 	}
-	if strings.TrimSpace(req.Reason) != "" {
-		body["reason"] = strings.TrimSpace(req.Reason)
+	return p.Nack(ctx, NackRequest{TenantKey: req.Message.TenantKey, SubscriberID: req.Message.SubscriberID, MessageID: req.Message.ID, ReceiptUUID: req.Message.Lease.ReceiptUUID, RetryAt: req.RetryAt, Reason: req.Reason})
+}
+func validLease(v *Lease) bool {
+	if v == nil || v.Fence == 0 || !v.ExpiresAt.After(time.Now()) {
+		return false
 	}
-	_, err := p.do(ctx, http.MethodPost, "/admin/runtime/task-queue/retry", body, nil)
-	return err
+	id, err := uuid.Parse(v.ReceiptUUID)
+	return err == nil && id != uuid.Nil
 }
 
 func (p *HostProvider) do(ctx context.Context, method, path string, body any, out any) ([]byte, error) {
@@ -183,37 +295,26 @@ func (p *HostProvider) do(ctx context.Context, method, path string, body any, ou
 		return raw, &AuthenticationError{StatusCode: resp.StatusCode, Body: string(raw)}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return raw, fmt.Errorf("taskqueue host request failed: status=%d body=%s", resp.StatusCode, string(raw))
-	}
-	if out == nil {
-		return raw, nil
+		return raw, hostError(resp.StatusCode, raw)
 	}
 	var envelope struct {
-		Success bool            `json:"success"`
-		Code    int             `json:"code"`
-		Message string          `json:"message"`
-		Data    json.RawMessage `json:"data"`
-		Error   any             `json:"error"`
+		Success   *bool           `json:"success"`
+		ErrorCode string          `json:"error_code"`
+		Code      *int            `json:"code"`
+		Data      json.RawMessage `json:"data"`
+		Error     json.RawMessage `json:"error"`
 	}
-	if err := json.Unmarshal(raw, &envelope); err == nil && len(envelope.Data) > 0 {
-		success := envelope.Success || envelope.Code == 0 || (envelope.Code >= 200 && envelope.Code < 300)
-		if !success {
-			errText := strings.TrimSpace(fmt.Sprint(envelope.Error))
-			if errText == "" || errText == "<nil>" {
-				errText = strings.TrimSpace(envelope.Message)
-			}
-			if errText == "" {
-				errText = string(raw)
-			}
-			return raw, fmt.Errorf("taskqueue host request failed: code=%d error=%s body=%s", envelope.Code, errText, string(raw))
-		}
-		if err := json.Unmarshal(envelope.Data, out); err != nil {
-			return raw, fmt.Errorf("taskqueue host response data decode failed: %w body=%s", err, string(raw))
-		}
-		return raw, nil
+	if json.Unmarshal(raw, &envelope) == nil && envelope.Code != nil && (*envelope.Code < 200 || *envelope.Code >= 300) {
+		return raw, hostError(resp.StatusCode, raw)
 	}
-	if err := json.Unmarshal(raw, out); err != nil {
-		return raw, fmt.Errorf("taskqueue host response decode failed: %w body=%s", err, string(raw))
+	if envelope.Success != nil && !*envelope.Success || envelope.ErrorCode != "" {
+		return raw, hostError(resp.StatusCode, raw)
+	}
+	if json.Unmarshal(raw, &envelope) != nil || envelope.Code == nil || *envelope.Code < 200 || *envelope.Code >= 300 || len(envelope.Data) == 0 || string(envelope.Data) == "null" || len(envelope.Error) > 0 && string(envelope.Error) != "null" {
+		return raw, errors.New("TASK_QUEUE_RESPONSE_INVALID")
+	}
+	if out == nil || json.Unmarshal(envelope.Data, out) != nil {
+		return raw, errors.New("TASK_QUEUE_RESPONSE_INVALID")
 	}
 	return raw, nil
 }
@@ -226,9 +327,6 @@ func (p *HostProvider) doAttempt(ctx context.Context, method, path string, bodyB
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", p.userAgent)
-	if p.tenantUUID != "" {
-		req.Header.Set("tenant_uuid", p.tenantUUID)
-	}
 	switch p.authScheme {
 	case "apikey":
 		if p.apiKey != "" {
@@ -251,7 +349,7 @@ func (p *HostProvider) doAttempt(ctx context.Context, method, path string, bodyB
 		return nil, nil, err
 	}
 	defer resp.Body.Close()
-	raw, readErr := io.ReadAll(resp.Body)
+	raw, readErr := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 	if readErr != nil {
 		return resp, nil, readErr
 	}
@@ -280,11 +378,11 @@ func isAuthStatus(status int) bool {
 }
 
 type hostMessage struct {
+	Lease          *Lease            `json:"lease"`
 	ID             string            `json:"id"`
 	TenantKey      string            `json:"tenant_key"`
 	SubscriberID   string            `json:"subscriber_id"`
 	Topic          string            `json:"topic"`
-	Payload        string            `json:"payload"`
 	PayloadBase64  string            `json:"payload_base64"`
 	Headers        map[string]string `json:"headers,omitempty"`
 	Attempt        int               `json:"attempt,omitempty"`
@@ -294,26 +392,12 @@ type hostMessage struct {
 	IdempotencyKey string            `json:"idempotency_key,omitempty"`
 }
 
-func (m hostMessage) toMessage() Message {
-	payload := []byte(m.Payload)
-	if strings.TrimSpace(m.PayloadBase64) != "" {
-		if decoded, err := base64.StdEncoding.DecodeString(m.PayloadBase64); err == nil {
-			payload = decoded
-		}
+func (m hostMessage) toMessage() (Message, error) {
+	payload, err := base64.StdEncoding.Strict().DecodeString(m.PayloadBase64)
+	if err != nil || base64.StdEncoding.EncodeToString(payload) != m.PayloadBase64 || m.ID == "" || m.IdempotencyKey == "" {
+		return Message{}, errors.New("TASK_QUEUE_RESPONSE_INVALID")
 	}
-	return Message{
-		ID:             m.ID,
-		TenantKey:      m.TenantKey,
-		SubscriberID:   m.SubscriberID,
-		Topic:          m.Topic,
-		Payload:        payload,
-		Headers:        m.Headers,
-		Attempt:        m.Attempt,
-		TraceID:        m.TraceID,
-		VisibleAt:      m.VisibleAt,
-		Metadata:       m.Metadata,
-		IdempotencyKey: m.IdempotencyKey,
-	}
+	return Message{ID: m.ID, TenantKey: m.TenantKey, SubscriberID: m.SubscriberID, Topic: m.Topic, Payload: payload, Headers: m.Headers, Attempt: m.Attempt, TraceID: m.TraceID, VisibleAt: m.VisibleAt, Metadata: m.Metadata, IdempotencyKey: m.IdempotencyKey, Lease: m.Lease}, nil
 }
 
 func encodeMessageRequest(req EnqueueRequest) map[string]any {

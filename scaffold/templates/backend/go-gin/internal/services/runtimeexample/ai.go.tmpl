@@ -194,29 +194,13 @@ func (s *LocalAI) TestConnection(ctx context.Context, key string) error {
 // shown on the settings page. A catalog entry is not a runtime declaration:
 // the profile supplies the endpoint and model to test.
 func (s *LocalAI) TestConnectionWithProfile(ctx context.Context, profile config.LocalAIModel) error {
-	_, err := s.quickCallWithProfile(ctx, profile, "ping")
+	_, err := s.ProbeProviderConnection(ctx, profile.Provider, profile.Endpoint)
 	return err
 }
 
 func (s *LocalAI) testConnection(ctx context.Context, m config.LocalAIModel) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(m.TimeoutSeconds)*time.Second)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, m.Endpoint+"/api/tags", nil)
-	if err != nil {
-		return aiError(400, "LOCAL_CONFIG_INVALID")
-	}
-	r, err := s.http.Do(req)
-	if err != nil {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		return aiError(503, "UPSTREAM_DEPENDENCY")
-	}
-	defer r.Body.Close()
-	if r.StatusCode != http.StatusOK {
-		return aiError(502, "UPSTREAM_DEPENDENCY")
-	}
-	return nil
+	_, err := s.ProbeProviderConnection(ctx, m.Provider, m.Endpoint)
+	return err
 }
 
 // QuickCall verifies the complete chat path using the selected model.

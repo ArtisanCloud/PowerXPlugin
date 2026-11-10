@@ -6,21 +6,24 @@ import (
 	"strings"
 
 	"{{ .BackendModulePath }}/internal/entity/models"
+	base "{{ .BackendModulePath }}/internal/entity/repository"
 	"gorm.io/gorm"
 )
 
-type LocalSettingsRepository struct{ db *gorm.DB }
+type LocalSettingsRepository struct {
+	*base.BaseRepository[models.LocalAISetting]
+}
 
 func NewLocalSettingsRepository(db *gorm.DB) (*LocalSettingsRepository, error) {
 	if db == nil {
 		return nil, errors.New("local AI settings repository database is required")
 	}
-	return &LocalSettingsRepository{db: db}, nil
+	return &LocalSettingsRepository{BaseRepository: base.NewBaseRepository[models.LocalAISetting](db)}, nil
 }
 
 func (r *LocalSettingsRepository) Get(ctx context.Context, tenantUUID, environment, modality, source string) (*models.LocalAISetting, error) {
 	var item models.LocalAISetting
-	err := r.db.WithContext(ctx).Where("tenant_uuid = ? AND environment = ? AND modality = ? AND source = ?", tenantUUID, environment, modality, source).First(&item).Error
+	err := r.DB.WithContext(ctx).Where("tenant_uuid = ? AND environment = ? AND modality = ? AND source = ?", tenantUUID, environment, modality, source).First(&item).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -34,7 +37,7 @@ func (r *LocalSettingsRepository) Upsert(ctx context.Context, item *models.Local
 	if item == nil || strings.TrimSpace(item.TenantUUID) == "" {
 		return nil, errors.New("tenant UUID is required")
 	}
-	return item, r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	return item, r.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var existing models.LocalAISetting
 		err := tx.Where("tenant_uuid = ? AND environment = ? AND modality = ? AND source = ?", item.TenantUUID, item.Environment, item.Modality, item.Source).First(&existing).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {

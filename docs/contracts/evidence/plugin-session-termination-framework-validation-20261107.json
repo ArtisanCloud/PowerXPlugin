@@ -1,0 +1,229 @@
+{
+  "contract": "plugin-session-termination-v2",
+  "owner": "PowerXPlugin Framework",
+  "date": "2026-11-07",
+  "checked_at": "2026-11-07T06:42:30.297462+00:00",
+  "branch": "025-framework-business-regression",
+  "base_head": "32aaf0bd33ecda9860384484b55aa1d092ad27fc",
+  "source_state": "local_uncommitted_changes_preserved_existing_worktree",
+  "scope": [
+    "framework-client",
+    "nuxt-admin",
+    "skeleton",
+    "scaffold_cli_templates",
+    "cli_contract_distribution",
+    "ci_regression"
+  ],
+  "changed_files": [
+    ".github/workflows/ci.yml",
+    "docs/contracts/plugin-session-termination-framework.md",
+    "docs/contracts/plugin-session-termination-source.json",
+    "docs/contracts/plugin-session-termination-v2.md",
+    "framework/frontend/nuxt/framework-admin/index.ts",
+    "framework/frontend/nuxt/framework-admin/layer/app/plugins/powerx-capability.client.ts",
+    "framework/frontend/nuxt/framework-admin/layer/nuxt.config.ts",
+    "framework/frontend/nuxt/framework-client/api-errors.ts",
+    "framework/frontend/nuxt/framework-client/api-fetch.ts",
+    "framework/frontend/nuxt/framework-client/bridge.ts",
+    "framework/frontend/nuxt/framework-client/host-session.ts",
+    "framework/frontend/nuxt/framework-client/index.ts",
+    "framework/frontend/nuxt/framework-client/navigation.ts",
+    "framework/frontend/nuxt/framework-client/sse.ts",
+    "framework/frontend/nuxt/framework-client/ws.ts",
+    "package.json",
+    "scaffold/templates/web-admin/nuxt/app/composables/useEmbeddedAuth.ts.tmpl",
+    "scaffold/templates/web-admin/nuxt/app/composables/useHostBridgeAdapter.ts.tmpl",
+    "scaffold/templates/web-admin/nuxt/app/middleware/auth.global.ts.tmpl",
+    "scaffold/templates/web-admin/nuxt/i18n/locales/en.json.tmpl",
+    "scaffold/templates/web-admin/nuxt/i18n/locales/zh.json.tmpl",
+    "scripts/contracts/package-session-termination.py",
+    "scripts/contracts/test-session-termination-browser.mjs",
+    "scripts/contracts/validate-session-termination.mjs",
+    "scripts/template-sync-config.yaml",
+    "skeleton/web-admin/nuxt/app/composables/useEmbeddedAuth.ts",
+    "skeleton/web-admin/nuxt/app/composables/useHostBridgeAdapter.ts",
+    "skeleton/web-admin/nuxt/app/middleware/auth.global.ts",
+    "skeleton/web-admin/nuxt/i18n/locales/en.json",
+    "skeleton/web-admin/nuxt/i18n/locales/zh.json",
+    "skeleton/web-admin/nuxt/tests/fixtures/core-bridge-v2.js",
+    "skeleton/web-admin/nuxt/tests/fixtures/core-bridge-v2.provenance.json",
+    "skeleton/web-admin/nuxt/tests/unit/api-auth-errors.spec.ts",
+    "skeleton/web-admin/nuxt/tests/unit/bridge-v2-interoperability.spec.ts",
+    "skeleton/web-admin/nuxt/tests/unit/session-termination-adapter.spec.ts",
+    "skeleton/web-admin/nuxt/tests/unit/session-termination-admin.spec.ts",
+    "skeleton/web-admin/nuxt/tests/unit/session-termination-router.spec.ts",
+    "skeleton/web-admin/nuxt/tests/unit/session-termination-v2.spec.ts",
+    "tools/cli/internal/contracts/data/media-contracts/plugin-session-termination-framework.md",
+    "tools/cli/internal/contracts/data/media-contracts/plugin-session-termination-source.json",
+    "tools/cli/internal/contracts/data/media-contracts/plugin-session-termination-v2.md",
+    "tools/cli/internal/contracts/embed.go",
+    "tools/cli/internal/templates/data/web-admin/nuxt/app/composables/useEmbeddedAuth.ts.tmpl",
+    "tools/cli/internal/templates/data/web-admin/nuxt/app/composables/useHostBridgeAdapter.ts.tmpl",
+    "tools/cli/internal/templates/data/web-admin/nuxt/app/middleware/auth.global.ts.tmpl",
+    "tools/cli/internal/templates/data/web-admin/nuxt/i18n/locales/en.json.tmpl",
+    "tools/cli/internal/templates/data/web-admin/nuxt/i18n/locales/zh.json.tmpl"
+  ],
+  "source_sha256": {
+    ".github/workflows/ci.yml": "b5cea700e5f37c1b44a397bb0f053b2a1ecc6d04fb18cbbd942ce11b34966c93",
+    "docs/contracts/plugin-session-termination-framework.md": "5429ff672347fc493d9019745580fd87db99e671e5b4793a15e29dad811015f6",
+    "docs/contracts/plugin-session-termination-source.json": "1c20285dbbfe0c0f258ae059b9083b5f9f9c0dc2dbd9e46963c7b5233d44cccb",
+    "docs/contracts/plugin-session-termination-v2.md": "b232a9718133e85b19dc65c22301c79729c6a15228ee80e40492567083df445d",
+    "framework/frontend/nuxt/framework-admin/index.ts": "a7515a9bdb30a248f6cd50edc85efe50e2702c7eda5c4fc87e280e9b891f1818",
+    "framework/frontend/nuxt/framework-admin/layer/app/plugins/powerx-capability.client.ts": "1f97bc044ca881e1f7fb52160fe8a5ed6a2898e4d24f1cf3298959ec7927840d",
+    "framework/frontend/nuxt/framework-admin/layer/nuxt.config.ts": "1e040666ebf5f3a706b7a0d6a86b8622b65a20569091da970623d3b8536d7c72",
+    "framework/frontend/nuxt/framework-client/api-errors.ts": "809b3082a8902e272b94830188ee694ec3188e0db7b92a157dda4380b2c0e62c",
+    "framework/frontend/nuxt/framework-client/api-fetch.ts": "c5dd1e5cab3413babe082f29a763df4c376b7ea72354a19248b8e7f01ee871a5",
+    "framework/frontend/nuxt/framework-client/bridge.ts": "ff85a22352c96235ba9450201ccefed71dccab9784781fa7ffd572bb7ef6c210",
+    "framework/frontend/nuxt/framework-client/host-session.ts": "3af513acfb1f4d1b481e0118609838d5ecf2089a0dba95335f576f84acc3dc03",
+    "framework/frontend/nuxt/framework-client/index.ts": "b180e41a648c2575a20e63af79839fdc7665d72c29aa246f8cc97e6b9e2876f8",
+    "framework/frontend/nuxt/framework-client/navigation.ts": "63121623e62287c7672083ca5ae455b586eea9d57af7b227298dbbb9ff0f2b1c",
+    "framework/frontend/nuxt/framework-client/sse.ts": "234ec336f3f759cd05497a0e494e67524004741b1a327d096120a160b8b231a9",
+    "framework/frontend/nuxt/framework-client/ws.ts": "2633f2cd79e3865f3a1b4baea7fa1a117c9e164a12f7b06b311f094dd20bee2b",
+    "package.json": "7ac3d3e38cce4441be0d5d4f2538c8dce5c3bbca93e994cfce038ce2940c9247",
+    "scaffold/templates/web-admin/nuxt/app/composables/useEmbeddedAuth.ts.tmpl": "e6d4e6d7eaaad3300758836f7642e77cc671dddbcbbec8a987a792196610885e",
+    "scaffold/templates/web-admin/nuxt/app/composables/useHostBridgeAdapter.ts.tmpl": "553696b35e072ea3890bc5d39bd2fc954262d278c90fd897c0ea7ffd8ab2c5b9",
+    "scaffold/templates/web-admin/nuxt/app/middleware/auth.global.ts.tmpl": "748ca6dd7240a76ac1caf4b305d87a3a0e9f488119b322331bf0af5f8d86939d",
+    "scaffold/templates/web-admin/nuxt/i18n/locales/en.json.tmpl": "8ce6ac7ab84e374c53140086674a1ab939076d1c780734afbe95b1177a57eb7e",
+    "scaffold/templates/web-admin/nuxt/i18n/locales/zh.json.tmpl": "b7ead055398278e14d58b92583707f52a40854a6c859ede3994cc4a51b44362b",
+    "scripts/contracts/package-session-termination.py": "89e495b814ca47f1026fdb0aa13c7ba4ec31ba68c6ecb1d24d1dde1840b48639",
+    "scripts/contracts/test-session-termination-browser.mjs": "3d6336f65a2b8eebc3c709260c3ef28279538c80ac76e07de62e59f3d420ddd9",
+    "scripts/contracts/validate-session-termination.mjs": "c5953d2f7a1e0d3c33f2947b512aca8bdaec084c16c45363fa1ff087ed23d235",
+    "scripts/template-sync-config.yaml": "0e0018c71bb4d02809cb5416708772632a31d5f8a5fe370cd3458be945bf12c3",
+    "skeleton/web-admin/nuxt/app/composables/useEmbeddedAuth.ts": "530d6be6578098e180adaeefc09a565c7d3c1a030fd4d1d65147d1e166dc9a3a",
+    "skeleton/web-admin/nuxt/app/composables/useHostBridgeAdapter.ts": "13de57ff781d2eba4b2a1093c9f4a14900212851359a72fa8c66f795adde83d4",
+    "skeleton/web-admin/nuxt/app/middleware/auth.global.ts": "748ca6dd7240a76ac1caf4b305d87a3a0e9f488119b322331bf0af5f8d86939d",
+    "skeleton/web-admin/nuxt/i18n/locales/en.json": "eefc525799f3acc1860d5525083c3b3a1ddd20b38bdabac91bff231d6e6bb3c6",
+    "skeleton/web-admin/nuxt/i18n/locales/zh.json": "b7ead055398278e14d58b92583707f52a40854a6c859ede3994cc4a51b44362b",
+    "skeleton/web-admin/nuxt/tests/fixtures/core-bridge-v2.js": "4af4fbcd54a07fa91cf0a0a18cbefcd9c0a10edc06080d85280abcce40092b09",
+    "skeleton/web-admin/nuxt/tests/fixtures/core-bridge-v2.provenance.json": "425b05941dd3bbdbbcc190f7fc978cf764aadf9331d330474f61b99a51e62947",
+    "skeleton/web-admin/nuxt/tests/unit/api-auth-errors.spec.ts": "839689b12b421c12e2131c1291249ac21ec9c865757ad02f34e1791a7365f3af",
+    "skeleton/web-admin/nuxt/tests/unit/bridge-v2-interoperability.spec.ts": "bf91de1a744c37475efe53d419791d4aa2cfc29fc0fa7442af28a3728e604dd9",
+    "skeleton/web-admin/nuxt/tests/unit/session-termination-adapter.spec.ts": "5c2f9a909aedae37507f9850659ae8e45e7c3ce1f4fac0ff3e2b540916ff835d",
+    "skeleton/web-admin/nuxt/tests/unit/session-termination-admin.spec.ts": "ae8258215ea625039e52c6b0706b8a2e8c2a2f602273dee044d5898701452f0d",
+    "skeleton/web-admin/nuxt/tests/unit/session-termination-router.spec.ts": "559d3390163359abab6365e7ecf999209a8d487b947a12ecfb258a3a1443fc62",
+    "skeleton/web-admin/nuxt/tests/unit/session-termination-v2.spec.ts": "ea3f7ce686be688c3d0e8857a9de82b940b33f38c04a34f6bdb1346d343d63a8",
+    "tools/cli/internal/contracts/data/media-contracts/plugin-session-termination-framework.md": "5429ff672347fc493d9019745580fd87db99e671e5b4793a15e29dad811015f6",
+    "tools/cli/internal/contracts/data/media-contracts/plugin-session-termination-source.json": "1c20285dbbfe0c0f258ae059b9083b5f9f9c0dc2dbd9e46963c7b5233d44cccb",
+    "tools/cli/internal/contracts/data/media-contracts/plugin-session-termination-v2.md": "b232a9718133e85b19dc65c22301c79729c6a15228ee80e40492567083df445d",
+    "tools/cli/internal/contracts/embed.go": "b3b3d83d748529b1eb7283c5c9cdd10535d18215d66b5bf87a95086586920388",
+    "tools/cli/internal/templates/data/web-admin/nuxt/app/composables/useEmbeddedAuth.ts.tmpl": "e6d4e6d7eaaad3300758836f7642e77cc671dddbcbbec8a987a792196610885e",
+    "tools/cli/internal/templates/data/web-admin/nuxt/app/composables/useHostBridgeAdapter.ts.tmpl": "553696b35e072ea3890bc5d39bd2fc954262d278c90fd897c0ea7ffd8ab2c5b9",
+    "tools/cli/internal/templates/data/web-admin/nuxt/app/middleware/auth.global.ts.tmpl": "748ca6dd7240a76ac1caf4b305d87a3a0e9f488119b322331bf0af5f8d86939d",
+    "tools/cli/internal/templates/data/web-admin/nuxt/i18n/locales/en.json.tmpl": "8ce6ac7ab84e374c53140086674a1ab939076d1c780734afbe95b1177a57eb7e",
+    "tools/cli/internal/templates/data/web-admin/nuxt/i18n/locales/zh.json.tmpl": "b7ead055398278e14d58b92583707f52a40854a6c859ede3994cc4a51b44362b"
+  },
+  "checks": [
+    {
+      "name": "frontend_units",
+      "command": "cd skeleton/web-admin/nuxt && npm run test:unit",
+      "result": "passed",
+      "files": 31,
+      "tests": 263
+    },
+    {
+      "name": "installed_package_units",
+      "result": "passed",
+      "files": 8,
+      "tests": 124,
+      "log": "artifacts/framework-session-termination-20261107-ec34cac980883009/validation.log"
+    },
+    {
+      "name": "browser",
+      "result": "passed",
+      "tests": 16,
+      "widths": [
+        1440,
+        390
+      ],
+      "boundary": "installed_framework_and_real_core_consumer_with_controlled_parent_not_deployed_core",
+      "log": "artifacts/framework-session-termination-20261107-ec34cac980883009/browser-validation.json"
+    },
+    {
+      "name": "typescript",
+      "command": "tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution bundler --lib ES2022,DOM framework/frontend/nuxt/framework-client/index.ts",
+      "result": "passed"
+    },
+    {
+      "name": "installed_types",
+      "result": "passed"
+    },
+    {
+      "name": "nuxt_production_build",
+      "command": "cd skeleton/web-admin/nuxt && npm run build",
+      "result": "passed"
+    },
+    {
+      "name": "cli_contract_and_generation",
+      "command": "go test ./tools/cli/internal/contracts ./tools/cli/internal/templates",
+      "result": "passed"
+    },
+    {
+      "name": "templates",
+      "command": "node scripts/sync-templates.mjs --check",
+      "result": "passed"
+    },
+    {
+      "name": "contract_provenance",
+      "command": "node scripts/contracts/validate-session-termination.mjs",
+      "result": "passed"
+    },
+    {
+      "name": "ci_guardrails",
+      "command": "node .codex/skills/ci/audit/scripts/ci-guardrails.mjs",
+      "result": "passed"
+    },
+    {
+      "name": "workflow_yaml_and_changed_file_whitespace",
+      "result": "passed"
+    }
+  ],
+  "bundle": "artifacts/framework-session-termination-20261107-ec34cac980883009",
+  "bundle_references": "artifacts/framework-session-termination-20261107-ec34cac980883009/references.json",
+  "npm_refs": {
+    "client": "file:/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-session-termination-20261107-ec34cac980883009/artisan-cloud-plugin-framework-client-0.0.14-dev.session.beea333a78a3a03e.tgz",
+    "admin": "file:/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-session-termination-20261107-ec34cac980883009/artisan-cloud-plugin-framework-admin-0.0.13-dev.session.7e25c14390313eff.tgz"
+  },
+  "package_versions": {
+    "client": "0.0.14-dev.session.beea333a78a3a03e",
+    "admin": "0.0.13-dev.session.7e25c14390313eff"
+  },
+  "tarball_sha256": {
+    "client": "23282f20b7f7fd40d4700e506f567bcbf4cf3cc0201daf6c1e5a37aec0e7aaac",
+    "admin": "99871b1948eecea1b4f7abe82b4a503e78a3c308f7e7252159c94da66c85597d"
+  },
+  "temporary_service": {
+    "command": "node scripts/contracts/test-session-termination-browser.mjs /private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/artifacts/framework-session-termination-20261107-ec34cac980883009",
+    "pid": 69331,
+    "port": 59692,
+    "closed": true,
+    "browser_child_pids": [
+      69386,
+      69393,
+      69394,
+      69409
+    ],
+    "browser_children_closed": true
+  },
+  "all_recorded_owned_pids_exited": true,
+  "core_snapshot_current": true,
+  "ci": {
+    "job_added": "session-termination-contract",
+    "runner": "ubuntu-24.04",
+    "remote_status": "not_run_no_commit_or_push"
+  },
+  "boundaries": {
+    "core_source_modified": false,
+    "ai_craft_modified": false,
+    "daily_services_restarted": false,
+    "business_data_or_grants_modified": false,
+    "npm_published": false,
+    "git_tag_created": false,
+    "committed_or_pushed": false,
+    "live_core_ai_craft_acceptance": false
+  },
+  "pending": [
+    "Publish approved SDK versions separately",
+    "AI Craft installs the matching SDK and updates its own adapter and draft ownership",
+    "Core and plugin owners deploy and verify a real login session together"
+  ]
+}

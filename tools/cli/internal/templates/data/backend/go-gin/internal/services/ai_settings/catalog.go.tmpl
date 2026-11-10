@@ -18,6 +18,7 @@ type catalogProvider struct {
 	Defaults   map[string]string          `yaml:"defaults"`
 	Modalities map[string]catalogModality `yaml:"modalities"`
 	Apps       map[string]catalogApp      `yaml:"apps"`
+	Drivers    map[string]string          `yaml:"drivers"`
 }
 type catalogAuth struct {
 	Scheme   string            `yaml:"scheme"`
@@ -70,7 +71,7 @@ func (c *Catalog) Providers(modality string) []map[string]any {
 		return out
 	}
 	for _, p := range c.providers {
-		if _, ok := p.Modalities[modality]; !ok {
+		if _, ok := p.Modalities[modality]; !ok && !(p.ID == "ollama" && modality == "vlm") {
 			continue
 		}
 		apps := []map[string]string{}
@@ -79,7 +80,14 @@ func (c *Catalog) Providers(modality string) []map[string]any {
 				apps = append(apps, map[string]string{"id": id, "name": app.Name})
 			}
 		}
-		out = append(out, map[string]any{"id": p.ID, "name": p.Name, "apps": apps, "auth": map[string]any{"scheme": p.Auth.Scheme, "fields": p.Auth.Fields, "defaults": p.Defaults}})
+		defaults := map[string]string{}
+		if value := p.Auth.Defaults["base_url"]; value != "" {
+			defaults["base_url"] = value
+		}
+		if value := p.Defaults["base_url"]; value != "" {
+			defaults["base_url"] = value
+		}
+		out = append(out, map[string]any{"id": p.ID, "name": p.Name, "apps": apps, "auth": map[string]any{"scheme": p.Auth.Scheme, "fields": p.Auth.Fields, "defaults": defaults}})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i]["id"].(string) < out[j]["id"].(string) })
 	return out

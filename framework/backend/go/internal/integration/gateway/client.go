@@ -180,6 +180,15 @@ func NewClient(cfg Config) (*Client, error) {
 	return client, nil
 }
 
+// TenantUUID returns the configured tenant assertion for response validation.
+// It does not override the tenant derived by Core from the service credential.
+func (c *Client) TenantUUID() string {
+	if c == nil {
+		return ""
+	}
+	return c.tenantUUID
+}
+
 // Invoke 通过 REST `/tenant/invocations` 触发能力调用。
 func (c *Client) Invoke(ctx context.Context, req InvokeRequest) (*Response, error) {
 	if err := validateInvokeRequest(req); err != nil {

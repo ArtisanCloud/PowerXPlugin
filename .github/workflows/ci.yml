@@ -348,7 +348,13 @@ jobs:
           token: ${{ secrets.CI_CHECKOUT_TOKEN || github.token }}
       - name: Install system dependencies
         run: |
-          apt-get update
+          sed -i \
+            -e 's|http://archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' \
+            -e 's|http://security.ubuntu.com/ubuntu|https://security.ubuntu.com/ubuntu|g' \
+            /etc/apt/sources.list.d/ubuntu.sources
+          getent ahosts archive.ubuntu.com
+          getent ahosts security.ubuntu.com
+          apt-get -o APT::Update::Error-Mode=any update
           apt-get install -y build-essential
       - uses: actions/setup-go@v5
         with:

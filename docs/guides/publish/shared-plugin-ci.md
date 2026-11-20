@@ -13,10 +13,12 @@
 
 插件根目录须提供 `plugin.yaml`、Publisher 兼容的 `make dist`、`backend/go.mod`、`backend/go.sum` 及 `web-admin/package-lock.json`。工作流先准备锁定依赖，Publisher 从 Git 干净源码构建并冻结安装包。后端需要支持 `CGO_ENABLED=0`、`-trimpath` 和计划版本注入，详见 [Publisher 构建契约](../../contracts/plugin-publisher-build-v1.md)。
 
-工具链固定为 Go `1.24.13`、Node.js `22.23.2`。Runner 安装固定的 ripgrep `14.1.1` 供 `make dist` 校验使用，并独立检出 CLI 源码，用 `go build -mod=readonly -trimpath -buildvcs=false` 构建 `px-plugin`，注入版本 `ci.880839e37fff9ada2765a7292f9817f01646c96c`。执行前用下列 SHA256 校验 Linux/amd64 CLI 二进制。 [CLI 源码提交](https://github.com/ArtisanCloud/PowerXPlugin/tree/880839e37fff9ada2765a7292f9817f01646c96c) · [ripgrep 发行](https://github.com/BurntSushi/ripgrep/releases/tag/14.1.1)
+使用 Framework 模板的插件应在提交构建源码前运行 `make plugin-yaml-sync`，并提交生成的 `plugin.d/` 清单变化。已同步的清单在构建时再次生成后应保持相同内容，否则 Publisher 会以 `PUBLISHER_BUILD_SOURCE_CHANGED` 拒绝冻结包。
+
+工具链固定为 Go `1.24.13`、Node.js `22.23.2`。Runner 安装固定的 ripgrep `14.1.1` 供 `make dist` 校验使用，并独立检出 CLI 源码，用 `go build -mod=readonly -trimpath -buildvcs=false` 构建 `px-plugin`，注入版本 `ci.10c98e4eada350d296d106ff5ad805192380eaa8`。执行前用下列 SHA256 校验 Linux/amd64 CLI 二进制。 [CLI 源码提交](https://github.com/ArtisanCloud/PowerXPlugin/tree/10c98e4eada350d296d106ff5ad805192380eaa8) · [ripgrep 发行](https://github.com/BurntSushi/ripgrep/releases/tag/14.1.1)
 
 ```text
-a8837172e81c7c85d886cd34db9ad7819e818f1e3920e653c4e69d2724b83b38
+d1c8c046ecf91913617eaeacbfcdacd5e9997aae192509287e56eccbfa0d9882
 ```
 
 ## 电商调用示例

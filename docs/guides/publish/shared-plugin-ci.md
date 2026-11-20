@@ -43,7 +43,7 @@ on:
         type: string
 ```
 
-在同一文件的 `jobs` 下加上以下调用。原 `build` 作业继续运行 `make ci-all`。将占位符替换成 Framework 审核后的**完整工作流提交 SHA**，再提交调用方。
+在同一文件的 `jobs` 下加上以下调用。原 `build` 作业继续运行 `make ci-all`。示例固定到通过完整 Go/Nuxt 生成插件验收的 Framework 候选提交。
 
 ```yaml
   package:
@@ -51,7 +51,7 @@ on:
     needs: build
     permissions:
       contents: read
-    uses: ArtisanCloud/PowerXPlugin/.github/workflows/reusable-plugin-ci.yml@<FRAMEWORK_WORKFLOW_COMMIT_SHA>
+    uses: ArtisanCloud/PowerXPlugin/.github/workflows/reusable-plugin-ci.yml@10f67261d9d3f699a59ed7175ef3a793bdee7a31
     with:
       source_sha: ${{ inputs.source_sha }}
       plugin_version: ${{ inputs.plugin_version }}
@@ -64,3 +64,7 @@ on:
 成功后，从电商运行的 **Artifacts** 下载 `plugin-build-<request_id>-attempt-<run_attempt>`。它包含 Publisher 生成的原始 `artifact.zip` 和 `build.json`。后者是 `build run` 响应中的 `.data`，保留原包大小和 SHA256。运行摘要记录插件源码、工作流实际提交、CLI 版本和摘要。
 
 把运行与 attempt 链接、插件源码 SHA、Framework 工作流 SHA 和两份文件交给 XDocker。使用 `verify-plugin-build` 时，将文件放在私有目录，并将 `build.json` 权限设为 `0600`。首单验收应覆盖业务 CI 通过和两份文件可下载。拒绝路径用另一个有效 SHA 作为预期提交，确认本次运行失败且没有插件包制品。
+
+## 候选验收记录
+
+完整 Go/Nuxt 生成插件 `com.example.framework-ci-fixture` 的包版本为 `1.2.3`。正向运行生成同一次构建的 `artifact.zip` 与 `build.json`，错误 SHA 运行在请求校验处返回 `PLUGIN_CI_SOURCE_MISMATCH`，制品数为 0。 [产包运行](https://github.com/ArtisanCloud/PowerXPlugin/actions/runs/44757093283/attempts/1) · [下载制品](https://github.com/ArtisanCloud/PowerXPlugin/actions/runs/44757093283/artifacts/14640825059) · [拒绝运行](https://github.com/ArtisanCloud/PowerXPlugin/actions/runs/44757093409/attempts/1)

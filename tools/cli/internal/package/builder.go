@@ -339,9 +339,15 @@ func (b *Builder) Build(ctx context.Context, userOpts *Options) (*Result, error)
 	if _, err := copyFile(pluginYAML, result.PluginYAMLPath); err != nil {
 		return nil, fmt.Errorf("copy plugin.yaml: %w", err)
 	}
-	if _, err := manifest.Load(result.PluginYAMLPath); err != nil {
+	packagedManifest, err := manifest.Load(result.PluginYAMLPath)
+	if err != nil {
 		return nil, fmt.Errorf("validate packaged plugin.yaml: %w", err)
 	}
+	datasets, err := packageDatasetAssets(opts.EntryPath, result, packagedManifest.DataLifecycle)
+	if err != nil {
+		return nil, err
+	}
+	artifacts = append(artifacts, datasets...)
 
 	if hash, size, err := hashFile(result.ManifestPath); err == nil {
 		artifacts = append(artifacts, Artifact{

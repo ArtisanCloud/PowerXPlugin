@@ -12,11 +12,17 @@ import (
 // PluginManifest represents the minimal fields needed from plugin.yaml.
 type PluginManifest struct {
 	NotificationPresentations []fwmanifest.NotificationPresentation `yaml:"notification_presentations"`
+	DataLifecycle             map[string]DatasetAsset               `yaml:"data_lifecycle"`
 	ID                        string                                `yaml:"id"`
 	Version                   string                                `yaml:"version"`
 	Backend                   struct {
 		Entry string `yaml:"entry"`
 	} `yaml:"backend"`
+}
+
+// DatasetAsset is the package index for a storage dataset declaration.
+type DatasetAsset struct {
+	SHA256 string `yaml:"sha256"`
 }
 
 // Load reads plugin.yaml from the provided directory (or absolute path).

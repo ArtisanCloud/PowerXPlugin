@@ -250,6 +250,10 @@ dist: dist-target-check plugin-yaml-check plugin-permission-declaration-check di
 	  mkdir -p $(DIST_DIR)/config; \
 	  cp config/event_fabric.yaml $(DIST_DIR)/config/event_fabric.yaml; \
 	fi
+	@if [ -d "contracts/storage-datasets" ]; then \
+	  mkdir -p "$(DIST_DIR)/contracts/storage-datasets"; \
+	  cp -R contracts/storage-datasets/. "$(DIST_DIR)/contracts/storage-datasets/"; \
+	fi
 	@if [ -d "skills" ]; then \
 	  mkdir -p $(DIST_DIR)/skills; \
 	  cp -R skills/. $(DIST_DIR)/skills/; \
@@ -333,6 +337,10 @@ release: build frontend-build
 	@if [ -f "config/event_fabric.yaml" ]; then \
 	  mkdir -p $(RELEASE_DIR)/config; \
 	  cp config/event_fabric.yaml $(RELEASE_DIR)/config/event_fabric.yaml; \
+	fi
+	@if [ -d "contracts/storage-datasets" ]; then \
+	  mkdir -p "$(RELEASE_DIR)/contracts/storage-datasets"; \
+	  cp -R contracts/storage-datasets/. "$(RELEASE_DIR)/contracts/storage-datasets/"; \
 	fi
 	@if [ -d "skills" ]; then \
 	  mkdir -p $(RELEASE_DIR)/skills; \

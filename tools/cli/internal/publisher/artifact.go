@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"gopkg.in/yaml.v3"
 )
@@ -394,8 +395,15 @@ func freezePackage(ctx context.Context, snapshot, dist, stage string, p Plan, to
 func checkReferences(root string, node any) error {
 	switch value := node.(type) {
 	case map[string]any:
-		for _, v := range value {
-			if err := checkReferences(root, v); err != nil {
+		for key, v := range value {
+			var err error
+			switch key {
+			case "path", "schema", "schema_ref", "template", "endpoint", "channel", "payload", "handler", "imports", "descriptor", "input", "output", "entrypoint":
+				err = checkReferenceValue(root, v)
+			default:
+				err = checkReferences(root, v)
+			}
+			if err != nil {
 				return err
 			}
 		}
@@ -405,9 +413,26 @@ func checkReferences(root string, node any) error {
 				return err
 			}
 		}
+	}
+	return nil
+}
+
+// Reference fields have file semantics. Schema IDs and descriptive text may
+// share the same prefix but are not paths in the package.
+func checkReferenceValue(root string, node any) error {
+	switch value := node.(type) {
 	case string:
-		if strings.HasPrefix(value, "contracts/") || strings.HasPrefix(value, "schema/") {
-			rel := value
+		ref := strings.TrimPrefix(value, "./")
+		if strings.HasPrefix(ref, "contracts/") || strings.HasPrefix(ref, "schema/") {
+			if !utf8.ValidString(ref) || strings.ContainsAny(ref, "\\\x00:%") {
+				return failure(ArtifactInvalid, nil)
+			}
+			for _, segment := range strings.Split(strings.TrimSuffix(ref, "/"), "/") {
+				if segment == "" || segment == "." || segment == ".." {
+					return failure(ArtifactInvalid, nil)
+				}
+			}
+			rel := ref
 			if strings.HasPrefix(rel, "schema/") {
 				rel = "contracts/" + rel
 			}
@@ -415,6 +440,14 @@ func checkReferences(root string, node any) error {
 				return err
 			}
 		}
+	case []any:
+		for _, item := range value {
+			if err := checkReferenceValue(root, item); err != nil {
+				return err
+			}
+		}
+	case map[string]any:
+		return checkReferences(root, value)
 	}
 	return nil
 }

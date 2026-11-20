@@ -1,7 +1,7 @@
 capabilities:
   imports:
-    - contracts/capabilities/com.example.framework-ci-fixture.parcel.volume.yaml
     - contracts/capabilities/com.example.framework-ci-fixture.auth.me_context.yaml
+    - contracts/capabilities/com.example.framework-ci-fixture.parcel.volume.yaml
     - contracts/capabilities/com.example.framework-ci-fixture.template.audit.yaml
     - contracts/capabilities/com.example.framework-ci-fixture.template.batch_clone.yaml
     - contracts/capabilities/com.example.framework-ci-fixture.template.compose.yaml
@@ -16,17 +16,17 @@ capabilities:
     - contracts/capabilities/com.example.framework-ci-fixture.template.update.yaml
     - contracts/capabilities/com.example.framework-ci-fixture.template.validate.yaml
   provides:
-    - descriptor: contracts/capabilities/com.example.framework-ci-fixture.parcel.volume.yaml
-      id: com.example.framework-ci-fixture.parcel.volume
-      schemas:
-        input: contracts/tools/parcel-volume.v1.json
-        output: contracts/tools/parcel-volume.v1.json
-      version: 1.0.0
     - descriptor: contracts/capabilities/com.example.framework-ci-fixture.auth.me_context.yaml
       id: com.example.framework-ci-fixture.auth.me_context
       schemas:
         input: contracts/schema/input/com.example.framework-ci-fixture.auth.me_context.json
         output: contracts/schema/output/com.example.framework-ci-fixture.auth.me_context.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/com.example.framework-ci-fixture.parcel.volume.yaml
+      id: com.example.framework-ci-fixture.parcel.volume
+      schemas:
+        input: ""
+        output: ""
       version: 1.0.0
     - descriptor: contracts/capabilities/com.example.framework-ci-fixture.template.audit.yaml
       id: com.example.framework-ci-fixture.template.audit
@@ -112,12 +112,12 @@ capabilities:
     - com.corex.ai.catalog.models.read
     - com.corex.ai.catalog.providers.read
     - com.corex.ai.connection.test
-    - com.corex.ai.vlm.invoke
     - com.corex.ai.image.invoke
-    - com.corex.ai.video.invoke
-    - com.corex.ai.tts.invoke
-    - com.corex.ai.media.tasks.read
     - com.corex.ai.media.tasks.cancel
+    - com.corex.ai.media.tasks.read
+    - com.corex.ai.tts.invoke
+    - com.corex.ai.video.invoke
+    - com.corex.ai.vlm.invoke
     - com.corex.capabilities.catalog.read
     - com.corex.capabilities.grant_status.read
     - com.corex.customer.memberships.delegated_read

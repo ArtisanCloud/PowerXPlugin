@@ -1,0 +1,350 @@
+package middleware
+
+import (
+	"fmt"
+	"net/http"
+	"os"
+	"runtime/debug"
+	"strings"
+	"sync"
+	"time"
+
+	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
+	fwmiddleware "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/middleware"
+	"github.com/example.com/framework-ci-fixture/backend/internal/logger"
+	"github.com/gin-gonic/gin"
+)
+
+// CORS 跨域中间件
+func CORS() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		origin := strings.TrimSpace(c.Request.Header.Get("Origin"))
+		if origin == "" {
+			origin = "*"
+		}
+		setHeaders := func() {
+			c.Header("Access-Control-Allow-Origin", origin)
+			c.Header("Vary", "Origin")
+			c.Header("Access-Control-Allow-Credentials", "true")
+			c.Header("Access-Control-Allow-Headers",
+				"Content-Type, Content-Length, Accept-Encoding, "+
+					"X-CSRF-Token, Authorization, accept, origin, Cache-Control, "+
+					"X-Requested-With, tenant_uuid, X-PowerX-CTX, X-PowerX-CTX-SIG, X-PowerX-CTX-JWT, "+
+					"X-Request-ID, X-Trace-Id, X-Scheduler-Provider-Mode, X-Local-Media-Ticket",
+			)
+			c.Header("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, PATCH")
+			c.Header("Access-Control-Expose-Headers", "X-Trace-Id, X-Correlation-Id, X-Request-Id")
+		}
+		setHeaders()
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+
+		c.Next()
+		setHeaders()
+	}
+}
+
+// RequestLogger 请求日志中间件
+func RequestLogger() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if !logger.HTTPAccessEnabled() {
+			c.Next()
+			return
+		}
+		start := time.Now()
+		path := c.Request.URL.Path
+		raw := c.Request.URL.RawQuery
+
+		// 处理请求
+		c.Next()
+
+		// 计算延迟
+		latency := time.Since(start)
+
+		// 获取客户端IP
+		clientIP := c.ClientIP()
+
+		// 获取租户信息
+		var tenantUUID string
+		if tenantCtx, exists := GetTenantContext(c); exists {
+			tenantUUID = tenantCtx.TenantUUID
+		}
+
+		// 构建日志字段
+		fields := logger.Fields{
+			"status":     c.Writer.Status(),
+			"method":     c.Request.Method,
+			"path":       path,
+			"ip":         clientIP,
+			"latency":    latency,
+			"user_agent": c.Request.UserAgent(),
+		}
+
+		if raw != "" {
+			query := c.Request.URL.Query()
+			for key := range query {
+				switch strings.ToLower(key) {
+				case "authorization", "access_token", "token", "context_ticket", "api_key":
+					query.Del(key)
+				}
+			}
+			if clean := query.Encode(); clean != "" {
+				fields["query"] = clean
+			}
+		}
+
+		if strings.TrimSpace(tenantUUID) != "" {
+			fields["tenant_uuid"] = tenantUUID
+		}
+		if requestID := strings.TrimSpace(c.GetString("request_id")); requestID != "" {
+			fields["request_id"] = requestID
+		}
+		if traceID := strings.TrimSpace(c.GetString("trace_id")); traceID != "" {
+			fields["trace_id"] = traceID
+		}
+		fields["plugin_id"] = pluginIDForLog()
+
+		// 根据状态码选择日志级别
+		if c.Writer.Status() >= 500 {
+			logger.ErrorWith(logger.HTTPMiddleware(), c.Request.Context(), "HTTP request completed with server error", fields)
+		} else if c.Writer.Status() >= 400 {
+			logger.WarnWith(logger.HTTPMiddleware(), c.Request.Context(), "HTTP request completed with client error", fields)
+		} else {
+			logger.InfoWith(logger.HTTPMiddleware(), c.Request.Context(), "HTTP request completed", fields)
+		}
+	}
+}
+
+// Recovery 恢复中间件，处理 panic
+func Recovery() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		defer func() {
+			if err := recover(); err != nil {
+				// 记录错误堆栈
+				stack := string(debug.Stack())
+
+				logger.ErrorWith(logger.HTTPMiddleware(), c.Request.Context(), "Panic recovered", logger.Fields{
+					"error":  err,
+					"stack":  stack,
+					"path":   c.Request.URL.Path,
+					"method": c.Request.Method,
+				})
+
+				// 返回错误响应
+				requestID := strings.TrimSpace(c.GetString("request_id"))
+				if requestID != "" {
+					c.Header("X-Request-ID", requestID)
+				}
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"request_id": requestID,
+					"timestamp":  time.Now().UTC(),
+					"error": gin.H{
+						"code":    "INTERNAL_SERVER_ERROR",
+						"message": "An unexpected error occurred",
+					},
+				})
+
+				c.Abort()
+			}
+		}()
+
+		c.Next()
+	}
+}
+
+// Timeout 超时中间件
+func Timeout(timeout time.Duration, next http.Handler) http.Handler {
+	return fwmiddleware.TimeoutHandler(next, timeout, isRealtimeStreamRequest)
+}
+
+func isRealtimeStreamRequest(req *http.Request) bool {
+	if req == nil {
+		return false
+	}
+	if isWebSocketUpgrade(req) {
+		return true
+	}
+	accept := strings.ToLower(req.Header.Get("Accept"))
+	if strings.Contains(accept, "text/event-stream") {
+		return true
+	}
+	path := strings.ToLower(strings.TrimSpace(req.URL.Path))
+	return strings.HasSuffix(path, "/stream/sse") || strings.Contains(path, "/sse")
+}
+
+func isWebSocketUpgrade(req *http.Request) bool {
+	if req == nil {
+		return false
+	}
+	upgrade := strings.ToLower(strings.TrimSpace(req.Header.Get("Upgrade")))
+	if upgrade != "websocket" {
+		return false
+	}
+	connection := strings.ToLower(req.Header.Get("Connection"))
+	return strings.Contains(connection, "upgrade")
+}
+
+// RateLimiter 简单的速率限制中间件（基于 IP）
+func RateLimiter(maxRequests int, window time.Duration) gin.HandlerFunc {
+	// 简单的内存存储，生产环境建议使用 Redis
+	clientRequests := make(map[string][]time.Time)
+	var mu sync.Mutex
+
+	return func(c *gin.Context) {
+		clientIP := c.ClientIP()
+		now := time.Now()
+
+		mu.Lock()
+
+		requests := clientRequests[clientIP]
+		if len(requests) > 0 {
+			validRequests := requests[:0]
+			for _, reqTime := range requests {
+				if now.Sub(reqTime) <= window {
+					validRequests = append(validRequests, reqTime)
+				}
+			}
+			clientRequests[clientIP] = validRequests
+		}
+
+		if len(clientRequests[clientIP]) >= maxRequests {
+			mu.Unlock()
+			c.JSON(http.StatusTooManyRequests, gin.H{
+				"error":   "Rate limit exceeded",
+				"message": fmt.Sprintf("Maximum %d requests per %v allowed", maxRequests, window),
+			})
+			c.Abort()
+			return
+		}
+
+		clientRequests[clientIP] = append(clientRequests[clientIP], now)
+		mu.Unlock()
+
+		c.Next()
+	}
+}
+
+// SecurityHeaders 安全头部中间件
+func SecurityHeaders() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 在 PowerX 宿主内允许同源嵌入；本地/独立运行仍然 DENY
+		if os.Getenv("POWERX_PROXY") == "1" {
+			c.Header("X-Frame-Options", "SAMEORIGIN")
+			c.Header("Content-Security-Policy", "frame-ancestors 'self'; default-src 'self'")
+		} else {
+			c.Header("X-Frame-Options", "DENY")
+			c.Header("Content-Security-Policy", "default-src 'self'")
+		}
+
+		// 防止 MIME 类型嗅探
+		c.Header("X-Content-Type-Options", "nosniff")
+
+		// XSS 保护
+		c.Header("X-XSS-Protection", "1; mode=block")
+
+		// 引用策略
+		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
+
+		c.Next()
+	}
+}
+
+// HealthInfo describes static plugin metadata returned by the health endpoint.
+type HealthInfo struct {
+	PluginID string
+	Version  string
+	Service  string
+}
+
+// HealthCheck 健康检查中间件
+func HealthCheck(endpoint string, info ...HealthInfo) gin.HandlerFunc {
+	healthInfo := HealthInfo{}
+	if len(info) > 0 {
+		healthInfo = info[0]
+	}
+	return func(c *gin.Context) {
+		if c.Request.Method == "GET" && c.Request.URL.Path == endpoint {
+			payload := gin.H{
+				"status":    "ok",
+				"timestamp": time.Now().UTC(),
+			}
+			if healthInfo.PluginID != "" {
+				payload["plugin_id"] = healthInfo.PluginID
+			}
+			if healthInfo.Version != "" {
+				payload["version"] = healthInfo.Version
+			}
+			if healthInfo.Service != "" {
+				payload["service"] = healthInfo.Service
+			}
+			c.JSON(http.StatusOK, payload)
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+// RequestID 请求 ID 中间件
+func RequestID() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		requestID := strings.TrimSpace(c.GetHeader("X-Request-ID"))
+		if requestID == "" {
+			requestID = strings.TrimSpace(c.GetHeader("Request-ID"))
+		}
+		if requestID == "" {
+			// 生成简单的请求 ID
+			requestID = fmt.Sprintf("%d", time.Now().UnixNano())
+		}
+		traceID := resolveTraceID(c, requestID)
+
+		c.Header("X-Request-ID", requestID)
+		c.Header("X-Trace-Id", traceID)
+		c.Set("request_id", requestID)
+		c.Set("trace_id", traceID)
+		c.Request = c.Request.WithContext(runtimelogging.WithRuntime(c.Request.Context(), runtimelogging.Fields{
+			runtimelogging.FieldTraceID:  traceID,
+			"request_id":                 requestID,
+			runtimelogging.FieldPluginID: pluginIDForLog(),
+		}))
+
+		c.Next()
+	}
+}
+
+func resolveTraceID(c *gin.Context, requestID string) string {
+	if c == nil {
+		return requestID
+	}
+	if traceparent := strings.TrimSpace(c.GetHeader("traceparent")); traceparent != "" {
+		if traceID := extractTraceIDFromTraceparent(traceparent); traceID != "" {
+			return traceID
+		}
+	}
+	if traceID := strings.TrimSpace(c.GetHeader("X-Trace-Id")); traceID != "" {
+		return traceID
+	}
+	return requestID
+}
+
+func extractTraceIDFromTraceparent(value string) string {
+	parts := strings.Split(strings.TrimSpace(value), "-")
+	if len(parts) != 4 {
+		return ""
+	}
+	traceID := strings.TrimSpace(parts[1])
+	if len(traceID) != 32 {
+		return ""
+	}
+	return traceID
+}
+
+func pluginIDForLog() string {
+	if pluginID := strings.TrimSpace(os.Getenv("POWERX_PLUGIN_ID")); pluginID != "" {
+		return pluginID
+	}
+	return "com.example.framework-ci-fixture"
+}

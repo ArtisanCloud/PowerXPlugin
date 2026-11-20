@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TemplateUpdateInput",
+  "type": "object",
+  "properties": {
+    "template_uuid": {
+      "type": "string",
+      "description": "UUID",
+      "format": "uuid"
+    },
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "content": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "template_uuid"
+  ],
+  "additionalProperties": false
+}

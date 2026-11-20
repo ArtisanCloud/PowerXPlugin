@@ -1,0 +1,309 @@
+package templates
+
+import (
+	"context"
+	"errors"
+	"github.com/google/uuid"
+	"io"
+	"math"
+	"os"
+	"strings"
+	"time"
+
+	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
+	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
+	"github.com/example.com/framework-ci-fixture/backend/internal/contracts"
+	dbm "github.com/example.com/framework-ci-fixture/backend/internal/entity/models/template"
+	srvtemplates "github.com/example.com/framework-ci-fixture/backend/internal/services/admin/templates"
+	"github.com/example.com/framework-ci-fixture/backend/internal/shared/app"
+	admincommon "github.com/example.com/framework-ci-fixture/backend/internal/transport/http/admin/common"
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+)
+
+const templateUpdateTopic = "_topic.template.update"
+
+type TemplateHandler struct {
+	TemplateService *srvtemplates.TemplateService
+	deps            *app.Deps
+}
+
+func NewTemplateHandler(deps *app.Deps) *TemplateHandler {
+	return &TemplateHandler{
+		TemplateService: srvtemplates.NewTemplateService(deps.DB),
+		deps:            deps,
+	}
+}
+
+func (h *TemplateHandler) GetTemplates(c *gin.Context) {
+	// capability: com.example.framework-ci-fixture.template.list
+	var q TemplateListRequest
+	if err := c.ShouldBindQuery(&q); err != nil {
+		contracts.ResponseBadRequest(c, "invalid query: "+err.Error())
+		return
+	}
+
+	res, err := h.TemplateService.List(c.Request.Context(), q.Q, q.Page, q.PageSize)
+	if err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, TemplateListResponse{
+		List:       NewTemplateResponses(res.List),
+		Page:       res.PageIndex,
+		PageSize:   res.PageSize,
+		Total:      res.Total,
+		TotalPages: totalPages(res.Total, res.PageSize),
+	})
+}
+
+func (h *TemplateHandler) GetTemplate(c *gin.Context) {
+	// capability: com.example.framework-ci-fixture.template.read
+	id, err := parseTemplateUUID(c.Param("uuid"))
+	if err != nil {
+		respondTemplateValidationError(c, newInvalidTemplateUUIDError())
+		return
+	}
+	tpl, err := h.TemplateService.GetByUUID(c.Request.Context(), id)
+	if err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			contracts.ResponseNotFound(c, "not found: "+err.Error())
+		default:
+			contracts.ResponseInternalError(c, err)
+		}
+		return
+	}
+	contracts.ResponseSuccess(c, tpl)
+}
+
+func (h *TemplateHandler) CreateTemplate(c *gin.Context) {
+	// capability: com.example.framework-ci-fixture.template.create
+	var req CreateTemplateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+		return
+	}
+	req.Normalize()
+	if err := req.Validate(); err != nil {
+		respondTemplateValidationError(c, err)
+		return
+	}
+	tpl, err := h.TemplateService.Create(c.Request.Context(), req.Name, req.Description, req.Content)
+	if err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	h.publishTemplateUpdateEvent(c, "created", tpl)
+	contracts.ResponseSuccess(c, tpl)
+}
+
+func (h *TemplateHandler) UpdateTemplate(c *gin.Context) {
+	// capability: com.example.framework-ci-fixture.template.update
+	id, err := parseTemplateUUID(c.Param("uuid"))
+	if err != nil {
+		respondTemplateValidationError(c, newInvalidTemplateUUIDError())
+		return
+	}
+	var req UpdateTemplateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+		return
+	}
+	req.Normalize()
+	if err := req.Validate(); err != nil {
+		respondTemplateValidationError(c, err)
+		return
+	}
+	tpl, err := h.TemplateService.Update(c.Request.Context(), id, req.Name, req.Description, req.Content)
+	if err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	h.publishTemplateUpdateEvent(c, "updated", tpl)
+	contracts.ResponseSuccess(c, tpl)
+}
+
+func (h *TemplateHandler) DeleteTemplate(c *gin.Context) {
+	// capability: com.example.framework-ci-fixture.template.delete
+	id, err := parseTemplateUUID(c.Param("uuid"))
+	if err != nil {
+		respondTemplateValidationError(c, newInvalidTemplateUUIDError())
+		return
+	}
+	if err := h.TemplateService.Delete(c.Request.Context(), id); err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{"ok": true})
+}
+
+func (h *TemplateHandler) BatchCloneTemplates(c *gin.Context) {
+	// capability: com.example.framework-ci-fixture.template.batch_clone
+	if h == nil || h.TemplateService == nil {
+		contracts.ResponseServiceUnavailable(c, "template service not available", nil)
+		return
+	}
+	var req BatchCloneRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+		return
+	}
+	req.Normalize()
+	if err := req.Validate(); err != nil {
+		respondTemplateValidationError(c, err)
+		return
+	}
+	result, err := h.TemplateService.BatchClone(
+		c.Request.Context(),
+		req.SourceUUIDs,
+		req.Copies,
+		srvtemplates.BatchCloneOptions{
+			NamePrefix:        req.NamePrefix,
+			DescriptionPrefix: req.DescriptionPrefix,
+		},
+	)
+	if err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, result)
+}
+
+func (h *TemplateHandler) ValidateTemplateCapability(c *gin.Context) {
+	// capability: com.example.framework-ci-fixture.template.validate
+	if h == nil || h.TemplateService == nil {
+		contracts.ResponseServiceUnavailable(c, "template service not available", nil)
+		return
+	}
+	id, err := parseTemplateUUID(c.Param("uuid"))
+	if err != nil {
+		respondTemplateValidationError(c, newInvalidTemplateUUIDError())
+		return
+	}
+	var req ValidateTemplateRequest
+	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
+		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+		return
+	}
+	res, err := h.TemplateService.Validate(c.Request.Context(), id, req.Rules, req.Strict)
+	if err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, res)
+}
+
+func parseTemplateUUID(s string) (string, error) {
+	u, err := uuid.Parse(s)
+	if err != nil || u == uuid.Nil || u.String() != s {
+		return "", gorm.ErrInvalidData
+	}
+	return s, nil
+}
+
+func totalPages(total int64, pageSize int) int {
+	if total <= 0 {
+		return 0
+	}
+	if pageSize <= 0 {
+		return 1
+	}
+	return int(math.Ceil(float64(total) / float64(pageSize)))
+}
+
+func respondTemplateValidationError(c *gin.Context, err *TemplateValidationError) {
+	if c == nil || err == nil {
+		return
+	}
+	contracts.ResponseErrorWithDetails(
+		c,
+		400,
+		contracts.ErrCodeValidationFailed,
+		err.Message,
+		gin.H{
+			"field":         err.Field,
+			"template_code": err.Code,
+		},
+	)
+}
+
+func (h *TemplateHandler) publishTemplateUpdateEvent(c *gin.Context, action string, tpl *dbm.Template) {
+	if h == nil || h.deps == nil || h.deps.WSBusHub == nil || c == nil {
+		return
+	}
+	if tpl == nil {
+		return
+	}
+
+	tenantUUID, tenantMismatch := admincommon.ResolveTenantUUIDStrict(c, tpl.TenantUuid)
+	if tenantMismatch || strings.TrimSpace(tenantUUID) == "" {
+		return
+	}
+	traceID := strings.TrimSpace(c.GetHeader("X-Request-ID"))
+
+	payload := gin.H{
+		"action":        strings.TrimSpace(action),
+		"template_uuid": tpl.UUID,
+		"name":          tpl.Name,
+		"status":        tpl.Status,
+		"review_status": tpl.ReviewStatus,
+		"tenant_uuid":   tenantUUID,
+		"trace_id":      traceID,
+		"occurred_at":   time.Now().UTC().Format(time.RFC3339Nano),
+	}
+
+	publisher := fwwsbus.Publisher(fwwsbus.NewAdapter(
+		fwwsbus.NewLocalPublisher(h.deps.WSBusHub, nil),
+		"",
+		nil,
+	))
+	if os.Getenv("POWERX_PROXY") == "1" && h.deps.Config != nil && h.deps.Config.Gateway != nil {
+		cfg := fwwsbus.HostClientConfig{
+			BaseURL:    strings.TrimSpace(h.deps.Config.Gateway.BaseURL),
+			APIPrefix:  strings.TrimSpace(h.deps.Config.Gateway.APIPrefix),
+			TenantUUID: "",
+			UserAgent:  strings.TrimSpace(h.deps.Config.Gateway.UserAgent),
+			Timeout:    h.deps.Config.Gateway.Timeout,
+		}
+		if h.deps.IAMAdapterMode.String() == "delegated" {
+			cfg.AuthScheme = "bearer"
+			cfg.TokenProvider = func(ctx context.Context) (string, error) {
+				if h.deps == nil || h.deps.PowerXClient == nil {
+					return "", errors.New("powerx STS client is not configured")
+				}
+				token := strings.TrimSpace(h.deps.PowerXClient.GetToken())
+				if token != "" && token != "sts" {
+					return token, nil
+				}
+				token, _, err := h.deps.PowerXClient.ExchangeSTS(ctx)
+				return strings.TrimSpace(token), err
+			}
+		} else {
+			cfg.AuthScheme = strings.TrimSpace(h.deps.Config.Gateway.AuthScheme)
+			cfg.APIKey = strings.TrimSpace(h.deps.Config.Gateway.APIKey)
+		}
+		hostClient, err := fwwsbus.NewHostClient(cfg)
+		if err == nil {
+			publisher = hostClient
+		}
+	}
+
+	publisher = frameworkrealtime.NewAuthorizedWSPublisher(publisher, h.deps.RealtimeDescriptors, "message")
+	result := publisher.Publish(c.Request.Context(), templateUpdateTopic, payload, fwwsbus.PublishOptions{
+		TenantUUID: tenantUUID,
+		TraceID:    traceID,
+	})
+	if result.OK {
+		return
+	}
+
+	h.deps.RuntimeLogger(c.Request.Context(), "templates.wsbus_publish", map[string]any{
+		"topic":         templateUpdateTopic,
+		"action":        strings.TrimSpace(action),
+		"template_uuid": tpl.UUID,
+		"tenant_uuid":   tenantUUID,
+		"error_code":    strings.TrimSpace(result.ErrorCode),
+		"error_reason":  strings.TrimSpace(result.ErrorMessage),
+	}).Warn("template ws event publish failed")
+}

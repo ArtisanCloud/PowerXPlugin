@@ -1,0 +1,152 @@
+package template
+
+import (
+	"context"
+	"database/sql"
+	"github.com/google/uuid"
+	"strings"
+
+	dbm "github.com/example.com/framework-ci-fixture/backend/internal/entity/models/template"
+	"github.com/example.com/framework-ci-fixture/backend/internal/entity/repository"
+	authx "github.com/example.com/framework-ci-fixture/backend/internal/middleware"
+	"gorm.io/gorm"
+)
+
+type TemplateRepository struct {
+	*repository.BaseRepository[dbm.Template]
+}
+
+func NewTemplateRepository(db *gorm.DB) *TemplateRepository {
+	return &TemplateRepository{
+		BaseRepository: repository.NewBaseRepository[dbm.Template](db),
+	}
+}
+
+func (r *TemplateRepository) FindByUUID(ctx context.Context, id string) (*dbm.Template, error) {
+	if !validUUID(id) {
+		return nil, gorm.ErrInvalidData
+	}
+	tenantUUID, err := authx.RequireTenantUUID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var out dbm.Template
+	err = r.WithTenantTx(ctx, tenantUUID, func(tx *gorm.DB) error {
+		return tx.Where("tenant_uuid = ? AND uuid = ?", tenantUUID, id).First(&out).Error
+	})
+	return &out, err
+}
+
+func validUUID(id string) bool {
+	v, e := uuid.Parse(id)
+	return e == nil && v != uuid.Nil && v.String() == id
+}
+
+func (r *TemplateRepository) Create(ctx context.Context, t *dbm.Template) (*dbm.Template, error) {
+	tenantUUID, err := authx.RequireTenantUUID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(t.TenantUuid) == "" {
+		t.TenantUuid = tenantUUID
+	} else if !strings.EqualFold(t.TenantUuid, tenantUUID) {
+		return nil, gorm.ErrInvalidData
+	}
+	err = r.WithTenantTx(ctx, tenantUUID, func(tx *gorm.DB) error { return tx.Create(t).Error })
+	return t, err
+}
+
+func (r *TemplateRepository) UpdateByUUID(ctx context.Context, id string, fields map[string]interface{}) (*dbm.Template, error) {
+	if !validUUID(id) || len(fields) == 0 {
+		return nil, gorm.ErrInvalidData
+	}
+	for k := range fields {
+		switch k {
+		case "name", "description", "content", "status", "review_status", "review_comment", "reviewed_by", "reviewed_at", "publish_channel", "published_at", "cleanup_reason", "cleaned_at":
+		default:
+			return nil, gorm.ErrInvalidData
+		}
+	}
+	tenantUUID, err := authx.RequireTenantUUID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var out dbm.Template
+	err = r.WithTenantTx(ctx, tenantUUID, func(tx *gorm.DB) error {
+		res := tx.Model(&dbm.Template{}).Where("tenant_uuid = ? AND uuid = ?", tenantUUID, id).Updates(fields)
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
+		}
+		return tx.Where("tenant_uuid = ? AND uuid = ?", tenantUUID, id).First(&out).Error
+	})
+	return &out, err
+}
+
+func (r *TemplateRepository) DeleteByUUID(ctx context.Context, id string) error {
+	if !validUUID(id) {
+		return gorm.ErrInvalidData
+	}
+	tenantUUID, err := authx.RequireTenantUUID(ctx)
+	if err != nil {
+		return err
+	}
+	return r.WithTenantTx(ctx, tenantUUID, func(tx *gorm.DB) error {
+		res := tx.Where("tenant_uuid = ? AND uuid = ?", tenantUUID, id).Delete(&dbm.Template{})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
+		}
+		return nil
+	})
+}
+
+func (r *TemplateRepository) FindPage(
+	ctx context.Context,
+	conditions map[string]interface{},
+	page, pageSize int,
+	cb func(*gorm.DB, interface{}) *gorm.DB,
+	opt interface{},
+) (*repository.Page[[]*dbm.Template], error) {
+	tenantUUID, err := authx.RequireTenantUUID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	conds := map[string]interface{}{
+		"tenant_uuid = ?": tenantUUID,
+	}
+	if len(conditions) > 0 {
+		for k, v := range conditions {
+			conds[k] = v
+		}
+	}
+	// Reassert the trusted scope after adding internal business filters.
+	conds["tenant_uuid = ?"] = tenantUUID
+	var out *repository.Page[[]*dbm.Template]
+	err = r.WithTenantTx(ctx, tenantUUID, func(tx *gorm.DB) error {
+		var queryErr error
+		out, queryErr = repository.NewBaseRepository[dbm.Template](tx).FindByCondition(ctx, conds, page, pageSize, cb, opt)
+		return queryErr
+	})
+	return out, err
+}
+
+func (r *TemplateRepository) CurrentTenantUUID(ctx context.Context) (string, bool, error) {
+	if r.DB == nil || r.DB.Dialector == nil || r.DB.Dialector.Name() != "postgres" {
+		return "", false, nil
+	}
+	var tid sql.NullString
+	err := r.DB.WithContext(ctx).
+		Raw(`SELECT current_setting('app.tenant_uuid', true)`).Scan(&tid).Error
+	if err != nil {
+		return "", false, err
+	}
+	if !tid.Valid {
+		return "", false, nil
+	}
+	return strings.TrimSpace(tid.String), true, nil
+}

@@ -1,0 +1,13 @@
+# Next.js i18n Ruleset
+kind: ruleset
+id: next_i18n
+version: 1.0.0
+summary: "Next.js i18n 规范（占位）"
+checks:
+  - id: next-i18n-location
+    desc: i18n 文案集中管理
+    assert:
+      type: text
+      target: web-admin/next
+      pattern:
+        - "i18n"

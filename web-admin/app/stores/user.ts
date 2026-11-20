@@ -1,0 +1,350 @@
+import { isPowerXEmbedded, getPowerXHostSession, PowerXHostSessionError } from '@artisan-cloud/plugin-framework-client';
+import { defineStore } from "pinia";
+import type {
+  UserContextData,
+  ContextUser,
+  ContextMember,
+} from "~/composables/api/services/meService";
+import { useMe } from "~/composables/useMe";
+import {
+  persistTenantUUID,
+  getStoredTenantUUID,
+} from "~/utils/tenant-context";
+
+export const useUserStore = defineStore("user", {
+  state: () => ({
+    // 用户上下文数据
+    context: null as UserContextData | null,
+
+    // 加载状态
+    isLoading: false,
+    error: null as string | null,
+
+    // 缓存时间戳
+    lastFetchedAt: null as number | null,
+    contextRequestVersion: 0,
+  }),
+
+  getters: {
+    // 基本用户信息
+    user: (state): ContextUser | null => state.context?.user || null,
+
+    // 是否为Root用户
+    isRoot: (state): boolean => state.context?.is_root || false,
+
+    // 当前租户 UUID
+    currentTenantUuid: (state): string | null =>
+      state.context?.current_tenant_uuid || getStoredTenantUUID() || null,
+
+    // 当前租户数值 ID
+    currentTenantId: (state): number | null =>
+      state.context?.current_tenant_id || null,
+
+    // 当前成员ID
+    currentMemberId: (state): number | null =>
+      state.context?.current_member_id || null,
+
+    // 当前成员 UUID
+    currentMemberUuid: (state): string | null =>
+      state.context?.current_member_uuid || null,
+
+    // 全局用户 UUID
+    currentUserUuid: (state): string | null =>
+      state.context?.user?.user_uuid || state.context?.user?.uuid || null,
+
+    // 用户所属的租户列表
+    memberTenants: (state): ContextMember[] => state.context?.members || [],
+
+    // 当前租户信息
+    currentTenant: (state): ContextMember | null => {
+      if (!state.context?.current_tenant_uuid || !state.context?.members)
+        return null;
+      return (
+        state.context.members.find(
+          (m: ContextMember) =>
+            m.tenant_uuid === state.context!.current_tenant_uuid
+        ) || null
+      );
+    },
+
+    // 是否为当前租户的管理员
+    isCurrentTenantAdmin: (state): boolean => {
+      if (state.context?.is_root) return true;
+      const currentTenant =
+        state.context?.members?.find(
+          (m: ContextMember) =>
+            m.tenant_uuid === state.context!.current_tenant_uuid
+        ) || null;
+      return currentTenant?.is_admin || false;
+    },
+
+    // delegated 场景下的模板写权限（优先使用宿主返回的能力/权限）
+    canReadTemplates: (state): boolean => {
+      if (state.context?.is_root) return true;
+
+      const perms = (state.context?.permissions || []).map((item) =>
+        String(item || "").trim()
+      );
+      const allowExact = new Set([
+        "base.templates.manage",
+        "base.templates.read",
+        "base.templates:read",
+        "template:read",
+        "*:*",
+      ]);
+      const allowSuffix = [":base.templates:manage", ":base.templates:read"];
+      return perms.some((perm) => {
+        if (allowExact.has(perm)) return true;
+        return allowSuffix.some((suffix) => perm.endsWith(suffix));
+      });
+    },
+
+    // delegated 场景下的模板写权限（优先使用宿主返回的能力/权限）
+    canWriteTemplates: (state): boolean => {
+      if (state.context?.is_root) return true;
+
+      const tplCaps = state.context?.capabilities?.templates;
+      if (
+        Boolean(tplCaps?.can_create) ||
+        Boolean(tplCaps?.can_update) ||
+        Boolean(tplCaps?.can_delete)
+      ) {
+        return true;
+      }
+
+      const perms = (state.context?.permissions || []).map((item) =>
+        String(item || "").trim()
+      );
+      const allowExact = new Set([
+        "base.templates.manage",
+        "base.templates:create",
+        "base.templates:update",
+        "base.templates:delete",
+        "template:create",
+        "template:update",
+        "template:delete",
+        "*:*",
+      ]);
+      const allowSuffix = [
+        ":base.templates:manage",
+        ":base.templates:create",
+        ":base.templates:update",
+        ":base.templates:delete",
+      ];
+      return perms.some((perm) => {
+        if (allowExact.has(perm)) return true;
+        return allowSuffix.some((suffix) => perm.endsWith(suffix));
+      });
+    },
+
+    // 通用客户基础管理读权限；仅表示 customer identity/auth/membership 基础能力，不代表 SCRM 业务权限。
+    canReadCustomers: (state): boolean => {
+      if (state.context?.is_root) return true;
+
+      const perms = (state.context?.permissions || []).map((item) =>
+        String(item || "").trim()
+      );
+      const allowExact = new Set([
+        "customer.read",
+        "customer:read",
+        "base.customer.read",
+        "base.customer:read",
+        "*:*",
+      ]);
+      const allowSuffix = [":customer:read", ":customer.read", ":base.customer:read", ":base.customer.read"];
+      return perms.some((perm) => {
+        if (allowExact.has(perm)) return true;
+        return allowSuffix.some((suffix) => perm.endsWith(suffix));
+      });
+    },
+
+    // 用户显示名称
+    displayName: (state): string => {
+      return (
+        state.context?.user?.display_name ||
+        state.context?.user?.email ||
+        "未知用户"
+      );
+    },
+
+    // 用户头像
+    avatarUrl: (state): string => {
+      return state.context?.user?.avatar_url || "";
+    },
+
+    // 用户状态是否正常
+    isActive: (state): boolean => {
+      return state.context?.user?.status === 1;
+    },
+
+    // 是否已登录
+    isLoggedIn: (state): boolean => {
+      return !!state.context?.user;
+    },
+  },
+
+  actions: {
+    // 加载用户上下文
+    async fetchUserContext({
+      force = false,
+      authToken,
+      tenantUuid,
+    }: { force?: boolean; authToken?: string; tenantUuid?: string } = {}) {
+      const config = useRuntimeConfig();
+      const host = isPowerXEmbedded(config.public?.insidePowerX) ? getPowerXHostSession(String(config.public?.powerxPluginId || 'com.example.framework-ci-fixture')) : null;
+      const snapshot = host ? await host.ensureSnapshot() : null;
+      if (host && !force && this.context) return;
+      // 如果正在加载，直接返回
+      if (this.isLoading) return;
+
+      // 如果不强制刷新且缓存未过期（5分钟），直接返回
+      if (
+        !force &&
+        this.lastFetchedAt &&
+        Date.now() - this.lastFetchedAt < 5 * 60 * 1000
+      ) {
+        return;
+      }
+
+      const version = ++this.contextRequestVersion;
+      this.isLoading = true;
+      this.error = null;
+
+      try {
+        const { getUserContext } = useMe();
+        const response = await getUserContext({
+          ...(authToken ? { authToken } : {}),
+          ...(tenantUuid ? { tenantUuid } : {}),
+        });
+
+        if (version !== this.contextRequestVersion || (host && !host.isCurrent(snapshot!))) throw new PowerXHostSessionError('AUTH_SESSION_CHANGED');
+        this.context = host ? response : this.normalizeUserContext(response);
+        this.lastFetchedAt = Date.now();
+        this.persistCurrentTenantUUID();
+      } catch (error: any) {
+        if (version !== this.contextRequestVersion || (host && !host.isCurrent(snapshot!))) throw new PowerXHostSessionError('AUTH_SESSION_CHANGED');
+        this.error = error?.message || "网络请求失败";
+        console.error("获取用户上下文失败:", error);
+        throw error;
+      } finally {
+        if (version === this.contextRequestVersion) this.isLoading = false;
+      }
+    },
+
+    commitHostContext(context: UserContextData) {
+      this.contextRequestVersion++;
+      this.context = { ...context, permissions: [...context.permission_codes!] }; this.lastFetchedAt = Date.now(); this.error = null; this.isLoading = false;
+    },
+
+    // 切换当前租户
+    async switchTenant(tenantUuid: string) {
+      if (isPowerXEmbedded(useRuntimeConfig().public?.insidePowerX)) throw new PowerXHostSessionError('AUTH_SESSION_HOST_MANAGED');
+      // 检查用户是否有权限访问该租户
+      const targetTenant = this.memberTenants.find(
+        (m: ContextMember) => m.tenant_uuid === tenantUuid
+      );
+      if (!targetTenant && !this.isRoot) {
+        throw new Error("您没有权限访问该租户");
+      }
+
+      try {
+        const { switchTenant } = useMe();
+        const response = await switchTenant(tenantUuid);
+
+        // 直接更新上下文，无需再次请求
+        this.context = response;
+        this.lastFetchedAt = Date.now();
+        this.persistCurrentTenantUUID();
+      } catch (error: any) {
+        if (isNotFoundError(error)) {
+          this.applyLocalTenantSwitch(tenantUuid, targetTenant || null);
+          return;
+        }
+        console.error("切换租户失败:", error);
+        throw new Error(error?.message || "切换租户失败");
+      }
+    },
+
+    applyLocalTenantSwitch(
+      tenantUuid: string,
+      targetTenant: ContextMember | null
+    ) {
+      if (!this.context) {
+        throw new Error("用户上下文未加载，无法切换租户");
+      }
+      this.context = {
+        ...this.context,
+        current_tenant_uuid: tenantUuid,
+        current_member_id: targetTenant?.member_id ?? this.context.current_member_id,
+        current_member_uuid: targetTenant?.member_uuid ?? this.context.current_member_uuid,
+        current_tenant_id: targetTenant?.tenant_id ?? this.context.current_tenant_id,
+      };
+      this.lastFetchedAt = Date.now();
+      this.persistCurrentTenantUUID();
+    },
+
+    normalizeUserContext(input: UserContextData): UserContextData {
+      const currentTenantUuid = String(input?.current_tenant_uuid || "").trim();
+      const currentMemberUuid = String(input?.current_member_uuid || "").trim();
+      if (input?.is_root || currentMemberUuid || !Array.isArray(input?.members)) {
+        return input;
+      }
+      const currentMember =
+        input.members.find((item: ContextMember) => {
+          if (currentTenantUuid && item.tenant_uuid === currentTenantUuid) return true;
+          return Number(item.member_id || 0) === Number(input.current_member_id || 0);
+        }) || null;
+      const memberUuid = String(currentMember?.member_uuid || "").trim();
+      if (!memberUuid) {
+        return input;
+      }
+      return {
+        ...input,
+        current_member_uuid: memberUuid,
+      };
+    },
+
+    // 更新用户信息（本地更新，不调用API）
+    updateUserInfo(userInfo: Partial<ContextUser>) {
+      if (this.context?.user) {
+        this.context.user = { ...this.context.user, ...userInfo };
+      }
+    },
+
+    // 清除用户状态（退出登录时调用）
+    clearUserState() {
+      this.contextRequestVersion++;
+      this.context = null;
+      this.error = null;
+      this.lastFetchedAt = null;
+      this.isLoading = false;
+      this.persistCurrentTenantUUID();
+    },
+
+    // 刷新用户上下文
+    async refreshUserContext() {
+      await this.fetchUserContext({ force: true });
+    },
+
+    persistCurrentTenantUUID() {
+      const uuid = this.context?.current_tenant_uuid?.trim();
+      if (uuid) {
+        persistTenantUUID(uuid);
+      } else {
+        persistTenantUUID(null);
+      }
+    },
+  },
+});
+
+// 导出类型供其他地方使用
+export type UserStoreState = ReturnType<typeof useUserStore>;
+
+function isNotFoundError(error: any): boolean {
+  const status = Number(error?.statusCode || error?.status || error?.response?.status || 0);
+  if (status === 404) {
+    return true;
+  }
+  const text = String(error?.message || "").toLowerCase();
+  return text.includes("404") || text.includes("not found");
+}

@@ -1,0 +1,17 @@
+name: Plugin source SHA rejection
+
+on:
+  push:
+    branches: [ci/reusable-plugin-ci-fixture]
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    uses: ArtisanCloud/PowerXPlugin/.github/workflows/reusable-plugin-ci.yml@d4ea4e439e71fcbb547e60ea14e5b1731faf1fac
+    with:
+      source_sha: 880839e37fff9ada2765a7292f9817f01646c96c
+      plugin_version: '1.2.3'
+      mode: build
+      request_id: framework-hosted-wrong-sha

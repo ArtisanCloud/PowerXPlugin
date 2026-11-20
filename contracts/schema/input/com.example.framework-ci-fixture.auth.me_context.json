@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AuthMeContextInput",
+  "type": "object",
+  "description": "GET 请求，无需 body。",
+  "additionalProperties": false
+}

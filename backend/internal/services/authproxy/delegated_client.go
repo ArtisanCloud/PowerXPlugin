@@ -1,0 +1,697 @@
+package authproxy
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
+	fwiamcontracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
+	fwiamerrors "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/errors"
+	iamservice "github.com/example.com/framework-ci-fixture/backend/internal/services/iam"
+)
+
+// HTTPClient captures the subset of http.Client we rely on.
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+// DelegatedClient proxies auth calls to PowerX Core.
+type DelegatedClient struct {
+	identityClient fwiamcontracts.DelegatedIdentityService
+	apiBase        string
+	httpClient     HTTPClient
+	serviceToken   string
+	apiKey         string
+	pluginID       string
+}
+
+// Option allows tweaking DelegatedClient construction.
+type Option func(*DelegatedClient)
+
+// WithHTTPClient overrides the default http.Client.
+func WithHTTPClient(c HTTPClient) Option {
+	return func(dc *DelegatedClient) {
+		if c != nil {
+			dc.httpClient = c
+		}
+	}
+}
+
+// WithPluginID sets the plugin identifier for logging/auditing headers.
+func WithPluginID(id string) Option {
+	return func(dc *DelegatedClient) {
+		dc.pluginID = id
+	}
+}
+
+// WithGatewayAPIKey configures the delegated client for the explicit Gateway
+// API-key Host Contract. It is intentionally distinct from an STS service
+// token so callers cannot silently send an API key as a Bearer token.
+func WithGatewayAPIKey(apiKey string) Option {
+	return func(dc *DelegatedClient) {
+		dc.apiKey = strings.TrimSpace(apiKey)
+	}
+}
+
+// NewDelegatedClient creates a proxy with explicit endpoint/token.
+func NewDelegatedClient(baseURL, token string, opts ...Option) (*DelegatedClient, error) {
+	baseURL = strings.TrimSpace(baseURL)
+	if baseURL == "" {
+		baseURL = strings.TrimSpace(os.Getenv("POWERX_CORE_ENDPOINT"))
+	}
+	if baseURL == "" {
+		baseURL = "http://localhost:8077"
+	}
+	baseURL = strings.TrimRight(baseURL, "/")
+
+	apiBase := ensureAPIBase(baseURL)
+
+	client := &DelegatedClient{
+		apiBase:      apiBase,
+		httpClient:   &http.Client{Timeout: 10 * time.Second},
+		serviceToken: strings.TrimSpace(token),
+		pluginID:     strings.TrimSpace(os.Getenv("POWERX_PLUGIN_ID")),
+	}
+	if client.serviceToken == "" {
+		client.serviceToken = strings.TrimSpace(os.Getenv("POWERX_AUTH_TOKEN"))
+	}
+
+	for _, opt := range opts {
+		opt(client)
+	}
+
+	if client.httpClient == nil {
+		client.httpClient = &http.Client{Timeout: 10 * time.Second}
+	}
+
+	return client, nil
+}
+
+func ensureAPIBase(base string) string {
+	lower := strings.ToLower(base)
+	if !strings.Contains(lower, "/api") {
+		base = strings.TrimRight(base, "/") + "/api"
+	}
+	if !strings.HasSuffix(strings.ToLower(base), "/api/v1") {
+		base = strings.TrimRight(base, "/") + "/v1"
+	}
+	return base
+}
+
+// Login delegates tenant login to PowerX Core.
+func (c *DelegatedClient) Login(ctx context.Context, req iamservice.LoginRequest) (*iamservice.AuthTokens, error) {
+	payload := map[string]any{
+		"identifier": strings.TrimSpace(req.Identifier),
+		"password":   req.Password,
+	}
+	if strings.TrimSpace(req.Tenant) != "" {
+		payload["tenant"] = strings.TrimSpace(req.Tenant)
+	}
+	if req.Remember {
+		payload["remember"] = true
+	}
+
+	var resp loginResponse
+	if err := c.post(ctx, "/admin/user/auth/login", payload, &resp, nil); err != nil {
+		return nil, err
+	}
+	return resp.toTokens(resp.RefreshToken), nil
+}
+
+// Refresh exchanges refresh_token for a fresh access token.
+func (c *DelegatedClient) Refresh(ctx context.Context, refreshToken string) (*iamservice.AuthTokens, error) {
+	refreshToken = strings.TrimSpace(refreshToken)
+	if refreshToken == "" {
+		return nil, fmt.Errorf("authproxy: refresh token required")
+	}
+	var resp loginResponse
+	if err := c.post(ctx, "/admin/user/auth/refresh", map[string]string{
+		"refresh_token": refreshToken,
+	}, &resp, nil); err != nil {
+		return nil, err
+	}
+	if resp.RefreshToken == "" {
+		resp.RefreshToken = refreshToken
+	}
+	return resp.toTokens(resp.RefreshToken), nil
+}
+
+// Logout revokes the refresh token upstream.
+func (c *DelegatedClient) Logout(ctx context.Context, refreshToken string) error {
+	refreshToken = strings.TrimSpace(refreshToken)
+	if refreshToken == "" {
+		return fmt.Errorf("authproxy: refresh token required")
+	}
+	return c.post(ctx, "/admin/user/auth/logout", map[string]string{
+		"refresh_token": refreshToken,
+	}, nil, nil)
+}
+
+// MeContext fetches the current user context via the provided access token.
+func (c *DelegatedClient) MeContext(ctx context.Context, accessToken string) (*MeContext, error) {
+	accessToken = strings.TrimSpace(accessToken)
+	if accessToken == "" {
+		return nil, fmt.Errorf("authproxy: access token required")
+	}
+	headers := map[string]string{
+		"Authorization": fmt.Sprintf("Bearer %s", accessToken),
+	}
+	var resp MeContext
+	if err := c.get(ctx, "/admin/user/auth/me/context", &resp, headers); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// ResolveIdentityContext resolves framework identity context from delegated /me/context payload.
+func (c *DelegatedClient) ResolveIdentityContext(ctx context.Context, accessToken string) (*fwiamcontracts.IdentityContext, error) {
+	return nil, fwiamerrors.New(fwiamerrors.CodeIdentityMigrationRequired, fwiamerrors.CodeIdentityMigrationRequired)
+}
+
+// SetIdentityResolver binds the Framework-owned service client once at startup.
+func (c *DelegatedClient) SetIdentityResolver(resolver fwiamcontracts.DelegatedIdentityService) {
+	c.identityClient = resolver
+}
+
+// AuthorizationBaselineProvider exposes only the Framework-owned service client.
+func (c *DelegatedClient) AuthorizationBaselineProvider() fwiamcontracts.AuthorizationBaselineService {
+	if c == nil {
+		return nil
+	}
+	provider, _ := c.identityClient.(fwiamcontracts.AuthorizationBaselineService)
+	return provider
+}
+
+// AuthorizationProvider exposes the same startup-selected Framework client;
+// authorization must not pass through the legacy proxy response projection.
+func (c *DelegatedClient) AuthorizationProvider() fwiamcontracts.AuthzService {
+	if c == nil {
+		return nil
+	}
+	provider, _ := c.identityClient.(fwiamcontracts.AuthzService)
+	return provider
+}
+func (c *DelegatedClient) IdentityResolverReady() bool {
+	if c == nil || c.identityClient == nil {
+		return false
+	}
+	_, ok := c.identityClient.(fwiamcontracts.WSIdentityRevalidationService)
+	return ok
+}
+func (c *DelegatedClient) ResolveDelegatedIdentity(ctx context.Context, in fwiamcontracts.DelegatedIdentityQuery) (*fwiamcontracts.DelegatedIdentity, error) {
+	if c == nil || c.identityClient == nil {
+		return nil, fwiamerrors.New(fwiamerrors.CodeAdapterNotBound, fwiamerrors.CodeAdapterNotBound)
+	}
+	return c.identityClient.ResolveDelegatedIdentity(ctx, in)
+}
+func (c *DelegatedClient) RevalidateWSIdentity(ctx context.Context, in fwiamcontracts.WSIdentityQuery) (*fwiamcontracts.WSIdentity, error) {
+	resolver, ok := c.identityClient.(fwiamcontracts.WSIdentityRevalidationService)
+	if !ok {
+		return nil, fwiamerrors.New(fwiamerrors.CodeAdapterNotBound, fwiamerrors.CodeAdapterNotBound)
+	}
+	return resolver.RevalidateWSIdentity(ctx, in)
+}
+
+type DirectoryMember struct {
+	MemberUUID  string `json:"member_uuid"`
+	TenantUUID  string `json:"tenant_uuid"`
+	UserUUID    string `json:"user_uuid"`
+	DisplayName string `json:"display_name,omitempty"`
+	Status      int16  `json:"status"`
+}
+type DirectoryTenant struct {
+	TenantUUID string `json:"tenant_uuid"`
+	TenantKey  string `json:"tenant_key"`
+	Name       string `json:"name"`
+	Status     string `json:"status"`
+}
+type DirectoryMemberPage struct {
+	Items      []DirectoryMember   `json:"items"`
+	Pagination DirectoryPagination `json:"pagination"`
+}
+type DirectoryPagination struct {
+	Page     int   `json:"page"`
+	PageSize int   `json:"page_size"`
+	Total    int64 `json:"total"`
+}
+type DirectoryMemberResolution struct {
+	Items              []DirectoryMember `json:"items"`
+	MissingMemberUUIDs []string          `json:"missing_member_uuids"`
+}
+type DirectoryMemberDisplayNameResolution struct {
+	Items []DirectoryMemberDisplayNameResolutionItem `json:"items"`
+}
+
+// DirectoryMemberDisplayNameMatch intentionally contains only the fields the
+// Host contract exposes for a unique exact-name match. Tenant scope comes from
+// the authenticated Host credential, not a response field.
+type DirectoryMemberDisplayNameMatch struct {
+	MemberUUID  string `json:"member_uuid"`
+	UserUUID    string `json:"user_uuid"`
+	DisplayName string `json:"display_name"`
+}
+type DirectoryMemberDisplayNameResolutionItem struct {
+	DisplayName string                           `json:"display_name"`
+	Status      string                           `json:"status"`
+	Member      *DirectoryMemberDisplayNameMatch `json:"member,omitempty"`
+}
+type DirectoryDepartment struct {
+	DepartmentUUID       string `json:"department_uuid"`
+	TenantUUID           string `json:"tenant_uuid"`
+	Name                 string `json:"name"`
+	Code                 string `json:"code"`
+	ParentDepartmentUUID string `json:"parent_department_uuid"`
+}
+type DirectoryRole struct {
+	RoleUUID    string `json:"role_uuid"`
+	TenantUUID  string `json:"tenant_uuid"`
+	Code        string `json:"code"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+type DirectoryPermission struct {
+	PermissionUUID string `json:"permission_uuid"`
+	Resource       string `json:"resource"`
+	Action         string `json:"action"`
+	Scope          string `json:"scope"`
+}
+type AuthorizationDecision struct {
+	Allowed    bool   `json:"allowed"`
+	ReasonCode string `json:"reason_code"`
+}
+
+// DirectoryAuthorizationRequest is the fixed Host Contract payload for
+// tenant-scoped IAM authorization checks. Keep dynamic Gateway maps outside
+// the Framework and delegated adapter boundary.
+type DirectoryAuthorizationRequest struct {
+	MemberUUID string `json:"member_uuid,omitempty"`
+	UserUUID   string `json:"user_uuid,omitempty"`
+	Resource   string `json:"resource"`
+	Action     string `json:"action"`
+	TraceID    string `json:"trace_id,omitempty"`
+}
+
+func (c *DelegatedClient) ListDirectoryDepartments(ctx context.Context) ([]DirectoryDepartment, error) {
+	var r struct {
+		Items []DirectoryDepartment `json:"items"`
+	}
+	if e := c.get(ctx, "/tenant/iam/departments", &r, nil); e != nil {
+		return nil, e
+	}
+	return r.Items, nil
+}
+func (c *DelegatedClient) ListDirectoryRoles(ctx context.Context) ([]DirectoryRole, error) {
+	var r struct {
+		Items []DirectoryRole `json:"items"`
+	}
+	if e := c.get(ctx, "/tenant/iam/roles", &r, nil); e != nil {
+		return nil, e
+	}
+	return r.Items, nil
+}
+func (c *DelegatedClient) ListDirectoryPermissions(ctx context.Context) ([]DirectoryPermission, error) {
+	var r struct {
+		Items []DirectoryPermission `json:"items"`
+	}
+	if e := c.get(ctx, "/tenant/iam/permissions", &r, nil); e != nil {
+		return nil, e
+	}
+	return r.Items, nil
+}
+func (c *DelegatedClient) CheckDirectoryAuthorization(ctx context.Context, request DirectoryAuthorizationRequest) (*AuthorizationDecision, error) {
+	var r AuthorizationDecision
+	if e := c.post(ctx, "/tenant/iam/authorization:check", request, &r, nil); e != nil {
+		return nil, e
+	}
+	return &r, nil
+}
+
+func (c *DelegatedClient) GetDirectoryMember(ctx context.Context, memberUUID string) (*DirectoryMember, error) {
+	memberUUID = strings.TrimSpace(memberUUID)
+	if memberUUID == "" {
+		return nil, fmt.Errorf("authproxy: member_uuid required")
+	}
+	var member DirectoryMember
+	if err := c.get(ctx, "/tenant/iam/members/"+url.PathEscape(memberUUID), &member, nil); err != nil {
+		return nil, err
+	}
+	return &member, nil
+}
+
+// GetDirectoryTenant reads the tenant determined by the Host credential.
+func (c *DelegatedClient) GetDirectoryTenant(ctx context.Context) (*DirectoryTenant, error) {
+	var tenant DirectoryTenant
+	if err := c.get(ctx, "/tenant/iam/tenant", &tenant, nil); err != nil {
+		return nil, err
+	}
+	return &tenant, nil
+}
+
+// ListDirectoryMembers reads exactly one Host-controlled member page.
+func (c *DelegatedClient) ListDirectoryMembers(ctx context.Context, page, pageSize int) (*DirectoryMemberPage, error) {
+	if page < 1 || pageSize < 1 || pageSize > 200 {
+		return nil, fmt.Errorf("authproxy: invalid directory pagination")
+	}
+	query := url.Values{}
+	query.Set("page", strconv.Itoa(page))
+	query.Set("page_size", strconv.Itoa(pageSize))
+	var response DirectoryMemberPage
+	if err := c.get(ctx, "/tenant/iam/members?"+query.Encode(), &response, nil); err != nil {
+		return nil, err
+	}
+	return &response, nil
+}
+
+func (c *DelegatedClient) BatchGetDirectoryMembers(ctx context.Context, memberUUIDs []string) ([]DirectoryMember, error) {
+	if len(memberUUIDs) == 0 {
+		return nil, fmt.Errorf("authproxy: member_uuids required")
+	}
+	var response struct {
+		Items []DirectoryMember `json:"items"`
+	}
+	if err := c.post(ctx, "/tenant/iam/members:batch-get", map[string]any{"member_uuids": memberUUIDs}, &response, nil); err != nil {
+		return nil, err
+	}
+	return response.Items, nil
+}
+
+// BatchResolveDirectoryMembers resolves historical member references. Unlike
+// BatchGetDirectoryMembers, missing members are represented in the response.
+func (c *DelegatedClient) BatchResolveDirectoryMembers(ctx context.Context, memberUUIDs []string) (*DirectoryMemberResolution, error) {
+	if len(memberUUIDs) == 0 {
+		return nil, fmt.Errorf("authproxy: member_uuids required")
+	}
+	var response DirectoryMemberResolution
+	if err := c.post(ctx, "/tenant/iam/members:batch-resolve", map[string]any{"member_uuids": memberUUIDs}, &response, nil); err != nil {
+		return nil, err
+	}
+	return &response, nil
+}
+
+// BatchResolveDirectoryMembersByDisplayNames resolves spreadsheet input with
+// the tenant derived from the delegated credential. The Host response is kept
+// per input so consumers can identify invalid source rows without guessing.
+func (c *DelegatedClient) BatchResolveDirectoryMembersByDisplayNames(ctx context.Context, displayNames []string) (*DirectoryMemberDisplayNameResolution, error) {
+	if len(displayNames) == 0 {
+		return nil, fmt.Errorf("authproxy: display_names required")
+	}
+	var response DirectoryMemberDisplayNameResolution
+	if err := c.post(ctx, "/tenant/iam/members:batch-find-by-display-names", map[string]any{"display_names": displayNames}, &response, nil); err != nil {
+		return nil, err
+	}
+	return &response, nil
+}
+
+// ----- HTTP helpers -----
+
+type loginResponse struct {
+	TokenType     string `json:"token_type"`
+	AccessToken   string `json:"access_token"`
+	ExpiresIn     int    `json:"expires_in"`
+	RefreshToken  string `json:"refresh_token,omitempty"`
+	Scope         string `json:"scope"`
+	PluginID      string `json:"plugin_id,omitempty"`
+	PolicyVersion string `json:"policy_version,omitempty"`
+	PermsHash     string `json:"perms_hash,omitempty"`
+	AuthzSource   string `json:"source,omitempty"`
+}
+
+func (lr loginResponse) toTokens(refresh string) *iamservice.AuthTokens {
+	expires := time.Now().Add(time.Duration(lr.ExpiresIn) * time.Second)
+	return &iamservice.AuthTokens{
+		TokenType:     lr.TokenType,
+		AccessToken:   lr.AccessToken,
+		RefreshToken:  refresh,
+		ExpiresIn:     int64(lr.ExpiresIn),
+		Scope:         lr.Scope,
+		ExpiresAt:     expires,
+		PluginID:      lr.PluginID,
+		PolicyVersion: lr.PolicyVersion,
+		PermsHash:     lr.PermsHash,
+		AuthzSource:   lr.AuthzSource,
+	}
+}
+
+func (c *DelegatedClient) post(ctx context.Context, path string, payload any, out any, extraHeaders map[string]string) error {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("authproxy: marshal payload: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.apiBase+path, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("authproxy: build request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	c.applyHeaders(req, extraHeaders)
+	return c.do(req, out)
+}
+
+func (c *DelegatedClient) get(ctx context.Context, path string, out any, extraHeaders map[string]string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.apiBase+path, nil)
+	if err != nil {
+		return fmt.Errorf("authproxy: build request: %w", err)
+	}
+	c.applyHeaders(req, extraHeaders)
+	return c.do(req, out)
+}
+
+func (c *DelegatedClient) applyHeaders(req *http.Request, extra map[string]string) {
+	if extra == nil || strings.TrimSpace(extra["Authorization"]) == "" {
+		switch {
+		case c.apiKey != "":
+			req.Header.Set("Authorization", fmt.Sprintf("ApiKey %s", c.apiKey))
+		case c.serviceToken != "":
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.serviceToken))
+		}
+	}
+	if c.serviceToken != "" {
+		req.Header.Set("X-PowerX-Service-Token", c.serviceToken)
+	}
+	if c.pluginID != "" {
+		req.Header.Set("X-PowerX-Plugin-ID", c.pluginID)
+	}
+	for k, v := range extra {
+		req.Header.Set(k, v)
+	}
+}
+
+func (c *DelegatedClient) do(req *http.Request, out any) error {
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return iamservice.ErrAuthUnavailable
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return parseProxyError(req, resp)
+	}
+
+	if out == nil {
+		io.Copy(io.Discard, resp.Body)
+		return nil
+	}
+
+	var envelope hostSuccess
+	envelope.Target = out
+	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+		return fmt.Errorf("authproxy: decode response: %w", err)
+	}
+	return nil
+}
+
+// hostSuccess decodes {code,message,data} envelopes.
+type hostSuccess struct {
+	Code      int             `json:"code"`
+	Message   string          `json:"message"`
+	Timestamp int64           `json:"timestamp"`
+	RequestID string          `json:"request_id"`
+	Target    any             `json:"-"`
+	DataRaw   json.RawMessage `json:"data"`
+}
+
+func (h *hostSuccess) UnmarshalJSON(data []byte) error {
+	type alias hostSuccess
+	aux := struct {
+		*alias
+	}{alias: (*alias)(h)}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	if h.Target != nil && len(h.DataRaw) > 0 {
+		if err := json.Unmarshal(h.DataRaw, h.Target); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ProxyError captures upstream HTTP failures.
+type ProxyError struct {
+	Status         int
+	ReasonCode     string
+	Message        string
+	UpstreamMethod string
+	UpstreamPath   string
+}
+
+func (e *ProxyError) Error() string {
+	if strings.TrimSpace(e.UpstreamMethod) != "" || strings.TrimSpace(e.UpstreamPath) != "" {
+		return fmt.Sprintf(
+			"authproxy: upstream %s %s returned %d: %s",
+			strings.TrimSpace(e.UpstreamMethod),
+			strings.TrimSpace(e.UpstreamPath),
+			e.Status,
+			e.Message,
+		)
+	}
+	return fmt.Sprintf("authproxy: status %d: %s", e.Status, e.Message)
+}
+
+func parseProxyError(req *http.Request, resp *http.Response) error {
+	body, _ := io.ReadAll(resp.Body)
+	var errResp struct {
+		Code       int    `json:"code"`
+		Message    string `json:"message"`
+		Error      string `json:"error"`
+		ErrorCode  string `json:"error_code"`
+		ReasonCode string `json:"reason_code"`
+	}
+	msg := resp.Status
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &errResp); err == nil {
+			switch {
+			case errResp.Message != "":
+				msg = errResp.Message
+			case errResp.Error != "":
+				msg = errResp.Error
+			default:
+				msg = string(body)
+			}
+		} else {
+			msg = string(body)
+		}
+	}
+	if resp.StatusCode == http.StatusUnauthorized {
+		return iamservice.ErrUnauthorized
+	}
+	upstreamMethod := ""
+	upstreamPath := ""
+	if req != nil {
+		upstreamMethod = strings.TrimSpace(req.Method)
+		if req.URL != nil {
+			upstreamPath = strings.TrimSpace(req.URL.Path)
+		}
+	}
+	return &ProxyError{
+		Status:         resp.StatusCode,
+		ReasonCode:     strings.TrimSpace(firstNonEmpty(errResp.ReasonCode, errResp.ErrorCode)),
+		Message:        msg,
+		UpstreamMethod: upstreamMethod,
+		UpstreamPath:   upstreamPath,
+	}
+}
+
+// MeContext mirrors PowerX Core /admin/user/auth/me/context payload.
+type MeContext struct {
+	IsRoot            bool            `json:"is_root"`
+	CurrentTenantUUID string          `json:"current_tenant_uuid"`
+	CurrentTenantID   *uint64         `json:"current_tenant_id,omitempty"`
+	CurrentMemberID   *uint64         `json:"current_member_id,omitempty"`
+	CurrentMemberUUID string          `json:"current_member_uuid,omitempty"`
+	User              *MeUserBrief    `json:"user,omitempty"`
+	Members           []MeMemberBrief `json:"members"`
+	Roles             []string        `json:"roles,omitempty"`
+	Permissions       []string        `json:"permissions,omitempty"`
+	PermissionCodes   []string        `json:"permission_codes,omitempty"`
+	PolicyVersion     string          `json:"policy_version,omitempty"`
+	PermsHash         string          `json:"perms_hash,omitempty"`
+	Source            string          `json:"source,omitempty"`
+	Capabilities      any             `json:"capabilities,omitempty"`
+}
+
+type MeUserBrief struct {
+	ID          uint64 `json:"id"`
+	UUID        string `json:"uuid,omitempty"`
+	UserUUID    string `json:"user_uuid,omitempty"`
+	Email       string `json:"email"`
+	Phone       string `json:"phone"`
+	DisplayName string `json:"display_name"`
+	AvatarURL   string `json:"avatar_url"`
+	Status      int16  `json:"status"`
+	IsRoot      bool   `json:"is_root"`
+	LastLoginAt *int64 `json:"last_login_at,omitempty"`
+}
+
+type MeMemberBrief struct {
+	TenantUUID string `json:"tenant_uuid"`
+	TenantID   uint64 `json:"tenant_id,omitempty"`
+	TenantName string `json:"tenant_name"`
+	MemberID   uint64 `json:"member_id"`
+	MemberUUID string `json:"member_uuid,omitempty"`
+	IsAdmin    bool   `json:"is_admin"`
+}
+
+// IdentityContextFromMeContext maps delegated me-context payload into framework identity context.
+func IdentityContextFromMeContext(me *MeContext) (*fwiamcontracts.IdentityContext, error) {
+	if me == nil {
+		return nil, fwiamerrors.New(fwiamerrors.CodeUnauthorized, "empty delegated identity context")
+	}
+
+	tenantUUID := strings.TrimSpace(me.CurrentTenantUUID)
+	if tenantUUID == "" && len(me.Members) > 0 {
+		tenantUUID = strings.TrimSpace(me.Members[0].TenantUUID)
+	}
+	if tenantUUID == "" {
+		return nil, fwiamerrors.New(fwiamerrors.CodeUnauthorized, "delegated tenant context missing")
+	}
+
+	identity := &fwiamcontracts.IdentityContext{
+		TenantUUID:  tenantUUID,
+		Roles:       normalizeStringSlice(me.Roles),
+		Permissions: normalizeStringSlice(me.Permissions),
+	}
+	if me.User != nil {
+		identity.UserUUID = firstNonEmpty(me.User.UserUUID, me.User.UUID)
+	}
+	if len(me.Members) > 0 {
+		identity.MemberUUID = strings.TrimSpace(me.Members[0].MemberUUID)
+	}
+	if identity.UserUUID == "" || identity.MemberUUID == "" {
+		return nil, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "delegated identity context is missing user_uuid or member_uuid")
+	}
+	return identity, nil
+}
+
+func normalizeStringSlice(values []string) []string {
+	result := make([]string, 0, len(values))
+	seen := map[string]struct{}{}
+	for _, value := range values {
+		normalized := strings.TrimSpace(value)
+		if normalized == "" {
+			continue
+		}
+		if _, ok := seen[normalized]; ok {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		result = append(result, normalized)
+	}
+	return result
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value = strings.TrimSpace(value); value != "" {
+			return value
+		}
+	}
+	return ""
+}

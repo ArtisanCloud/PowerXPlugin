@@ -1,0 +1,11 @@
+# Next.js Components Ruleset
+kind: ruleset
+id: next_components
+version: 1.0.0
+summary: "Next.js 组件规范"
+checks:
+  - id: next-components-location
+    desc: 组件必须放在 web-admin/next/app 下
+    assert:
+      type: dir
+      target: web-admin/next/app

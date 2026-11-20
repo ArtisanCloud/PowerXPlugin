@@ -1,0 +1,960 @@
+<template>
+  <UContainer class="py-10 space-y-8">
+    <div class="flex items-start justify-between gap-4">
+      <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">{{ $t("frameworkLab.title") }}</h1>
+      <p class="max-w-3xl text-gray-600 dark:text-gray-300">{{ $t("frameworkLab.description") }}</p>
+    </div>
+
+    <UCard>
+      <template #header>
+        <div class="flex items-center justify-between">
+          <span class="font-medium text-gray-900 dark:text-gray-100">{{ $t("frameworkLab.cardTitle") }}</span>
+        </div>
+      </template>
+
+      <div class="grid gap-6 lg:grid-cols-[11rem_minmax(0,1fr)]">
+        <nav class="flex flex-col gap-2 border-b border-gray-200 pb-4 dark:border-gray-800 lg:border-b-0 lg:border-r lg:pb-0 lg:pr-4">
+          <UButton size="sm" block class="justify-start" :variant="activeModule === 'notification' ? 'solid' : 'soft'" color="info" @click="selectModule('notification')">{{ $t("frameworkLab.moduleNotification") }}</UButton>
+          <UButton size="sm" block class="justify-start" :variant="activeModule === 'websocket' ? 'solid' : 'soft'" color="primary" @click="selectModule('websocket')">{{ $t("frameworkLab.moduleWebsocket") }}</UButton>
+          <UButton size="sm" block class="justify-start" :variant="activeModule === 'scheduler' ? 'solid' : 'soft'" color="warning" @click="selectModule('scheduler')">{{ $t("frameworkLab.moduleScheduler") }}</UButton>
+          <UButton size="sm" block class="justify-start" :variant="activeModule === 'metadata' ? 'solid' : 'soft'" color="secondary" @click="selectModule('metadata')">{{ $t("frameworkLab.moduleMetadata") }}</UButton>
+          <UButton size="sm" block class="justify-start" :variant="activeModule === 'customer' ? 'solid' : 'soft'" color="secondary" @click="selectCustomerContactTab">{{ $t("frameworkLab.customerContactTab") }}</UButton>
+        </nav>
+        <div>
+      <div class="mb-5 flex items-center gap-2 border-b border-gray-200 pb-3 dark:border-gray-800">
+        <span class="mr-2 text-xs text-gray-500 dark:text-gray-400">{{ $t("frameworkLab.testRoute") }}</span>
+        <UButton size="xs" :variant="testRoute === 'local' ? 'solid' : 'soft'" color="success" :disabled="customerProbeCreating || contactProbeCreating" @click="selectTestRoute('local')">{{ $t("frameworkLab.localAdapter") }}</UButton>
+        <UButton size="xs" :variant="testRoute === 'delegated' ? 'solid' : 'soft'" color="primary" :disabled="customerProbeCreating || contactProbeCreating" @click="selectTestRoute('delegated')">{{ $t("frameworkLab.delegatedHost") }}</UButton>
+      </div>
+
+      <div v-if="activeModule === 'notification'" class="space-y-6 pt-4">
+        <div class="flex items-end gap-3 flex-wrap">
+          <div class="flex items-center gap-3">
+            <UButton size="sm" color="info" icon="i-heroicons-bell-alert" :loading="capabilityNotifying" @click="sendCapabilityNotification">{{ $t("frameworkLab.sendCapabilityButton") }}</UButton>
+          </div>
+          <p class="w-full text-xs text-gray-500 dark:text-gray-400">{{ $t("frameworkLab.explicitRouteHint") }}</p>
+        </div>
+        <div class="space-y-2 text-sm text-gray-600 dark:text-gray-300">
+          <p>Member UUID: <span class="font-mono">{{ capabilityNotifyMemberUUID || ensureMemberUUID() || "-" }}</span></p>
+          <p>Target: <span>{{ notificationTargetLabel }}</span></p>
+          <p>Topic: <span class="font-mono">{{ capabilityNotifyTopic || memberNotifyTopic || "-" }}</span></p>
+          <p>Flow Mode: <span>{{ notificationFlowMode || "-" }}</span></p>
+          <p>Backend POWERX_PROXY: <span>{{ notificationPowerXProxy || "-" }}</span></p>
+          <p>Backend ProviderMode: <span>{{ notificationProviderMode || "-" }}</span></p>
+          <p>Host Publish: <span>{{ notificationHostPublishOK || "-" }}</span></p>
+        </div>
+      </div>
+
+      <div v-else-if="activeModule === 'websocket' && testRoute === 'delegated'" class="space-y-6 pt-4">
+        <div class="flex items-end gap-3 flex-wrap">
+          <div class="flex items-center gap-3">
+            <UButton size="sm" color="primary" icon="i-heroicons-signal" :loading="gatewayWsNotifying" @click="runWSBusFlow">网关WS测试通知</UButton>
+          </div>
+          <p class="w-full text-xs text-gray-500 dark:text-gray-400">{{ $t("frameworkLab.gatewayHint") }}</p>
+        </div>
+
+        <div class="space-y-2 text-sm text-gray-600 dark:text-gray-300">
+          <p>Topic: <span class="font-mono">{{ wsFlowTopic || "-" }}</span></p>
+          <p>Trace ID: <span class="font-mono">{{ wsFlowTraceID || "-" }}</span></p>
+          <p>Grant: <span>{{ wsFlowGrantStatus }}</span></p>
+          <p>Publish: <span>{{ wsFlowPublishStatus }}</span></p>
+          <p>Flow Mode: <span>{{ wsFlowMode }}</span></p>
+          <p>Runtime Mode: <span>{{ runtimeModeView }}</span></p>
+          <p>Host Reachable: <span>{{ wsFlowHostReachable }}</span></p>
+          <p>Host Grant: <span>{{ wsFlowHostGrantStatus }}</span></p>
+          <p>Host Publish: <span>{{ wsFlowHostPublishStatus }}</span></p>
+        </div>
+      </div>
+
+      <div v-else-if="activeModule === 'websocket' && testRoute === 'local'" class="space-y-6 pt-4">
+        <div class="flex items-end gap-3 flex-wrap">
+          <div class="flex items-center gap-3">
+            <UButton size="sm" color="success" icon="i-heroicons-bolt" :loading="localWsNotifying" @click="runLocalWSFlow">本地WS测试通知</UButton>
+          </div>
+          <p class="w-full text-xs text-gray-500 dark:text-gray-400">本地 WS 测试会调用插件本地通知接口，并在本地 WS 通道验证订阅事件。</p>
+        </div>
+
+        <div class="space-y-2 text-sm text-gray-600 dark:text-gray-300">
+          <p>Topic: <span class="font-mono">{{ localWsTopic || "-" }}</span></p>
+          <p>Submit: <span>{{ localWsSubmitStatus }}</span></p>
+          <p>WS Tenant: <span class="font-mono">{{ localWsTenantFromConnection || "-" }}</span></p>
+          <p>Publish Tenant: <span class="font-mono">{{ localWsTenantFromPublish || "-" }}</span></p>
+          <p>Runtime Mode: <span>{{ runtimeModeView }}</span></p>
+          <p>Last Event Topic: <span class="font-mono">{{ localLastEventTopic || "-" }}</span></p>
+          <p>Last Event At: <span>{{ localLastEventAt || "-" }}</span></p>
+          <p>diag.connected_ok: <span>{{ localWsDiag.connectedOK }}</span></p>
+          <p>diag.welcome_ok: <span>{{ localWsDiag.welcomeOK }}</span></p>
+          <p>diag.sub_sent: <span>{{ localWsDiag.subSent }}</span></p>
+          <p>diag.ack_ok: <span>{{ localWsDiag.ackOK }}</span></p>
+          <p>diag.event_ok: <span>{{ localWsDiag.eventOK }}</span></p>
+          <p>diag.last_ack.req_id: <span class="font-mono">{{ localWsDiag.lastAckReqID || "-" }}</span></p>
+          <p>diag.last_event.topic: <span class="font-mono">{{ localWsDiag.lastEventTopic || "-" }}</span></p>
+          <p>diag.last_event.trace_id: <span class="font-mono">{{ localWsDiag.lastEventTraceID || "-" }}</span></p>
+        </div>
+      </div>
+
+      <div v-else-if="activeModule === 'customer'" class="space-y-5 pt-1">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div><h2 class="font-medium text-gray-900 dark:text-gray-100">{{ $t("frameworkLab.customerContactTitle") }}</h2><p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ $t("frameworkLab.customerContactDescription") }}</p></div>
+          <UBadge :color="testRoute === 'delegated' ? 'primary' : 'success'" variant="soft">{{ testRoute }}</UBadge>
+        </div>
+        <div v-if="testRoute === 'delegated'" class="space-y-1 rounded-lg border border-gray-200 p-3 text-xs text-gray-600 dark:border-gray-800 dark:text-gray-300">
+          <p>{{ $t("frameworkLab.customerGatewayAuth") }}: {{ contactProbeAuthScheme || "-" }}</p>
+          <p>{{ $t("frameworkLab.customerSelectorCapability") }}: <span class="font-mono">{{ contactProbeSelectorCapability || "-" }}</span></p>
+          <p>{{ $t("frameworkLab.customerCreateCapability") }}: <span class="font-mono">{{ contactProbeAccountManageCapability || "-" }}</span></p>
+          <p>{{ $t("frameworkLab.customerReadCapability") }}: <span class="font-mono">{{ contactProbeReadCapability || "-" }}</span></p>
+          <p>{{ $t("frameworkLab.customerManageCapability") }}: <span class="font-mono">{{ contactProbeManageCapability || "-" }}</span></p>
+          <p>{{ $t("frameworkLab.customerSelectorResult") }}: {{ $t(`frameworkLab.probeStatus.${contactProbeSelectorStatus}`) }}</p>
+          <p>{{ $t("frameworkLab.contactOperationResult") }}: {{ $t(`frameworkLab.probeStatus.${contactProbeContactStatus}`) }}</p>
+        </div>
+        <div class="flex flex-wrap items-end gap-3">
+          <UButton color="neutral" variant="soft" icon="i-heroicons-arrow-path" :loading="contactProbeLoading" @click="loadContactProbeCustomers">{{ $t("frameworkLab.loadCustomers") }}</UButton>
+          <UButton color="secondary" icon="i-heroicons-plus" :disabled="!contactProbeReady" @click="openCustomerCreate">{{ $t("frameworkLab.createCustomer") }}</UButton>
+        </div>
+        <div v-if="contactProbeReady" class="overflow-x-auto rounded-lg border border-gray-200 bg-white text-gray-900 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-100">
+          <table class="min-w-full text-left text-sm"><thead class="bg-gray-50 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300"><tr><th class="px-3 py-2">{{ $t('frameworkLab.customerLabel') }}</th><th class="px-3 py-2">{{ $t('frameworkLab.customerEmail') }}</th><th class="px-3 py-2">{{ $t('frameworkLab.customerPhone') }}</th><th class="px-3 py-2">{{ $t('frameworkLab.contactStatusLabel') }}</th><th class="px-3 py-2">{{ $t('frameworkLab.selectCustomer') }}</th></tr></thead>
+            <tbody><tr v-for="customer in contactProbeCustomers" :key="customer.customer_uuid" :class="['border-t border-gray-200 text-gray-900 dark:border-gray-700 dark:text-gray-100', customer.customer_uuid === contactProbeCustomerUUID ? 'bg-blue-50 dark:bg-blue-900/30' : '']"><td class="px-3 py-2">{{ customerLabel(customer) }}</td><td class="px-3 py-2">{{ customer.primary_email || customer.email || '—' }}</td><td class="px-3 py-2">{{ customer.primary_phone || customer.phone || '—' }}</td><td class="px-3 py-2">{{ customerStatusLabel(customer.status) }}</td><td class="px-3 py-2"><UButton size="xs" :variant="customer.customer_uuid === contactProbeCustomerUUID ? 'solid' : 'soft'" color="secondary" @click="selectContactProbeCustomer(customer.customer_uuid)">{{ customer.customer_uuid === contactProbeCustomerUUID ? $t('frameworkLab.selectedCustomer') : $t('frameworkLab.selectCustomer') }}</UButton><UButton class="ml-2" size="xs" variant="soft" :disabled="customerProbeCreating" @click="openCustomerEdit(customer)">{{ $t("frameworkLab.editCustomer") }}</UButton></td></tr><tr v-if="contactProbeCustomers.length === 0"><td colspan="5" class="px-3 py-6 text-center text-gray-500 dark:text-gray-400">{{ $t('frameworkLab.noCustomers') }}</td></tr></tbody></table>
+        </div>
+        <div v-if="contactProbeReady && contactProbeTotalPages > 1" class="flex items-center justify-end gap-3 text-sm text-gray-300"><UButton size="xs" color="neutral" variant="soft" :disabled="contactProbePage <= 1 || contactProbeLoading" @click="loadContactProbeCustomers(contactProbePage - 1)">{{ $t('frameworkLab.previousPage') }}</UButton><span>{{ contactProbePage }} / {{ contactProbeTotalPages }}</span><UButton size="xs" color="neutral" variant="soft" :disabled="contactProbePage >= contactProbeTotalPages || contactProbeLoading" @click="loadContactProbeCustomers(contactProbePage + 1)">{{ $t('frameworkLab.nextPage') }}</UButton></div>
+        <UModal v-model:open="showCustomerCreateModal" :title="customerEditUUID ? $t('frameworkLab.editCustomer') : $t('frameworkLab.createCustomer')">
+          <template #content><form class="space-y-4 bg-white p-6 text-gray-900 dark:bg-gray-900 dark:text-gray-100" @submit.prevent="createCustomerProbe">
+            <h3 class="text-lg font-semibold">{{ customerEditUUID ? $t('frameworkLab.editCustomer') : $t('frameworkLab.createCustomer') }}</h3><p v-if="!customerEditUUID" class="text-xs text-gray-400">{{ $t('frameworkLab.customerCreationHint') }}</p>
+            <UFormField v-if="!customerEditUUID" :label="$t('frameworkLab.customerType')" required><USelect v-model="customerProbeForm.type" :items="[{ label: $t('frameworkLab.customerTypePerson'), value: 'person' }, { label: $t('frameworkLab.customerTypeCompany'), value: 'company' }]" class="w-full" /></UFormField>
+            <label v-if="!customerEditUUID && customerProbeForm.type === 'person'" class="flex gap-2 text-sm"><input v-model="customerProbeForm.explicitContact" type="checkbox">{{ $t('frameworkLab.explicitPrimaryContact') }}</label>
+            <div v-if="!customerEditUUID && (customerProbeForm.type === 'company' || customerProbeForm.explicitContact)" class="grid gap-3 md:grid-cols-2"><UFormField :label="$t('frameworkLab.primaryContactName')" class="md:col-span-2" required><UInput v-model="customerProbeForm.contactName" /></UFormField><UFormField :label="$t('frameworkLab.customerEmail')"><UInput v-model="customerProbeForm.contactEmail" type="email" /></UFormField><UFormField :label="$t('frameworkLab.customerPhone')"><UInput v-model="customerProbeForm.contactPhone" /></UFormField></div>
+            <div class="grid gap-3 md:grid-cols-2"><UFormField :label="$t('frameworkLab.customerName')" class="md:col-span-2"><UInput v-model="customerProbeForm.displayName" class="w-full" /></UFormField><UFormField :label="$t('frameworkLab.customerNickname')"><UInput v-model="customerProbeForm.nickname" class="w-full" /></UFormField><UFormField :label="$t('frameworkLab.contactStatusLabel')"><USelect v-model="customerProbeForm.status" :items="customerProbeStatusOptions" class="w-full" /></UFormField><UFormField :label="$t('frameworkLab.contactFamilyName')"><UInput v-model="customerProbeForm.familyName" class="w-full" /></UFormField><UFormField :label="$t('frameworkLab.contactGivenName')"><UInput v-model="customerProbeForm.givenName" class="w-full" /></UFormField><UFormField :label="$t('frameworkLab.customerEmail')"><UInput v-model="customerProbeForm.email" type="email" class="w-full" /></UFormField><UFormField :label="$t('frameworkLab.customerPhone')"><UInput v-model="customerProbeForm.phone" class="w-full" /></UFormField><UFormField :label="$t('frameworkLab.customerAvatar')"><UInput v-model="customerProbeForm.avatarURL" type="url" class="w-full" /></UFormField><UFormField :label="$t('frameworkLab.customerLocale')"><UInput v-model="customerProbeForm.locale" class="w-full" /></UFormField><UFormField :label="$t('frameworkLab.customerTimezone')"><UInput v-model="customerProbeForm.timezone" class="w-full" /></UFormField></div>
+            <UAlert v-if="customerProbeFormError" color="error" variant="soft" :title="customerProbeFormError" /><div class="flex justify-end gap-2"><UButton color="neutral" variant="ghost" type="button" :disabled="customerProbeCreating" @click="showCustomerCreateModal = false">{{ $t('frameworkLab.cancel') }}</UButton><UButton color="secondary" type="submit" :loading="customerProbeCreating">{{ customerEditUUID ? $t('frameworkLab.saveChanges') : $t('frameworkLab.createCustomer') }}</UButton></div>
+          </form></template>
+        </UModal>
+        <UModal v-model:open="showContactCreateModal" :title="contactEditUUID ? $t('frameworkLab.editContact') : $t('frameworkLab.createContact')">
+          <template #content>
+            <form class="space-y-4 bg-white p-6 text-gray-900 dark:bg-gray-900 dark:text-gray-100" @submit.prevent="createContactProbe">
+              <h3 class="text-lg font-semibold">{{ contactEditUUID ? $t("frameworkLab.editContact") : $t("frameworkLab.createContact") }}</h3>
+              <p class="text-sm text-gray-500">{{ $t("frameworkLab.customerLabel") }}: {{ selectedContactProbeCustomerLabel }}</p>
+              <div class="grid gap-3 md:grid-cols-2">
+                <UFormField :label="$t('frameworkLab.contactNameLabel')" required class="md:col-span-2"><UInput v-model="contactProbeForm.displayName" :placeholder="$t('frameworkLab.contactNamePlaceholder')" class="w-full" /></UFormField>
+                <UFormField :label="$t('frameworkLab.contactFamilyName')"><UInput v-model="contactProbeForm.familyName" class="w-full" /></UFormField>
+                <UFormField :label="$t('frameworkLab.contactGivenName')"><UInput v-model="contactProbeForm.givenName" class="w-full" /></UFormField>
+                <UFormField :label="$t('frameworkLab.contactStatusLabel')"><USelect v-model="contactProbeForm.status" :items="contactProbeStatusOptions" class="w-full" /></UFormField>
+                <UFormField :label="$t('frameworkLab.customerEmail')"><UInput v-model="contactProbeForm.email" type="email" class="w-full" /></UFormField><UFormField :label="$t('frameworkLab.customerPhone')"><UInput v-model="contactProbeForm.phone" class="w-full" /></UFormField><UFormField :label="$t('frameworkLab.contactTagsLabel')"><UInput v-model="contactProbeForm.tags" :placeholder="$t('frameworkLab.contactTagsPlaceholder')" class="w-full" /></UFormField>
+              </div>
+              <p v-if="!contactEditUUID" class="text-xs text-gray-500">{{ $t('frameworkLab.contactCreationIntentHint') }}</p>
+              <div class="space-y-2">
+                <p class="text-sm font-medium">{{ $t('frameworkLab.contactRolesLabel') }}</p>
+                <p v-if="contactEditUUID" class="text-xs text-gray-500">{{ $t("frameworkLab.primaryRoleEditHint") }}</p><UCheckbox v-model="contactProbeForm.primaryRole" :label="$t('frameworkLab.contactRolePrimary')" />
+                <UCheckbox v-model="contactProbeForm.legalRepresentativeRole" :label="$t('frameworkLab.contactRoleLegalRepresentative')" />
+              </div>
+              <UAlert v-if="contactProbeFormError" color="error" variant="soft" :title="contactProbeFormError" />
+              <div class="flex justify-end gap-2">
+                <UButton color="neutral" variant="ghost" type="button" :disabled="contactProbeCreating" @click="showContactCreateModal = false">{{ $t('frameworkLab.cancel') }}</UButton>
+                <UButton color="secondary" type="submit" :loading="contactProbeCreating">{{ contactEditUUID ? $t('frameworkLab.saveChanges') : $t('frameworkLab.createContact') }}</UButton>
+              </div>
+            </form>
+          </template>
+        </UModal>
+        <UTabs v-model="customerRecordsTab" :items="customerRecordsTabs" :content="false" class="w-full" />
+        <CustomerExternalIdentityLab v-show="customerRecordsTab === 'identities'" :active="customerRecordsTab === 'identities'" :route="testRoute" :customerUUID="contactProbeCustomerUUID" :customer-name="selectedContactProbeCustomerLabel" @created="selectIdentityCustomer" />
+        <UAlert v-if="contactProbeError" color="error" variant="soft" :title="contactProbeError" />
+        <div v-show="customerRecordsTab === 'contacts'" class="space-y-3">
+          <div class="flex items-center justify-between gap-3"><p class="text-sm">{{ contactProbeCustomerUUID ? $t('identityLab.selected', { name: selectedContactProbeCustomerLabel }) : $t('frameworkLab.selectCustomerForRecords') }}</p>
+          <UButton color="secondary" icon="i-heroicons-plus" :disabled="!contactProbeCustomerUUID || !contactProbeReady" @click="openContactCreate">{{ $t("frameworkLab.createContact") }}</UButton>
+          </div>
+          <p v-if="contactRecordsLoading" role="status" class="text-sm text-gray-500">{{ $t('common.loading') }}</p>
+        <div v-if="!contactRecordsLoading && contactProbeLoaded && contactProbeReady" class="overflow-x-auto rounded-lg border border-gray-200 bg-white text-gray-900 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-100"><table class="min-w-full text-left text-sm"><thead class="bg-gray-50 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300"><tr><th class="px-3 py-2">{{ $t("frameworkLab.contactNameLabel") }}</th><th class="px-3 py-2">{{ $t("frameworkLab.customerEmail") }}</th><th class="px-3 py-2">{{ $t("frameworkLab.customerPhone") }}</th><th class="px-3 py-2">{{ $t("frameworkLab.contactStatusLabel") }}</th><th class="px-3 py-2">{{ $t("frameworkLab.contactTagsLabel") }}</th><th class="px-3 py-2">{{ $t("frameworkLab.editContact") }}</th></tr></thead><tbody><tr v-for="contact in contactProbeContacts" :key="contact.contact_uuid" class="border-t border-gray-200 text-gray-900 dark:border-gray-700 dark:text-gray-100"><td class="px-3 py-2">{{ contact.display_name }}</td><td class="px-3 py-2">{{ contact.email || "—" }}</td><td class="px-3 py-2">{{ contact.phone || "—" }}</td><td class="px-3 py-2">{{ contactStatusLabel(contact.status) }}</td><td class="px-3 py-2">{{ contact.tags?.join(', ') || '—' }}</td><td class="px-3 py-2"><UButton size="xs" variant="soft" @click="openContactEdit(contact)">{{ $t('frameworkLab.editContact') }}</UButton></td></tr><tr v-if="contactProbeContacts.length === 0"><td colspan="6" class="px-3 py-6 text-center text-gray-500 dark:text-gray-400">{{ $t("frameworkLab.noContacts") }}</td></tr></tbody></table></div>
+      </div>
+      </div>
+      <div v-else-if="activeModule === 'metadata'" class="pt-1">
+        <MetadataGovernanceExplorer :key="testRoute" :debug-route="testRoute" />
+      </div>
+      <div v-else-if="activeModule === 'scheduler'" class="space-y-6 pt-4">
+        <div class="flex items-center gap-3 flex-wrap">
+          <UButton size="sm" :color="schedulerMode === 'host' ? 'primary' : 'warning'" icon="i-heroicons-clock" :loading="schedulerCreating" @click="createSchedulerSample">创建 Scheduler 样例</UButton>
+          <UButton size="sm" color="primary" variant="soft" icon="i-heroicons-arrow-path" :loading="schedulerListing" @click="refreshSchedulerJobs">刷新列表</UButton>
+          <UButton size="sm" color="success" icon="i-heroicons-play" :disabled="!selectedSchedulerJobID" :loading="schedulerTriggering" @click="triggerSelectedSchedulerJob">立即触发</UButton>
+          <UButton size="sm" color="neutral" variant="soft" icon="i-heroicons-pause" :disabled="!selectedSchedulerJobID" :loading="schedulerPausing" @click="pauseSelectedSchedulerJob">暂停</UButton>
+          <UButton size="sm" color="success" variant="soft" icon="i-heroicons-play-circle" :disabled="!selectedSchedulerJobID" :loading="schedulerResuming" @click="resumeSelectedSchedulerJob">恢复</UButton>
+        </div>
+        <p class="text-xs text-gray-500 dark:text-gray-400">当前 Scheduler 模式：{{ schedulerMode === "host" ? "网关测试，会显式走 HostProvider/proxy 调试入口" : "本地测试，会在插件进程内创建并触发事件" }}。</p>
+
+        <div class="grid gap-2 text-sm text-gray-600 dark:text-gray-300 md:grid-cols-2">
+          <p>Runtime Mode: <span>{{ runtimeModeView }}</span></p>
+          <p>Scheduler Provider: <span>{{ schedulerMode }}</span></p>
+          <p>Tenant UUID: <span class="font-mono">{{ schedulerTenantUUID || selectedSchedulerJob?.tenant_uuid || "-" }}</span></p>
+          <p>Selected Job: <span class="font-mono">{{ selectedSchedulerJobID || "-" }}</span></p>
+          <p>Last Action: <span>{{ schedulerLastAction || "idle" }}</span></p>
+          <p>Last Topic: <span class="font-mono">{{ schedulerLastTopic || "-" }}</span></p>
+          <p>Next Run At: <span>{{ selectedSchedulerNextRunAt || "-" }}</span></p>
+          <p>Last Error: <span>{{ schedulerLastError || "-" }}</span></p>
+          <p>Notify Topic: <span class="font-mono">{{ schedulerNotifyTopic || "-" }}</span></p>
+          <p>Last Notify At: <span>{{ schedulerLastNotifyAt || "-" }}</span></p>
+          <p>Last Notify Title: <span>{{ schedulerLastNotifyTitle || "-" }}</span></p>
+          <p>Last Notify Message: <span>{{ schedulerLastNotifyMessage || "-" }}</span></p>
+        </div>
+
+        <div class="overflow-x-auto rounded border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950/30">
+          <table class="min-w-full text-left text-sm">
+            <thead class="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-gray-900 dark:text-gray-400">
+              <tr>
+                <th class="px-3 py-2">任务</th>
+                <th class="px-3 py-2 text-center">类型</th>
+                <th class="px-3 py-2 text-center">状态</th>
+                <th class="px-3 py-2 text-center">表达式</th>
+                <th class="px-3 py-2 text-center">Action</th>
+                <th class="px-3 py-2 text-center">操作</th>
+              </tr>
+            </thead>
+            <tbody class="text-gray-700 dark:text-gray-200">
+              <tr v-for="job in schedulerJobs" :key="job.job_id" class="border-t border-gray-200 dark:border-gray-800">
+                <td class="px-3 py-2 align-top">
+                  <button class="text-left font-medium text-primary-500 hover:underline" @click="selectedSchedulerJobID = job.job_id">{{ job.name }}</button>
+                  <div class="font-mono text-xs text-gray-500 dark:text-gray-400">{{ job.job_id }}</div>
+                </td>
+                <td class="px-3 py-2 align-top text-center text-gray-700 dark:text-gray-200">{{ job.schedule_type || "-" }}</td>
+                <td class="px-3 py-2 align-top text-center text-gray-700 dark:text-gray-200">{{ job.status || "-" }}</td>
+                <td class="max-w-xs px-3 py-2 align-top text-center font-mono text-gray-700 dark:text-gray-200 break-all">{{ job.schedule_expr || "-" }}</td>
+                <td class="max-w-md px-3 py-2 align-top text-center font-mono text-gray-700 dark:text-gray-200 break-all">{{ job.payload?.business_action || "-" }}</td>
+                <td class="px-3 py-2 align-top text-center">
+                  <div class="flex justify-center gap-2">
+                    <UButton size="xs" color="success" variant="soft" @click="triggerSchedulerJobByID(job.job_id)">触发</UButton>
+                    <UButton size="xs" color="neutral" variant="soft" :disabled="job.status === 'completed'" @click="pauseSchedulerJobByID(job.job_id)">暂停</UButton>
+                    <UButton size="xs" color="success" variant="soft" :disabled="job.status === 'completed'" @click="resumeSchedulerJobByID(job.job_id)">恢复</UButton>
+                  </div>
+                </td>
+              </tr>
+              <tr v-if="schedulerJobs.length === 0">
+                <td colspan="6" class="px-3 py-6 text-center text-gray-500">暂无 Scheduler Job</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+        </div>
+      </div>
+    </UCard>
+
+    <ToastAlert v-model="toast.visible" :title="toast.title" :message="toast.message" :color="toast.color" :duration="toast.duration" />
+  </UContainer>
+</template>
+
+<script setup lang="ts">
+import { nextTick } from "vue"
+import ToastAlert from "~/components/ToastAlert.vue"
+import { useNotificationProbe } from "~/composables/useNotificationProbe"
+import { getTenantUuid } from "~/composables/api/_base"
+import { resolveFrontendRuntimeMode } from "~/utils/runtime-mode"
+import { resolveTenantUUIDForRequest } from "~/utils/tenant-context"
+import { useUserStore } from "~/stores/user"
+import { useApiClient } from "~/composables/api/_client"
+import { useSchedulerApi, type SchedulerJob } from "~/composables/api/useScheduler"
+import { useCustomerBaseApi, type CustomerAccount, type CustomerContact } from "~/composables/api/useCustomerBase"
+import MetadataGovernanceExplorer from "~/components/settings/metadata-governance/MetadataGovernanceExplorer.vue"
+
+type ToastColor = "primary" | "secondary" | "success" | "info" | "warning" | "error" | "neutral"
+
+const capabilityNotifying = ref(false)
+const gatewayWsNotifying = ref(false)
+const localWsNotifying = ref(false)
+const schedulerCreating = ref(false)
+const schedulerListing = ref(false)
+const schedulerTriggering = ref(false)
+const schedulerPausing = ref(false)
+const schedulerResuming = ref(false)
+const contactProbeLoading = ref(false)
+const contactProbeCreating = ref(false)
+const schedulerJobs = ref<SchedulerJob[]>([])
+const selectedSchedulerJobID = ref("")
+const schedulerLastAction = ref("")
+const schedulerLastTopic = ref("")
+const schedulerLastError = ref("")
+const wsFlowTopic = ref("")
+const wsFlowTraceID = ref("")
+const wsFlowGrantStatus = ref("idle")
+const wsFlowPublishStatus = ref("idle")
+const wsFlowMode = ref("-")
+const wsFlowHostReachable = ref("-")
+const wsFlowHostGrantStatus = ref("-")
+const wsFlowHostPublishStatus = ref("-")
+const localWsTopic = ref("")
+const localWsSubmitStatus = ref("idle")
+const localWsTenantFromConnection = ref("")
+const localWsTenantFromPublish = ref("")
+const capabilityNotifyTopic = ref("")
+const capabilityNotifyMemberUUID = ref("")
+const notificationTarget = ref("")
+const notificationFlowMode = ref("")
+const notificationPowerXProxy = ref("")
+const notificationProviderMode = ref("")
+const notificationHostPublishOK = ref("")
+const activeModule = ref<"notification" | "websocket" | "scheduler" | "metadata" | "customer">("notification")
+const testRoute = ref<"local" | "delegated">("local")
+const contactProbeMode = ref("")
+const contactProbeCustomerUUID = ref("")
+const contactProbeCustomers = ref<CustomerAccount[]>([])
+const contactProbePage = ref(1)
+const contactProbeTotalPages = ref(1)
+const contactProbeContacts = ref<CustomerContact[]>([])
+const showCustomerCreateModal = ref(false)
+const customerProbeCreating = ref(false)
+const customerProbeFormError = ref("")
+const emptyCustomerForm = () => ({ type: "person" as "person" | "company", explicitContact: false, contactName: "", contactEmail: "", contactPhone: "", displayName: "", nickname: "", givenName: "", familyName: "", email: "", phone: "", avatarURL: "", locale: "", timezone: "", status: "active" as "active" | "pending" | "suspended" | "disabled" | "expired" | "deleted" })
+const customerProbeForm = reactive(emptyCustomerForm())
+const customerEditUUID = ref("")
+const contactEditUUID = ref("")
+const showContactCreateModal = ref(false)
+const contactProbeFormError = ref("")
+const emptyContactForm = () => ({ email: "", phone: "", displayName: "", givenName: "", familyName: "", status: "active" as "active" | "inactive" | "temporary", tags: "", primaryRole: false, legalRepresentativeRole: false })
+const contactProbeForm = reactive(emptyContactForm())
+const contactProbeError = ref("")
+const contactProbeLoaded = ref(false)
+const contactProbeAuthScheme = ref("")
+const contactProbeSelectorCapability = ref("")
+const contactProbeAccountManageCapability = ref("")
+const contactProbeReadCapability = ref("")
+const contactProbeManageCapability = ref("")
+const contactProbeSelectorStatus = ref<"idle" | "pending" | "success" | "failed">("idle")
+const contactProbeContactStatus = ref<"idle" | "pending" | "success" | "failed">("idle")
+const schedulerMode = computed<"local" | "host">(() => testRoute.value === "delegated" ? "host" : "local")
+const runtimeModeView = computed(() => resolveFrontendRuntimeMode().mode)
+const notificationTargetLabel = computed(() => {
+  const target = notificationTarget.value || "framework runtime 自动选择"
+  return target
+})
+const schedulerResolvedTenantUUID = computed(() => String(getTenantUuid() || resolveTenantUUIDForRequest() || "").trim())
+const schedulerTenantUUID = computed(() => schedulerMode.value === "local" ? (schedulerResolvedTenantUUID.value || "00000000-0000-0000-0000-000000000001") : "")
+const schedulerPluginID = "com.example.framework-ci-fixture"
+const schedulerRequestOptions = computed(() => ({
+  ...(schedulerTenantUUID.value ? { tenant_uuid: schedulerTenantUUID.value } : {}),
+  provider_mode: schedulerMode.value,
+  force_local: schedulerMode.value === "local",
+  force_host: schedulerMode.value === "host",
+}))
+
+const toast = reactive({ visible: false, title: "", message: "", color: "primary" as ToastColor, duration: 3000 })
+
+const apiClient = useApiClient()
+const schedulerApi = useSchedulerApi()
+const customerBaseApi = useCustomerBaseApi()
+const userStore = useUserStore()
+const auth = useAuth()
+const { t, locale } = useI18n()
+const resolvedTenantNotifyTopic = computed(() => {
+  const tenantUUID = String(getTenantUuid() || resolveTenantUUIDForRequest() || "").trim()
+  return tenantUUID ? `_topic.notify.tenant.${tenantUUID}` : ""
+})
+const localProbe = useNotificationProbe("local", "")
+const schedulerProbe = useNotificationProbe("scheduler", "")
+const localLastEventTopic = computed(() => String(localProbe.lastEventTopic.value || ""))
+const localLastEventAt = computed(() => String(localProbe.lastEventAt.value || ""))
+const localWsDiag = computed(() => localProbe.wsDiag.value)
+const memberNotifyTopic = computed(() => {
+  const memberUUID = ensureMemberUUID()
+  return memberUUID ? `_topic.notify.member.${memberUUID}` : ""
+})
+const schedulerNotifyTopic = computed(() => schedulerTenantUUID.value ? `_topic.notify.tenant.${schedulerTenantUUID.value}` : resolvedTenantNotifyTopic.value)
+const schedulerLastNotifyAt = computed(() => String(schedulerProbe.lastEventAt.value || ""))
+const schedulerLastNotifyEvent = computed(() => schedulerProbe.events.value[0] || null)
+const schedulerLastNotifyTitle = computed(() => String(schedulerLastNotifyEvent.value?.title || ""))
+const schedulerLastNotifyMessage = computed(() => String(schedulerLastNotifyEvent.value?.message || ""))
+const contactProbeCustomerOptions = computed(() => contactProbeCustomers.value.map((customer) => ({
+  label: String(customer.display_name || customer.nickname || customer.primary_email || customer.email || t("frameworkLab.unnamedCustomer")),
+  value: customer.customer_uuid,
+})))
+const selectedContactProbeCustomerLabel = computed(() => contactProbeCustomerOptions.value.find((option) => option.value === contactProbeCustomerUUID.value)?.label || t("frameworkLab.unnamedCustomer"))
+const customerLabel = (customer: CustomerAccount) => String(customer.display_name || customer.nickname || customer.primary_email || customer.email || t("frameworkLab.unnamedCustomer"))
+const customerStatusLabel = (status: string) => t(`frameworkLab.customerStatus.${status || 'unknown'}`)
+const contactStatusLabel = (status: string) => t(`frameworkLab.contactStatus.${status || 'unknown'}`)
+const customerProbeStatusOptions = computed(() => ((customerEditUUID.value ? ["active", "pending", "suspended", "disabled", "expired", "deleted"] : ["active", "pending", "suspended", "disabled"]) as string[]).map((value) => ({ value, label: customerStatusLabel(value) })))
+const customerRecordsTab = ref('contacts')
+const customerRecordsTabs = computed(() => [
+  { value: 'contacts', label: t('frameworkLab.contactsTab') },
+  { value: 'identities', label: t('frameworkLab.identitiesTab') },
+])
+const contactRecordsLoading = ref(false)
+let contactRecordsRequest = 0
+const selectContactProbeCustomer = (customerUUID: string) => { if (contactProbeCustomerUUID.value === customerUUID) return; contactProbeCustomerUUID.value = customerUUID; contactProbeContacts.value = []; contactProbeLoaded.value = false }
+const contactProbeStatusOptions = computed(() => [
+  { label: t("frameworkLab.contactStatusActive"), value: "active" },
+  { label: t("frameworkLab.contactStatusInactive"), value: "inactive" },
+  { label: t("frameworkLab.contactStatusTemporary"), value: "temporary" },
+])
+const contactProbeReady = computed(() => contactProbeMode.value === testRoute.value)
+const contactProbeRouteQuery = computed(() => ({ framework_debug_route: testRoute.value }))
+const selectedSchedulerJob = computed(() => schedulerJobs.value.find((job) => job.job_id === selectedSchedulerJobID.value) || null)
+const selectedSchedulerNextRunAt = computed(() => String(selectedSchedulerJob.value?.schedule_expr || selectedSchedulerJob.value?.next_run_at || ""))
+const selectModule = (module: typeof activeModule.value) => { activeModule.value = module }
+
+const selectTestRoute = async (route: "local" | "delegated") => {
+  if (testRoute.value === route) return
+  testRoute.value = route
+
+  // Customer and Contact results belong to the selected runtime route. Keeping
+  // the previous route's rows visible would make a local result look delegated.
+  contactProbeMode.value = ""
+  contactProbeCustomerUUID.value = ""
+  contactProbeCustomers.value = []
+  contactProbePage.value = 1
+  contactProbeTotalPages.value = 1
+  contactProbeContacts.value = []
+  contactProbeLoaded.value = false
+  contactProbeError.value = ""
+  contactProbeAuthScheme.value = ""
+  contactProbeSelectorCapability.value = ""
+  contactProbeAccountManageCapability.value = ""
+  contactProbeReadCapability.value = ""
+  contactProbeManageCapability.value = ""
+  contactProbeSelectorStatus.value = "idle"
+  contactProbeContactStatus.value = "idle"
+  showContactCreateModal.value = false
+  showCustomerCreateModal.value = false
+  contactProbeFormError.value = ""
+
+  if (activeModule.value === "customer") await loadContactProbeCustomers()
+}
+
+const selectCustomerContactTab = async () => {
+  activeModule.value = "customer"
+  if (contactProbeCustomers.value.length === 0) await loadContactProbeCustomers()
+}
+
+const contactProbeErrorMessage = (error: any) => String(
+  error?.data?.error?.message || error?.response?._data?.error?.message || error?.message || t("frameworkLab.contactOperationFailed")
+)
+
+const loadContactProbeCustomers = async (page = 1) => {
+  contactProbeLoading.value = true
+  contactProbeError.value = ""
+  contactProbeSelectorStatus.value = "pending"
+  try {
+    if (testRoute.value === "delegated") {
+      const mode = await customerBaseApi.mode()
+      const details = mode.data
+      contactProbeAuthScheme.value = String(details?.gateway_auth_scheme || "")
+      contactProbeSelectorCapability.value = String(details?.account_selector_capability || "")
+      contactProbeAccountManageCapability.value = String(details?.account_manage_capability || "")
+      contactProbeReadCapability.value = String(details?.contact_read_capability || "")
+      contactProbeManageCapability.value = String(details?.contact_manage_capability || "")
+    }
+    const customers = await customerBaseApi.listAccounts({ page, page_size: 20, framework_debug_route: testRoute.value })
+    contactProbeMode.value = testRoute.value
+    contactProbeCustomers.value = customers.data?.items || []
+    contactProbePage.value = customers.data?.page || page
+    contactProbeTotalPages.value = customers.data?.total_pages || 1
+    if (!contactProbeCustomers.value.some((item) => item.customer_uuid === contactProbeCustomerUUID.value)) selectContactProbeCustomer("")
+    contactProbeSelectorStatus.value = "success"
+  } catch (error: any) {
+    contactProbeSelectorStatus.value = "failed"
+    contactProbeError.value = contactProbeErrorMessage(error)
+  } finally {
+    contactProbeLoading.value = false
+  }
+}
+
+// Locate the authoritative customer, including idempotent replays on older pages.
+const selectIdentityCustomer = async (customerUUID: string) => {
+  const route = testRoute.value
+  selectContactProbeCustomer("")
+  contactProbeLoading.value = true
+  contactProbeError.value = ""
+  try {
+    let page = 1
+    let totalPages = 1
+    do {
+      const response = await customerBaseApi.listAccounts({ page, page_size: 20, framework_debug_route: route })
+      if (route !== testRoute.value) return
+      const customers = response.data?.items || []
+      totalPages = response.data?.total_pages || 1
+      if (customers.some(item => item.customer_uuid === customerUUID)) {
+        contactProbeCustomers.value = customers
+        contactProbePage.value = page
+        contactProbeTotalPages.value = totalPages
+        selectContactProbeCustomer(customerUUID)
+        return
+      }
+      page++
+    } while (page <= totalPages)
+    contactProbeError.value = t("identityLab.customerNotFound")
+  } catch (error: any) {
+    if (route === testRoute.value) contactProbeError.value = contactProbeErrorMessage(error)
+  } finally {
+    contactProbeLoading.value = false
+  }
+}
+
+const openCustomerCreate = () => { customerEditUUID.value = ""; Object.assign(customerProbeForm, emptyCustomerForm()); customerProbeFormError.value = ""; showCustomerCreateModal.value = true }
+const openContactCreate = () => { contactEditUUID.value = ""; Object.assign(contactProbeForm, emptyContactForm()); contactProbeFormError.value = ""; showContactCreateModal.value = true }
+const openCustomerEdit = (customer: CustomerAccount) => {
+  customerEditUUID.value = customer.customer_uuid
+  Object.assign(customerProbeForm, emptyCustomerForm(), { type: customer.type, displayName: customer.display_name || "", nickname: customer.nickname || "", givenName: customer.given_name || "", familyName: customer.family_name || "", email: customer.primary_email || "", phone: customer.primary_phone || "", avatarURL: customer.avatar_url || "", locale: customer.locale || "", timezone: customer.timezone || "", status: customer.status })
+  customerProbeFormError.value = ""; showCustomerCreateModal.value = true
+}
+const openContactEdit = (contact: CustomerContact) => {
+  contactEditUUID.value = contact.contact_uuid
+  Object.assign(contactProbeForm, { displayName: contact.display_name, givenName: contact.given_name || "", familyName: contact.family_name || "", email: contact.email || "", phone: contact.phone || "", status: contact.status, tags: contact.tags?.join(", ") || "", primaryRole: contact.roles?.includes("primary") || false, legalRepresentativeRole: contact.roles?.includes("legal_representative") || false })
+  contactProbeFormError.value = ""; showContactCreateModal.value = true
+}
+
+const createCustomerProbe = async () => {
+  if (customerEditUUID.value && !customerProbeForm.displayName.trim()) { customerProbeFormError.value = t("frameworkLab.customerNameRequired"); return }
+  if (![customerProbeForm.displayName, customerProbeForm.nickname, customerProbeForm.email, customerProbeForm.phone].some((value) => value.trim())) { customerProbeFormError.value = t("frameworkLab.customerIdentityRequired"); return }
+  if (!customerEditUUID.value && (customerProbeForm.type === "company" || customerProbeForm.explicitContact) && !customerProbeForm.contactName.trim()) { customerProbeFormError.value = t("frameworkLab.primaryContactRequired"); return }
+  customerProbeCreating.value = true
+  customerProbeFormError.value = ""
+  try {
+    if (customerEditUUID.value) {
+      await customerBaseApi.updateAccount(customerEditUUID.value, { display_name: customerProbeForm.displayName.trim(), nickname: customerProbeForm.nickname.trim(), given_name: customerProbeForm.givenName.trim(), family_name: customerProbeForm.familyName.trim(), primary_email: customerProbeForm.email.trim(), primary_phone: customerProbeForm.phone.trim(), avatar_url: customerProbeForm.avatarURL.trim(), locale: customerProbeForm.locale.trim(), timezone: customerProbeForm.timezone.trim(), status: customerProbeForm.status }, { query: contactProbeRouteQuery.value })
+      showCustomerCreateModal.value = false
+      await loadContactProbeCustomers(contactProbePage.value)
+      return
+    }
+    const result = await customerBaseApi.createBasicAccount({ type: customerProbeForm.type, ...((customerProbeForm.type === "company" || customerProbeForm.explicitContact) ? { primary_contact: { display_name: customerProbeForm.contactName.trim(), email: customerProbeForm.contactEmail.trim(), phone: customerProbeForm.contactPhone.trim() } } : {}), display_name: customerProbeForm.displayName.trim(), nickname: customerProbeForm.nickname.trim(), given_name: customerProbeForm.givenName.trim(), family_name: customerProbeForm.familyName.trim(), primary_email: customerProbeForm.email.trim(), primary_phone: customerProbeForm.phone.trim(), avatar_url: customerProbeForm.avatarURL.trim(), locale: customerProbeForm.locale.trim(), timezone: customerProbeForm.timezone.trim(), status: customerProbeForm.status as "active" | "pending" | "suspended" | "disabled" }, testRoute.value)
+    showCustomerCreateModal.value = false
+    Object.assign(customerProbeForm, { type: "person", explicitContact: false, contactName: "", contactEmail: "", contactPhone: "", displayName: "", nickname: "", givenName: "", familyName: "", email: "", phone: "", avatarURL: "", locale: "", timezone: "", status: "active" })
+    await loadContactProbeCustomers(1)
+    if (result.data?.customer_uuid) {
+      if (!contactProbeCustomers.value.some((item) => item.customer_uuid === result.data.customer_uuid)) contactProbeCustomers.value.unshift(result.data)
+      selectContactProbeCustomer(result.data.customer_uuid)
+    }
+  } catch (error: any) { customerProbeFormError.value = contactProbeErrorMessage(error) }
+  finally { customerProbeCreating.value = false }
+}
+
+const listContactProbe = async () => {
+  const request = ++contactRecordsRequest
+  const customer = contactProbeCustomerUUID.value
+  const route = testRoute.value
+  contactProbeContacts.value = []; contactProbeLoaded.value = false
+  if (!customer) { contactRecordsLoading.value = false; return }
+  contactRecordsLoading.value = true
+  contactProbeError.value = ''
+  contactProbeContactStatus.value = 'pending'
+  const current = () => request === contactRecordsRequest && customer === contactProbeCustomerUUID.value && route === testRoute.value
+  try {
+    const result = await customerBaseApi.listContacts(customer, { page: 1, page_size: 20, ...contactProbeRouteQuery.value })
+    if (!current()) return
+    contactProbeContacts.value = result.data?.items || []
+    contactProbeLoaded.value = true
+    contactProbeContactStatus.value = 'success'
+  } catch (error: any) {
+    if (!current()) return
+    contactProbeContactStatus.value = 'failed'
+    contactProbeError.value = contactProbeErrorMessage(error)
+  } finally { if (request === contactRecordsRequest) contactRecordsLoading.value = false }
+}
+watch([contactProbeCustomerUUID, testRoute, customerRecordsTab], () => {
+  ++contactRecordsRequest
+  contactRecordsLoading.value = false
+  contactProbeContacts.value = []; contactProbeLoaded.value = false
+  if (customerRecordsTab.value === 'contacts') void listContactProbe()
+})
+
+const createContactProbe = async () => {
+  const displayName = contactProbeForm.displayName.trim()
+  if (!contactProbeCustomerUUID.value || !displayName) {
+    contactProbeFormError.value = t("frameworkLab.contactNameRequired")
+    return
+  }
+  const tags = contactProbeForm.tags.split(/[,，;；\s]+/).map((value) => value.trim()).filter(Boolean)
+  if (tags.length > 20 || tags.join("").length > 1024 || tags.some((tag) => !/^[a-z0-9][a-z0-9._-]{0,63}$/.test(tag))) {
+    contactProbeFormError.value = t("frameworkLab.contactTagsInvalid")
+    return
+  }
+  const roles: ("primary" | "legal_representative")[] = []
+  if (contactProbeForm.primaryRole) roles.push("primary")
+  if (contactProbeForm.legalRepresentativeRole) roles.push("legal_representative")
+  contactProbeCreating.value = true
+  contactProbeFormError.value = ""
+  contactProbeContactStatus.value = "pending"
+  try {
+    const input = {
+      display_name: displayName,
+      email: contactProbeForm.email.trim(),
+      phone: contactProbeForm.phone.trim(),
+      given_name: contactProbeForm.givenName.trim(),
+      family_name: contactProbeForm.familyName.trim(),
+      status: contactProbeForm.status,
+      roles,
+      tags,
+    }
+    if (contactEditUUID.value) {
+      await customerBaseApi.updateContact(contactProbeCustomerUUID.value, contactEditUUID.value, input, { query: contactProbeRouteQuery.value })
+    } else {
+      await customerBaseApi.createContact(contactProbeCustomerUUID.value, { ...input, creation_intent: contactProbeForm.status === "temporary" ? "explicit_temporary" : "explicit_create" }, { query: contactProbeRouteQuery.value })
+    }
+    contactProbeForm.displayName = ""
+    contactProbeForm.givenName = ""
+    contactProbeForm.familyName = ""
+    contactProbeForm.tags = ""
+    contactProbeForm.status = "active"
+    contactProbeForm.primaryRole = false
+    contactProbeForm.legalRepresentativeRole = false
+    showContactCreateModal.value = false
+    await listContactProbe()
+  } catch (error: any) {
+    contactProbeContactStatus.value = "failed"
+    contactProbeFormError.value = contactProbeErrorMessage(error)
+  } finally {
+    contactProbeCreating.value = false
+  }
+}
+
+const shouldSkipSchedulerRequest = () => {
+  if (!auth.isAuthenticated.value) {
+    schedulerLastError.value = "当前未登录，已跳过 Scheduler 请求"
+    schedulerLastAction.value = "scheduler request skipped: unauthenticated"
+    return true
+  }
+  if (activeModule.value !== "scheduler") {
+    return true
+  }
+  return false
+}
+
+const normalizeToString = (value: unknown) => (typeof value === "string" ? value : typeof value === "number" ? String(value) : "")
+
+const showToast = ({ title, message, color = "primary", duration = 3000 }: { title?: string; message: string | number; color?: ToastColor; duration?: number }) => {
+  toast.title = normalizeToString(title)
+  toast.message = normalizeToString(message)
+  toast.color = color
+  toast.duration = duration
+  toast.visible = false
+  nextTick(() => {
+    toast.visible = true
+  })
+}
+
+const waitFor = async (predicate: () => boolean, timeoutMs = 2500, intervalMs = 50) => {
+  const startedAt = Date.now()
+  while (Date.now() - startedAt < timeoutMs) {
+    if (predicate()) return true
+    await new Promise((resolve) => setTimeout(resolve, intervalMs))
+  }
+  return predicate()
+}
+
+const parseTokenClaims = (token?: string | null): Record<string, any> | null => {
+  if (!token) return null
+  const parts = token.split(".")
+  if (parts.length < 2) return null
+  try {
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/")
+    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4)
+    const decoded = typeof atob === "function" ? atob(padded) : ""
+    if (!decoded) return null
+    return JSON.parse(decoded)
+  } catch {
+    return null
+  }
+}
+
+const pickFirstNonEmpty = (values: unknown[]) => {
+  for (const raw of values) {
+    const value = typeof raw === "string" ? raw.trim() : String(raw ?? "").trim()
+    if (value) return value
+  }
+  return ""
+}
+
+const isUUIDLike = (value: unknown) => {
+  const text = String(value ?? "").trim()
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(text)
+}
+
+const guessMemberUUID = () => {
+  const claims = parseTokenClaims(auth.getToken?.() ?? null) || {}
+  const context = (userStore.context || {}) as Record<string, any>
+  const currentMember = Array.isArray(context.members)
+    ? context.members.find((item: any) => String(item?.member_id || "") === String(context.current_member_id || ""))
+    : null
+  const candidates = [
+    context.current_member_uuid,
+    context.currentMemberUUID,
+    context.member_uuid,
+    context.memberUuid,
+    currentMember?.member_uuid,
+    currentMember?.memberUuid,
+    claims.mid,
+    claims.member_uuid,
+    claims.memberUuid,
+    claims.sub,
+  ].filter(isUUIDLike)
+  return pickFirstNonEmpty(candidates)
+}
+
+const ensureMemberUUID = () => String(guessMemberUUID() || "").trim()
+
+const sendCapabilityNotification = async () => {
+  const targetMemberUUID = ensureMemberUUID()
+  if (!targetMemberUUID) {
+    showToast({ title: "发送失败", message: "当前上下文缺少 member_uuid；请重新登录并确认 /me/context 返回 current_member_uuid", color: "warning", duration: 5000 })
+    return
+  }
+  capabilityNotifying.value = true
+  try {
+    const memberTopic = `_topic.notify.member.${targetMemberUUID}`
+    capabilityNotifyMemberUUID.value = targetMemberUUID
+    notificationTarget.value = "插件本地通知"
+    capabilityNotifyTopic.value = memberTopic
+    localProbe.connect()
+    localProbe.subscribeTopic(memberTopic)
+    await waitFor(() => Boolean(localProbe.wsDiag.value.connectedOK), 3000)
+    const traceID = makeTraceID()
+    const resp: any = await apiClient.post("/admin/notifications/test", {
+      topic: memberTopic,
+      member_uuid: targetMemberUUID,
+      force_local: testRoute.value === "local",
+      force_host: testRoute.value === "delegated",
+      title: "Plugin 测试通知",
+      message: "这是一条来自 framework runtime 统一入口的 member 通知",
+      trace_id: traceID,
+    })
+    const data = resp?.data || resp || {}
+    const flowMode = String(data.flow_mode || "").trim()
+    const resolvedTopic = String(data.topic || memberTopic).trim()
+    notificationFlowMode.value = flowMode
+    notificationPowerXProxy.value = String(data.powerx_proxy || "").trim()
+    notificationProviderMode.value = String(data.provider_mode || "").trim()
+    notificationHostPublishOK.value = data.host_publish_ok === undefined ? "" : String(Boolean(data.host_publish_ok))
+    const target = flowMode.startsWith("host") ? "PowerX 底座通知" : "插件本地通知"
+    notificationTarget.value = target
+    capabilityNotifyTopic.value = target === "PowerX 底座通知" ? "_topic.system.notification" : resolvedTopic
+    showToast({ title: "发送成功", message: `${target}已提交：${resolvedTopic}`, color: "success", duration: 4500 })
+  } catch (error: any) {
+    showToast({ title: "发送失败", message: error?.message || "能力调用失败", color: "error", duration: 5000 })
+  } finally {
+    capabilityNotifying.value = false
+  }
+}
+
+const makeTraceID = () => `fw-lab-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+const makeFlowTopic = () => "_topic.system.notification"
+
+const runWSBusFlow = async () => {
+  gatewayWsNotifying.value = true
+  wsFlowGrantStatus.value = "pending"
+  wsFlowPublishStatus.value = "idle"
+  wsFlowMode.value = "-"
+  wsFlowHostReachable.value = "-"
+  wsFlowHostGrantStatus.value = "-"
+  wsFlowHostPublishStatus.value = "-"
+  wsFlowTopic.value = makeFlowTopic()
+  wsFlowTraceID.value = makeTraceID()
+  try {
+    const traceID = wsFlowTraceID.value
+    const flowResp: any = await apiClient.post("/admin/runtime/ws-bus/test-flow", {
+      topic: wsFlowTopic.value,
+      force_host: true,
+      trace_id: traceID,
+      payload: {
+        type: "framework.wsbus.test",
+        title: "WS Bus Flow Test",
+        message: "grant->publish flow from framework lab",
+        trace_id: traceID,
+        created_at: new Date().toISOString(),
+      },
+    })
+    wsFlowGrantStatus.value = flowResp?.success === false ? "failed" : "ok"
+    wsFlowPublishStatus.value = flowResp?.success === false ? "failed" : "ok"
+    wsFlowMode.value = String(flowResp?.data?.flow_mode || "-")
+    wsFlowHostReachable.value = flowResp?.data?.host_reachable ? "yes" : "no"
+    wsFlowHostGrantStatus.value = flowResp?.data?.host_grant_ok ? "ok" : "failed"
+    wsFlowHostPublishStatus.value = flowResp?.data?.host_publish_ok ? "ok" : "failed"
+    showToast({ title: "发送成功", message: "WS Bus test flow 已提交", color: "success", duration: 3500 })
+  } catch (error: any) {
+    const msg = String(error?.message || "ws bus flow failed")
+    if (wsFlowGrantStatus.value === "pending") wsFlowGrantStatus.value = `failed: ${msg}`
+    else wsFlowPublishStatus.value = `failed: ${msg}`
+    showToast({ title: "发送失败", message: msg, color: "error", duration: 5000 })
+  } finally {
+    gatewayWsNotifying.value = false
+  }
+}
+
+const runLocalWSFlow = async () => {
+  localWsNotifying.value = true
+  localWsSubmitStatus.value = "pending"
+  const tenantFromConnection = String(getTenantUuid() || "").trim()
+  const tenantUUID = String(
+    tenantFromConnection || resolveTenantUUIDForRequest() || ""
+  ).trim()
+  localWsTenantFromConnection.value = tenantFromConnection
+  localWsTenantFromPublish.value = tenantUUID
+  localWsTopic.value = tenantUUID
+    ? `_topic.notify.tenant.${tenantUUID}`
+    : "_topic.notify.tenant.00000000-0000-0000-0000-000000000001"
+  try {
+    localProbe.connect()
+    localProbe.subscribeTopic(localWsTopic.value)
+    const traceID = makeTraceID()
+    const resp: any = await apiClient.post("/admin/runtime/ws-bus/test-flow", {
+      topic: localWsTopic.value,
+      force_local: true,
+      trace_id: traceID,
+      payload: {
+        type: "framework.local.wsbus.test",
+        title: "Local WS Bus Flow Test",
+        message: "local ws test flow from templates/framework-lab",
+        trace_id: traceID,
+        created_at: new Date().toISOString(),
+      },
+    })
+    const topic = String(resp?.data?.topic || localWsTopic.value).trim()
+    localWsTopic.value = topic
+    localProbe.subscribeTopic(topic)
+    localWsSubmitStatus.value = "ok"
+    showToast({ title: "发送成功", message: "本地 WS 测试通知已提交", color: "success", duration: 3500 })
+  } catch (error: any) {
+    localWsSubmitStatus.value = `failed: ${String(error?.message || "local ws failed")}`
+    showToast({ title: "发送失败", message: error?.message || "本地 WS 测试通知发送失败", color: "error", duration: 5000 })
+  } finally {
+    localWsNotifying.value = false
+  }
+}
+
+const refreshSchedulerJobs = async (options: { updateLastAction?: boolean } = {}) => {
+  if (shouldSkipSchedulerRequest()) {
+    return
+  }
+  const updateLastAction = options.updateLastAction !== false
+  schedulerListing.value = true
+  schedulerLastError.value = ""
+  try {
+    const result = await schedulerApi.listJobs({ ...(schedulerTenantUUID.value ? { tenant_uuid: schedulerTenantUUID.value } : {}), provider_mode: schedulerMode.value })
+    schedulerJobs.value = result.items || []
+    if (!selectedSchedulerJobID.value && schedulerJobs.value[0]?.job_id) {
+      selectedSchedulerJobID.value = schedulerJobs.value[0].job_id
+    }
+    if (updateLastAction) {
+      schedulerLastAction.value = `${schedulerMode.value} list ok: jobs=${schedulerJobs.value.length}`
+    }
+  } catch (error: any) {
+    schedulerLastError.value = String(error?.message || "list scheduler jobs failed")
+    showToast({ title: "Scheduler 列表失败", message: schedulerLastError.value, color: "error", duration: 5000 })
+  } finally {
+    schedulerListing.value = false
+  }
+}
+
+const createSchedulerSample = async () => {
+  schedulerCreating.value = true
+  schedulerLastError.value = ""
+  try {
+    const now = new Date()
+    const runAt = new Date(now.getTime() + 60_000).toISOString()
+    const traceID = makeTraceID()
+    if (schedulerMode.value === "local") {
+      schedulerProbe.connect()
+      schedulerProbe.subscribeTopic(schedulerNotifyTopic.value)
+    }
+    const job = await schedulerApi.createJob({
+      provider_mode: schedulerMode.value,
+      force_local: schedulerMode.value === "local",
+      force_host: schedulerMode.value === "host",
+      ...(schedulerTenantUUID.value ? { tenant_uuid: schedulerTenantUUID.value } : {}),
+      owner_type: "plugin",
+      owner_id: schedulerPluginID,
+      name: `framework_lab_once_${now.getTime()}`,
+      schedule_type: "once",
+      schedule_expr: runAt,
+      topic: "powerx.runtime.scheduler.triggered.v1",
+      idempotency_key: `framework-lab:${traceID}`,
+      payload: {
+        business_action: "framework_lab_scheduler_probe",
+        source: "framework-lab",
+        trace_id: traceID,
+        created_at: now.toISOString(),
+      },
+    })
+    selectedSchedulerJobID.value = job.job_id
+    if (!schedulerTenantUUID.value && job.tenant_uuid) {
+      schedulerTenantUUID.value = job.tenant_uuid
+    }
+    schedulerLastTopic.value = job.topic || "powerx.runtime.scheduler.triggered.v1"
+    schedulerLastAction.value = `${schedulerMode.value} create ok: ${job.job_id}; next run at ${runAt}`
+    await refreshSchedulerJobs({ updateLastAction: false })
+    showToast({ title: "Scheduler 创建成功", message: job.job_id, color: "success", duration: 3500 })
+  } catch (error: any) {
+    schedulerLastError.value = String(error?.message || "create scheduler job failed")
+    showToast({ title: "Scheduler 创建失败", message: schedulerLastError.value, color: "error", duration: 5000 })
+  } finally {
+    schedulerCreating.value = false
+  }
+}
+
+const triggerSchedulerJobByID = async (jobID: string) => {
+  if (!jobID) return
+  schedulerTriggering.value = true
+  schedulerLastError.value = ""
+  schedulerLastAction.value = `${schedulerMode.value} trigger pending: ${jobID}`
+  try {
+    if (schedulerMode.value === "local") {
+      schedulerProbe.connect()
+      schedulerProbe.subscribeTopic(schedulerNotifyTopic.value)
+    }
+    const result: any = await schedulerApi.triggerJob(jobID, schedulerRequestOptions.value)
+    const hostTriggerOK = result?.host_trigger_ok === true
+    const localSkipped = result?.local_notification_skipped === true
+    schedulerLastAction.value = schedulerMode.value === "host"
+      ? `host trigger ok: ${jobID}; PowerX=${hostTriggerOK ? "ok" : "-"}; local_notify=${localSkipped ? "skipped" : "-"}`
+      : `local trigger ok: ${jobID}`
+    const notifyTopic = String(result?.notification?.topic || "").trim()
+    if (notifyTopic) {
+      schedulerLastTopic.value = notifyTopic
+      schedulerProbe.subscribeTopic(notifyTopic)
+    }
+    showToast({ title: "Scheduler 触发成功", message: schedulerMode.value === "local" ? "已发送本地通知" : jobID, color: "success", duration: 3500 })
+    await refreshSchedulerJobs({ updateLastAction: false })
+  } catch (error: any) {
+    schedulerLastError.value = String(error?.message || "trigger scheduler job failed")
+    showToast({ title: "Scheduler 触发失败", message: schedulerLastError.value, color: "error", duration: 5000 })
+  } finally {
+    schedulerTriggering.value = false
+  }
+}
+
+const pauseSchedulerJobByID = async (jobID: string) => {
+  if (!jobID) return
+  schedulerPausing.value = true
+  schedulerLastError.value = ""
+  try {
+    await schedulerApi.pauseJob(jobID, schedulerRequestOptions.value)
+    schedulerLastAction.value = `${schedulerMode.value} pause ok: ${jobID}`
+    await refreshSchedulerJobs({ updateLastAction: false })
+  } catch (error: any) {
+    schedulerLastError.value = String(error?.message || "pause scheduler job failed")
+    showToast({ title: "Scheduler 暂停失败", message: schedulerLastError.value, color: "error", duration: 5000 })
+  } finally {
+    schedulerPausing.value = false
+  }
+}
+
+const resumeSchedulerJobByID = async (jobID: string) => {
+  if (!jobID) return
+  schedulerResuming.value = true
+  schedulerLastError.value = ""
+  try {
+    await schedulerApi.resumeJob(jobID, schedulerRequestOptions.value)
+    schedulerLastAction.value = `${schedulerMode.value} resume ok: ${jobID}`
+    await refreshSchedulerJobs({ updateLastAction: false })
+  } catch (error: any) {
+    schedulerLastError.value = String(error?.message || "resume scheduler job failed")
+    showToast({ title: "Scheduler 恢复失败", message: schedulerLastError.value, color: "error", duration: 5000 })
+  } finally {
+    schedulerResuming.value = false
+  }
+}
+
+const triggerSelectedSchedulerJob = () => triggerSchedulerJobByID(selectedSchedulerJobID.value)
+const pauseSelectedSchedulerJob = () => pauseSchedulerJobByID(selectedSchedulerJobID.value)
+const resumeSelectedSchedulerJob = () => resumeSchedulerJobByID(selectedSchedulerJobID.value)
+
+onMounted(async () => {
+  if (!userStore.context && !userStore.isLoading) {
+    try {
+      await userStore.fetchUserContext()
+    } catch {
+      // ignore
+    }
+  }
+})
+
+</script>

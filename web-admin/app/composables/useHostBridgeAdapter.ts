@@ -1,0 +1,64 @@
+import { getCurrentScope, onScopeDispose } from 'vue';
+import { useNuxtApp, useRuntimeConfig, useRouter } from '#imports';
+import { initPowerXBridge, getPowerXHostSession, createPowerXRouterNavigator, createFrameworkLogger, type HostSessionClearScope } from '@artisan-cloud/plugin-framework-client';
+import { useTheme } from '~/composables/useTheme';
+import { useUserStore } from '~/stores/user';
+import { useMe } from '~/composables/useMe';
+import { validatePowerXUserContext } from '~/utils/host-context';
+
+export function setupHostBridgeAdapter(opts: { pluginId?: string; debug?: boolean } = {}) {
+  const app = useNuxtApp();
+  const config = useRuntimeConfig();
+  const router = useRouter();
+  const theme = useTheme();
+  const user = useUserStore();
+  const me = useMe();
+  const pluginId = opts.pluginId || String(config.public?.powerxPluginId || 'com.example.framework-ci-fixture');
+  const session = getPowerXHostSession(pluginId);
+  const logger = createFrameworkLogger('bridge.session');
+  const clearContext = (scope: HostSessionClearScope = 'session') => {
+    user.clearUserState();
+    if (scope === 'identity') return;
+    // These are this iframe application's stores, never the host application's stores.
+    const pinia = app.$pinia;
+    for (const store of Array.from(pinia._s.values())) {
+      if (store.$id === 'user') continue;
+      store.$dispose(); delete pinia.state.value[store.$id];
+    }
+  };
+  const request = () => bridge.consumer.requestAuth();
+  const bridge = initPowerXBridge({
+    pluginId, debug: opts.debug, logger,
+    onSync: async payload => {
+      session.bindInstance(payload.instanceId);
+      theme.setTheme(payload.theme === 'system' ? 'auto' : payload.theme);
+      if (payload.locale !== app.$i18n.locale.value) await app.$i18n.setLocale(payload.locale);
+    },
+    onAuthToken: async payload => {
+      try {
+        await session.apply(payload, {
+          readContext: (snapshot, signal) => me.getUserContext({ hostSnapshot: snapshot, signal }),
+          validateContext: validatePowerXUserContext,
+          commitContext: context => user.commitHostContext(context),
+          clearContext,
+        });
+      } catch (cause) {
+        logger.warn('PLUGIN_AUTH_CONTEXT_FAILED', { pluginId, instanceId: payload.instanceId, sequence: payload.sequence });
+        throw cause;
+      }
+    },
+    navigator: createPowerXRouterNavigator(router, config.app.baseURL, window.location.origin, session),
+  });
+  const stopRequester = session.setRequester(request);
+  const stopState = session.subscribe(state => { if (state.status === 'cleared' || state.status === 'rejected') clearContext(state.clearScope); });
+  let disposed = false;
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
+    const ownsSession = session.ownsRequester(request);
+    bridge.stop(); stopState(); stopRequester();
+    if (ownsSession) clearContext();
+  };
+  if (getCurrentScope()) onScopeDispose(dispose);
+  return { bridge, dispose };
+}

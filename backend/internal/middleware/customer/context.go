@@ -1,0 +1,71 @@
+package customer
+
+import (
+	"context"
+	"errors"
+
+	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
+	customerdomain "github.com/example.com/framework-ci-fixture/backend/internal/domain/customer"
+	customersvc "github.com/example.com/framework-ci-fixture/backend/internal/services/customer"
+	"github.com/gin-gonic/gin"
+)
+
+var ErrCustomerMissing = errors.New("customer context missing")
+
+const ginCustomerContextKey = "customer_ctx"
+
+// SetCustomerContext stores CustomerContext into Gin + request contexts.
+func SetCustomerContext(c *gin.Context, cc *customerdomain.CustomerContext) {
+	if c == nil || cc == nil {
+		return
+	}
+	c.Set(ginCustomerContextKey, cc)
+	customerfw.SetGinContext(c, customersvc.ToFrameworkContext(cc))
+	if c.Request != nil {
+		c.Request = c.Request.WithContext(customerdomain.SetContext(c.Request.Context(), cc))
+	}
+}
+
+// GetCustomerContext reads CustomerContext from Gin context if present.
+func GetCustomerContext(c *gin.Context) (*customerdomain.CustomerContext, bool) {
+	if c == nil {
+		return nil, false
+	}
+	if v, ok := c.Get(ginCustomerContextKey); ok && v != nil {
+		if cc, ok := v.(*customerdomain.CustomerContext); ok && cc != nil {
+			return cc, true
+		}
+	}
+	if fwcc, ok := customerfw.ContextFromGin(c); ok {
+		cc := customersvc.FromFrameworkContext(fwcc)
+		if cc != nil {
+			c.Set(ginCustomerContextKey, cc)
+			return cc, true
+		}
+	}
+	return nil, false
+}
+
+// CustomerContextFromRequest reads CustomerContext from a standard context.
+func CustomerContextFromRequest(ctx context.Context) (*customerdomain.CustomerContext, bool) {
+	if fwcc, ok := customerfw.ContextFrom(ctx); ok {
+		cc := customersvc.FromFrameworkContext(fwcc)
+		if cc != nil {
+			return cc, true
+		}
+	}
+	return customerdomain.ContextFrom(ctx)
+}
+
+// RequireCustomerContext returns ErrCustomerMissing when absent.
+func RequireCustomerContext(c *gin.Context) (*customerdomain.CustomerContext, error) {
+	if cc, ok := GetCustomerContext(c); ok {
+		return cc, nil
+	}
+	if c != nil && c.Request != nil {
+		if cc, ok := customerdomain.ContextFrom(c.Request.Context()); ok {
+			return cc, nil
+		}
+	}
+	return nil, ErrCustomerMissing
+}

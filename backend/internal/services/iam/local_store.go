@@ -1,0 +1,911 @@
+package iam
+
+import (
+	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"os"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/example.com/framework-ci-fixture/backend/internal/config"
+	iamm "github.com/example.com/framework-ci-fixture/backend/internal/entity/models/iam"
+	authx "github.com/example.com/framework-ci-fixture/backend/internal/middleware"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
+)
+
+const (
+	defaultAccessTTL     = 15 * time.Minute
+	defaultRefreshTTL    = 30 * 24 * time.Hour
+	defaultPolicyVersion = "local.v1"
+	defaultPluginID      = "com.example.framework-ci-fixture"
+)
+
+// LocalDirectory implements IAMDirectory against the plugin's own database.
+type LocalDirectory struct {
+	db               *gorm.DB
+	cfg              *config.Config
+	issuer           string
+	audience         string
+	hmacSecret       []byte
+	accessTTL        time.Duration
+	refreshTTL       time.Duration
+	defaultTenantKey string
+	pluginID         string
+	policyVersion    string
+}
+
+func NewLocalDirectory(db *gorm.DB, cfg *config.Config) (*LocalDirectory, error) {
+	if db == nil {
+		return nil, errors.New("iam: db is nil")
+	}
+	if cfg == nil {
+		return nil, errors.New("iam: config is nil")
+	}
+	ctxCfg := cfg.Context
+	secret := strings.TrimSpace(ctxCfg.HMACSecret)
+	if secret == "" {
+		secret = "powerx-plugin-dev"
+	}
+	issuer := strings.TrimSpace(ctxCfg.Issuer)
+	if issuer == "" {
+		issuer = "powerx-local"
+	}
+	audience := strings.TrimSpace(ctxCfg.Audience)
+	if audience == "" {
+		audience = "powerx:plugin"
+	}
+	ttl := ctxCfg.TTL
+	if ttl <= 0 {
+		ttl = defaultAccessTTL
+	}
+	refreshTTL := defaultRefreshTTL
+	if v := strings.TrimSpace(os.Getenv("PLUGIN_IAM_REFRESH_TTL")); v != "" {
+		if dur, err := time.ParseDuration(v); err == nil {
+			refreshTTL = dur
+		}
+	}
+	tenantKey := strings.TrimSpace(os.Getenv("PLUGIN_IAM_TENANT_KEY"))
+	if tenantKey == "" {
+		tenantKey = "00000000-0000-0000-0000-000000000001"
+	}
+	pluginID := resolvePluginID()
+	policyVersion := strings.TrimSpace(os.Getenv("PLUGIN_IAM_POLICY_VERSION"))
+	if policyVersion == "" {
+		policyVersion = defaultPolicyVersion
+	}
+	return &LocalDirectory{
+		db:               db,
+		cfg:              cfg,
+		issuer:           issuer,
+		audience:         audience,
+		hmacSecret:       []byte(secret),
+		accessTTL:        ttl,
+		refreshTTL:       refreshTTL,
+		defaultTenantKey: strings.ToLower(tenantKey),
+		pluginID:         pluginID,
+		policyVersion:    policyVersion,
+	}, nil
+}
+
+func (d *LocalDirectory) Mode() IAMAdapterMode { return IAMAdapterModeLocal }
+
+func (d *LocalDirectory) Login(ctx context.Context, req LoginRequest) (*AuthTokens, *UserContext, error) {
+	identifier := strings.TrimSpace(req.Identifier)
+	if identifier == "" || strings.TrimSpace(req.Password) == "" {
+		return nil, nil, ErrInvalidArguments
+	}
+	tenant, err := d.resolveTenant(ctx, req.Tenant)
+	if err != nil {
+		return nil, nil, err
+	}
+	tenantUUID := tenantIdentifier(tenant)
+	member, user, err := d.findMember(ctx, tenantUUID, identifier)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+		return nil, nil, ErrUnauthorized
+	}
+	if err := d.ensureIdentityUUIDs(ctx, user, member); err != nil {
+		return nil, nil, err
+	}
+	roles, perms, err := d.loadRolePermissionCodes(ctx, member.ID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("iam: load roles: %w", err)
+	}
+	deptIDs := []uint64{}
+	if member.DepartmentID != nil {
+		deptIDs = append(deptIDs, *member.DepartmentID)
+	}
+	userCtx := &UserContext{
+		TenantUUID:    tenantUUID,
+		TenantUuid:    tenantUUID,
+		TenantKey:     tenant.Key,
+		TenantName:    tenant.Name,
+		TenantID:      tenant.ID,
+		IsRoot:        user.IsRoot,
+		MemberID:      member.ID,
+		MemberUUID:    member.UUID,
+		UserID:        user.ID,
+		UserUUID:      user.UUID,
+		Username:      member.Username,
+		Email:         user.Email,
+		DisplayName:   valueOrDefault(member.DisplayName, user.DisplayName),
+		Roles:         roles,
+		Permissions:   perms,
+		DepartmentIDs: deptIDs,
+		PolicyVersion: d.policyVersion,
+		PermsHash:     permissionCodesHash(perms),
+		AuthzSource:   "local_mock",
+		PluginID:      d.pluginID,
+		IssuedAt:      time.Now(),
+	}
+	tokens, err := d.issueTokens(userCtx)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := d.persistRefreshToken(ctx, userCtx, tokens.RefreshToken); err != nil {
+		return nil, nil, err
+	}
+	return tokens, userCtx, nil
+}
+
+func (d *LocalDirectory) LoginByFederated(ctx context.Context, req FederatedLoginRequest) (*AuthTokens, *UserContext, error) {
+	tenantUUID := strings.TrimSpace(req.TenantUUID)
+	if tenantUUID == "" || req.MemberID == 0 {
+		return nil, nil, ErrInvalidArguments
+	}
+	tenant, err := d.findTenantByIdentifier(ctx, tenantUUID)
+	if err != nil {
+		return nil, nil, err
+	}
+	resolvedTenant := tenantIdentifier(tenant)
+	var member iamm.Member
+	if err := d.db.WithContext(ctx).Where("id = ? AND tenant_uuid = ?", req.MemberID, resolvedTenant).First(&member).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil, ErrUnauthorized
+		}
+		return nil, nil, err
+	}
+	var user iamm.User
+	if err := d.db.WithContext(ctx).Where("id = ?", member.UserID).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil, ErrUnauthorized
+		}
+		return nil, nil, err
+	}
+	if err := d.ensureIdentityUUIDs(ctx, &user, &member); err != nil {
+		return nil, nil, err
+	}
+	roles, perms, err := d.loadRolePermissionCodes(ctx, member.ID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("iam: load roles: %w", err)
+	}
+	deptIDs := []uint64{}
+	if member.DepartmentID != nil {
+		deptIDs = append(deptIDs, *member.DepartmentID)
+	}
+	userCtx := &UserContext{
+		TenantUUID:    resolvedTenant,
+		TenantUuid:    resolvedTenant,
+		TenantKey:     tenant.Key,
+		TenantName:    tenant.Name,
+		TenantID:      tenant.ID,
+		IsRoot:        user.IsRoot,
+		MemberID:      member.ID,
+		MemberUUID:    member.UUID,
+		UserID:        user.ID,
+		UserUUID:      user.UUID,
+		Username:      member.Username,
+		Email:         user.Email,
+		DisplayName:   valueOrDefault(member.DisplayName, user.DisplayName),
+		Roles:         roles,
+		Permissions:   perms,
+		DepartmentIDs: deptIDs,
+		PolicyVersion: d.policyVersion,
+		PermsHash:     permissionCodesHash(perms),
+		AuthzSource:   "local_mock",
+		PluginID:      d.pluginID,
+		IssuedAt:      time.Now(),
+	}
+	tokens, err := d.issueTokens(userCtx)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := d.persistRefreshToken(ctx, userCtx, tokens.RefreshToken); err != nil {
+		return nil, nil, err
+	}
+	return tokens, userCtx, nil
+}
+
+func (d *LocalDirectory) Refresh(ctx context.Context, refreshToken string) (*AuthTokens, error) {
+	if strings.TrimSpace(refreshToken) == "" {
+		return nil, ErrInvalidArguments
+	}
+	record, err := d.lookupRefreshToken(ctx, refreshToken)
+	if err != nil {
+		return nil, err
+	}
+	member, user, tenant, err := d.loadSessionPrincipals(ctx, record)
+	if err != nil {
+		return nil, err
+	}
+	if err := d.ensureIdentityUUIDs(ctx, user, member); err != nil {
+		return nil, err
+	}
+	roles, perms, err := d.loadRolePermissionCodes(ctx, member.ID)
+	if err != nil {
+		return nil, fmt.Errorf("iam: load roles: %w", err)
+	}
+	deptIDs := []uint64{}
+	if member.DepartmentID != nil {
+		deptIDs = append(deptIDs, *member.DepartmentID)
+	}
+	tenantUUID := tenantIdentifier(tenant)
+	userCtx := &UserContext{
+		TenantUUID:    tenantUUID,
+		TenantUuid:    tenantUUID,
+		TenantKey:     tenant.Key,
+		TenantName:    tenant.Name,
+		TenantID:      tenant.ID,
+		IsRoot:        user.IsRoot,
+		MemberID:      member.ID,
+		MemberUUID:    member.UUID,
+		UserID:        user.ID,
+		UserUUID:      user.UUID,
+		Username:      member.Username,
+		Email:         user.Email,
+		DisplayName:   valueOrDefault(member.DisplayName, user.DisplayName),
+		Roles:         roles,
+		Permissions:   perms,
+		DepartmentIDs: deptIDs,
+		PolicyVersion: d.policyVersion,
+		PermsHash:     permissionCodesHash(perms),
+		AuthzSource:   "local_mock",
+		PluginID:      d.pluginID,
+		IssuedAt:      time.Now(),
+	}
+	tokens, err := d.issueTokens(userCtx)
+	if err != nil {
+		return nil, err
+	}
+	if err := d.rotateRefreshToken(ctx, record, userCtx, tokens.RefreshToken); err != nil {
+		return nil, err
+	}
+	return tokens, nil
+}
+
+func (d *LocalDirectory) Logout(ctx context.Context, refreshToken string) error {
+	if strings.TrimSpace(refreshToken) == "" {
+		return ErrInvalidArguments
+	}
+	return d.revokeRefreshToken(ctx, refreshToken)
+}
+
+func (d *LocalDirectory) CurrentUser(ctx context.Context) (*UserContext, error) {
+	return nil, ErrUnsupportedMode
+}
+
+func (d *LocalDirectory) ListRoles(ctx context.Context, tenantUUID string) ([]RoleInfo, error) {
+	tenant, err := d.findTenantByIdentifier(ctx, tenantUUID)
+	if err != nil {
+		return nil, err
+	}
+	scopeTenant := tenantIdentifier(tenant)
+	var roles []iamm.Role
+	if err := d.db.WithContext(ctx).Where("tenant_uuid = ?", scopeTenant).Find(&roles).Error; err != nil {
+		return nil, err
+	}
+	result := make([]RoleInfo, 0, len(roles))
+	for _, r := range roles {
+		result = append(result, RoleInfo{
+			ID:          r.ID,
+			UUID:        strings.TrimSpace(r.UUID),
+			TenantUUID:  scopeTenant,
+			TenantUuid:  r.TenantUuid,
+			Code:        r.Code,
+			Name:        r.Name,
+			Description: r.Description,
+		})
+	}
+	return result, nil
+}
+
+func (d *LocalDirectory) ListDepartments(ctx context.Context, tenantUUID string) ([]DepartmentInfo, error) {
+	tenant, err := d.findTenantByIdentifier(ctx, tenantUUID)
+	if err != nil {
+		return nil, err
+	}
+	scopeTenant := tenantIdentifier(tenant)
+	var deps []iamm.Department
+	if err := d.db.WithContext(ctx).Where("tenant_uuid = ?", scopeTenant).Find(&deps).Error; err != nil {
+		return nil, err
+	}
+	result := make([]DepartmentInfo, 0, len(deps))
+	for _, dep := range deps {
+		info := DepartmentInfo{
+			ID:          dep.ID,
+			UUID:        strings.TrimSpace(dep.UUID),
+			TenantUUID:  scopeTenant,
+			TenantUuid:  dep.TenantUuid,
+			Name:        dep.Name,
+			Code:        dep.Code,
+			Description: dep.Description,
+		}
+		if dep.ParentID != nil {
+			info.ParentID = dep.ParentID
+		}
+		result = append(result, info)
+	}
+	return result, nil
+}
+
+// ListPermissions exposes the local permission catalog with stable UUIDs.
+// It is intentionally separate from IAMDirectory: only the framework adapter needs
+// the catalog, while legacy administrative services still own their write workflow.
+func (d *LocalDirectory) ListPermissions(ctx context.Context, _ string) ([]PermissionInfo, error) {
+	var permissions []iamm.Permission
+	if err := d.db.WithContext(ctx).Order("resource ASC, action ASC").Find(&permissions).Error; err != nil {
+		return nil, err
+	}
+	result := make([]PermissionInfo, 0, len(permissions))
+	for _, permission := range permissions {
+		if strings.TrimSpace(permission.UUID) == "" {
+			return nil, fmt.Errorf("iam: permission %s:%s is missing uuid", permission.Resource, permission.Action)
+		}
+		result = append(result, PermissionInfo{
+			PermissionUUID: strings.TrimSpace(permission.UUID),
+			Resource:       strings.TrimSpace(permission.Resource),
+			Action:         strings.TrimSpace(permission.Action),
+		})
+	}
+	return result, nil
+}
+
+func (d *LocalDirectory) ListMembers(ctx context.Context, tenantUUID string) ([]MemberInfo, error) {
+	tenant, err := d.findTenantByIdentifier(ctx, tenantUUID)
+	if err != nil {
+		return nil, err
+	}
+	scopeTenant := tenantIdentifier(tenant)
+	var members []iamm.Member
+	if err := d.db.WithContext(ctx).
+		Where("tenant_uuid = ?", scopeTenant).
+		Order("id ASC").
+		Find(&members).Error; err != nil {
+		return nil, err
+	}
+	result := make([]MemberInfo, 0, len(members))
+	for _, member := range members {
+		info, err := d.memberInfo(ctx, scopeTenant, &member)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, *info)
+	}
+	return result, nil
+}
+
+func (d *LocalDirectory) GetMember(ctx context.Context, tenantUUID, memberUUID string) (*MemberInfo, error) {
+	tenant, err := d.findTenantByIdentifier(ctx, tenantUUID)
+	if err != nil {
+		return nil, err
+	}
+	memberUUID = strings.TrimSpace(memberUUID)
+	if memberUUID == "" {
+		return nil, ErrInvalidArguments
+	}
+	scopeTenant := tenantIdentifier(tenant)
+	var member iamm.Member
+	err = d.db.WithContext(ctx).
+		Where("tenant_uuid = ? AND uuid = ?", scopeTenant, memberUUID).
+		First(&member).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrMemberNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return d.memberInfo(ctx, scopeTenant, &member)
+}
+
+// BatchResolveMembersByDisplayNames applies the same tenant-scoped exact
+// directory semantics as the delegated Host Contract. Names are import input,
+// never identity: only a unique match yields a member UUID.
+func (d *LocalDirectory) BatchResolveMembersByDisplayNames(ctx context.Context, tenantUUID string, displayNames []string) ([]MemberDisplayNameResolutionItem, error) {
+	normalized, err := NormalizeMemberDisplayNames(displayNames)
+	if err != nil {
+		return nil, err
+	}
+	members, err := d.ListMembers(ctx, tenantUUID)
+	if err != nil {
+		return nil, err
+	}
+	byDisplayName := make(map[string][]MemberInfo, len(members))
+	for _, member := range members {
+		name := strings.TrimSpace(member.DisplayName)
+		if name != "" {
+			byDisplayName[name] = append(byDisplayName[name], member)
+		}
+	}
+	result := make([]MemberDisplayNameResolutionItem, 0, len(normalized))
+	for _, displayName := range normalized {
+		matches := byDisplayName[displayName]
+		item := MemberDisplayNameResolutionItem{DisplayName: displayName, Status: MemberDisplayNameNotFound}
+		switch len(matches) {
+		case 1:
+			item.Status = MemberDisplayNameFound
+			member := matches[0]
+			item.Member = &member
+		case 0:
+		default:
+			item.Status = MemberDisplayNameAmbiguous
+		}
+		result = append(result, item)
+	}
+	return result, nil
+}
+
+func (d *LocalDirectory) memberInfo(ctx context.Context, tenantUUID string, member *iamm.Member) (*MemberInfo, error) {
+	if member == nil || strings.TrimSpace(member.UUID) == "" {
+		return nil, ErrMemberNotFound
+	}
+	var user iamm.User
+	if err := d.db.WithContext(ctx).Where("id = ?", member.UserID).First(&user).Error; err != nil {
+		return nil, err
+	}
+	if err := d.ensureIdentityUUIDs(ctx, &user, member); err != nil {
+		return nil, err
+	}
+	return &MemberInfo{
+		MemberUUID:  strings.TrimSpace(member.UUID),
+		TenantUUID:  strings.TrimSpace(tenantUUID),
+		UserUUID:    strings.TrimSpace(user.UUID),
+		DisplayName: valueOrDefault(member.DisplayName, user.DisplayName),
+		Status:      strings.TrimSpace(member.Status),
+	}, nil
+}
+
+func (d *LocalDirectory) CheckPermission(ctx context.Context, tc TenantContext, resource, action string) error {
+	if resource == "" || action == "" {
+		return ErrInvalidArguments
+	}
+	if len(tc.Roles) == 0 && len(tc.Permissions) == 0 {
+		tenant, err := d.findTenantByIdentifier(ctx, tc.TenantUUID)
+		if err != nil {
+			return err
+		}
+		scopeTenant := tenantIdentifier(tenant)
+		var member iamm.Member
+		query := d.db.WithContext(ctx).Where("tenant_uuid = ?", scopeTenant)
+		switch {
+		case strings.TrimSpace(tc.MemberUUID) != "":
+			query = query.Where("uuid = ?", strings.TrimSpace(tc.MemberUUID))
+		case strings.TrimSpace(tc.UserUUID) != "":
+			var user iamm.User
+			if err := d.db.WithContext(ctx).Where("uuid = ?", strings.TrimSpace(tc.UserUUID)).First(&user).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return ErrUnauthorized
+				}
+				return err
+			}
+			query = query.Where("user_id = ?", user.ID)
+		default:
+			return ErrUnauthorized
+		}
+		if err := query.First(&member).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrUnauthorized
+			}
+			return err
+		}
+		roles, permissions, err := d.loadRolePermissionCodes(ctx, member.ID)
+		if err != nil {
+			return fmt.Errorf("iam: load authorization: %w", err)
+		}
+		tc.Roles = roles
+		tc.Permissions = permissions
+	}
+	for _, role := range tc.Roles {
+		if role == "system.admin" {
+			return nil
+		}
+	}
+	permCode := fmt.Sprintf("%s:%s", strings.ToLower(resource), strings.ToLower(action))
+	for _, perm := range tc.Permissions {
+		if strings.EqualFold(perm, permCode) || perm == "*" {
+			return nil
+		}
+	}
+	return ErrUnauthorized
+}
+
+func (d *LocalDirectory) UserContextFromToken(ctx context.Context, bearer string) (*UserContext, error) {
+	if strings.TrimSpace(bearer) == "" {
+		return nil, ErrUnauthorized
+	}
+	claims := &authx.PowerXClaims{}
+	token, err := jwt.ParseWithClaims(bearer, claims, func(t *jwt.Token) (any, error) {
+		if t.Method != jwt.SigningMethodHS256 {
+			return nil, errors.New("invalid signing method")
+		}
+		return d.hmacSecret, nil
+	}, jwt.WithIssuer(d.issuer), jwt.WithAudience(d.audience))
+	if err != nil || token == nil || !token.Valid {
+		return nil, ErrUnauthorized
+	}
+	tenantUUID := strings.TrimSpace(claims.TenantUUID.String())
+	tenant, err := d.findTenantByIdentifier(ctx, tenantUUID)
+	if err != nil {
+		return nil, err
+	}
+	resolvedTenant := tenantIdentifier(tenant)
+	userID := uint64(claims.UserID)
+	var user iamm.User
+	if err := d.db.WithContext(ctx).Where("id = ?", userID).First(&user).Error; err != nil {
+		return nil, err
+	}
+	var member iamm.Member
+	if claims.MemberID > 0 {
+		if err := d.db.WithContext(ctx).Where("id = ? AND tenant_uuid = ? AND user_id = ?", uint64(claims.MemberID), resolvedTenant, userID).First(&member).Error; err != nil {
+			return nil, err
+		}
+	} else {
+		if err := d.db.WithContext(ctx).Where("tenant_uuid = ? AND user_id = ?", resolvedTenant, userID).First(&member).Error; err != nil {
+			return nil, err
+		}
+	}
+	if err := d.ensureIdentityUUIDs(ctx, &user, &member); err != nil {
+		return nil, err
+	}
+	deptIDs := []uint64{}
+	if member.DepartmentID != nil {
+		deptIDs = append(deptIDs, *member.DepartmentID)
+	}
+	policyVersion := strings.TrimSpace(claims.PolicyVersion)
+	if policyVersion == "" {
+		policyVersion = d.policyVersion
+	}
+	pluginID := strings.TrimSpace(claims.PluginID)
+	if pluginID == "" {
+		pluginID = d.pluginID
+	}
+	return &UserContext{
+		TenantUUID:    resolvedTenant,
+		TenantUuid:    resolvedTenant,
+		TenantKey:     tenant.Key,
+		TenantName:    tenant.Name,
+		TenantID:      tenant.ID,
+		IsRoot:        user.IsRoot,
+		MemberID:      member.ID,
+		MemberUUID:    member.UUID,
+		UserID:        userID,
+		UserUUID:      user.UUID,
+		Username:      member.Username,
+		Email:         user.Email,
+		DisplayName:   valueOrDefault(member.DisplayName, user.DisplayName),
+		Roles:         claims.Roles,
+		Permissions:   claims.Permissions,
+		DepartmentIDs: deptIDs,
+		PolicyVersion: policyVersion,
+		PermsHash:     firstNonEmpty(claims.PermsHash, permissionCodesHash(claims.Permissions)),
+		AuthzSource:   firstNonEmpty(claims.AuthzSource, "local_mock"),
+		PluginID:      pluginID,
+		IssuedAt:      time.Now(),
+	}, nil
+}
+
+func (d *LocalDirectory) resolveTenant(ctx context.Context, key string) (*iamm.Tenant, error) {
+	search := strings.ToLower(strings.TrimSpace(key))
+	if search == "" {
+		search = d.defaultTenantKey
+	}
+	var tenant iamm.Tenant
+	query := d.db.WithContext(ctx).Model(&iamm.Tenant{}).
+		Where("lower(key) = ? OR uuid = ?", search, search)
+	if id, err := strconv.ParseUint(search, 10, 64); err == nil && id > 0 {
+		query = query.Or("id = ?", id)
+	}
+	if err := query.First(&tenant).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrUnauthorized
+		}
+		return nil, err
+	}
+	if tenant.Status != iamm.StatusActive {
+		return nil, ErrUnauthorized
+	}
+	return &tenant, nil
+}
+
+func (d *LocalDirectory) findMember(ctx context.Context, tenantUUID string, identifier string) (*iamm.Member, *iamm.User, error) {
+	ident := strings.ToLower(strings.TrimSpace(identifier))
+	var member iamm.Member
+	query := d.db.WithContext(ctx).Model(&iamm.Member{}).Where("tenant_uuid = ?", tenantUUID).Where("status = ?", iamm.StatusActive)
+	if strings.Contains(ident, "@") {
+		var user iamm.User
+		if err := d.db.WithContext(ctx).Where("lower(email) = ?", ident).First(&user).Error; err == nil {
+			if err := query.Where("user_id = ?", user.ID).First(&member).Error; err == nil {
+				return &member, &user, nil
+			}
+		}
+	}
+	if err := query.Where("lower(username) = ?", ident).First(&member).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil, ErrUnauthorized
+		}
+		return nil, nil, err
+	}
+	var user iamm.User
+	if err := d.db.WithContext(ctx).Where("id = ?", member.UserID).First(&user).Error; err != nil {
+		return nil, nil, err
+	}
+	return &member, &user, nil
+}
+
+func (d *LocalDirectory) loadRolePermissionCodes(ctx context.Context, memberID uint64) ([]string, []string, error) {
+	roleTable := iamm.Role{}.TableName()
+	memberRoleTable := iamm.MemberRole{}.TableName()
+	var roles []string
+	if err := d.db.WithContext(ctx).
+		Table(roleTable+" r").
+		Select("r.code").
+		Joins("JOIN "+memberRoleTable+" mr ON mr.role_id = r.id").
+		Where("mr.member_id = ?", memberID).
+		Scan(&roles).Error; err != nil {
+		return nil, nil, err
+	}
+	permTable := iamm.Permission{}.TableName()
+	rolePermTable := iamm.RolePermission{}.TableName()
+	var rows []struct {
+		Resource string
+		Action   string
+	}
+	if err := d.db.WithContext(ctx).
+		Table(permTable+" p").
+		Select("p.resource, p.action").
+		Joins("JOIN "+rolePermTable+" rp ON rp.permission_id = p.id").
+		Joins("JOIN "+memberRoleTable+" mr ON mr.role_id = rp.role_id").
+		Where("mr.member_id = ?", memberID).
+		Scan(&rows).Error; err != nil {
+		return roles, nil, err
+	}
+	perms := make([]string, 0, len(rows))
+	for _, row := range rows {
+		code := d.formatPermissionCode(row.Resource, row.Action)
+		if code == "" {
+			continue
+		}
+		perms = append(perms, code)
+	}
+	return roles, perms, nil
+}
+
+func (d *LocalDirectory) issueTokens(userCtx *UserContext) (*AuthTokens, error) {
+	now := time.Now()
+	expires := now.Add(d.accessTTL)
+	claims := authx.PowerXClaims{
+		TenantUUID:      authx.TenantClaim(strings.TrimSpace(userCtx.TenantUUID)),
+		TenantID:        int64(userCtx.TenantID),
+		UserUUID:        strings.TrimSpace(userCtx.UserUUID),
+		UserID:          int64(userCtx.UserID),
+		MemberUUID:      strings.TrimSpace(userCtx.MemberUUID),
+		MemberID:        int64(userCtx.MemberID),
+		MemberIDAlias:   int64(userCtx.MemberID),
+		IsRoot:          userCtx.IsRoot,
+		Roles:           userCtx.Roles,
+		Permissions:     userCtx.Permissions,
+		PermissionCodes: userCtx.Permissions,
+		PolicyVersion:   userCtx.PolicyVersion,
+		PermsHash:       firstNonEmpty(userCtx.PermsHash, permissionCodesHash(userCtx.Permissions)),
+		AuthzSource:     firstNonEmpty(userCtx.AuthzSource, "local_mock"),
+		PluginID:        d.pluginID,
+		Scope:           "access",
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    d.issuer,
+			Audience:  jwt.ClaimStrings{d.audience},
+			Subject:   strings.TrimSpace(userCtx.MemberUUID),
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(expires),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signed, err := token.SignedString(d.hmacSecret)
+	if err != nil {
+		return nil, fmt.Errorf("iam: sign token: %w", err)
+	}
+	refreshToken, err := generateRandomToken()
+	if err != nil {
+		return nil, err
+	}
+	return &AuthTokens{
+		TokenType:     "Bearer",
+		AccessToken:   signed,
+		RefreshToken:  refreshToken,
+		ExpiresIn:     int64(d.accessTTL.Seconds()),
+		Scope:         "access",
+		ExpiresAt:     expires,
+		TenantUUID:    strings.TrimSpace(userCtx.TenantUUID),
+		PluginID:      d.pluginID,
+		PolicyVersion: d.policyVersion,
+		PermsHash:     firstNonEmpty(userCtx.PermsHash, permissionCodesHash(userCtx.Permissions)),
+		AuthzSource:   firstNonEmpty(userCtx.AuthzSource, "local_mock"),
+	}, nil
+}
+
+func permissionCodesHash(codes []string) string {
+	normalized := make([]string, 0, len(codes))
+	for _, code := range codes {
+		code = strings.TrimSpace(strings.ToLower(code))
+		if code != "" {
+			normalized = append(normalized, code)
+		}
+	}
+	sort.Strings(normalized)
+	sum := sha256.Sum256([]byte(strings.Join(normalized, "\n")))
+	return "sha256:" + hex.EncodeToString(sum[:])
+}
+
+func (d *LocalDirectory) ensureIdentityUUIDs(ctx context.Context, user *iamm.User, member *iamm.Member) error {
+	if user == nil || member == nil {
+		return ErrInvalidArguments
+	}
+	if strings.TrimSpace(user.UUID) == "" {
+		user.UUID = uuid.NewString()
+		if err := d.db.WithContext(ctx).Model(user).Update("uuid", user.UUID).Error; err != nil {
+			return err
+		}
+	}
+	if strings.TrimSpace(member.UUID) == "" {
+		member.UUID = uuid.NewString()
+		if err := d.db.WithContext(ctx).Model(member).Update("uuid", member.UUID).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (d *LocalDirectory) persistRefreshToken(ctx context.Context, uc *UserContext, refreshToken string) error {
+	hash := hashToken(refreshToken)
+	rec := &iamm.RefreshToken{
+		TokenHash:  hash,
+		UserID:     uc.UserID,
+		TenantUuid: uc.TenantUuid,
+		UserRecord: uc.MemberID,
+		ExpiresAt:  time.Now().Add(d.refreshTTL),
+	}
+	return d.db.WithContext(ctx).Create(rec).Error
+}
+
+func (d *LocalDirectory) rotateRefreshToken(ctx context.Context, rec *iamm.RefreshToken, uc *UserContext, newToken string) error {
+	return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Delete(&iamm.RefreshToken{}, "id = ?", rec.ID).Error; err != nil {
+			return err
+		}
+		return tx.Create(&iamm.RefreshToken{
+			TokenHash:  hashToken(newToken),
+			UserID:     uc.UserID,
+			TenantUuid: uc.TenantUuid,
+			UserRecord: uc.MemberID,
+			ExpiresAt:  time.Now().Add(d.refreshTTL),
+		}).Error
+	})
+}
+
+func (d *LocalDirectory) revokeRefreshToken(ctx context.Context, token string) error {
+	hash := hashToken(token)
+	return d.db.WithContext(ctx).Delete(&iamm.RefreshToken{}, "token_hash = ?", hash).Error
+}
+
+func tenantIdentifier(tenant *iamm.Tenant) string {
+	if tenant == nil {
+		return ""
+	}
+	if uuid := strings.TrimSpace(tenant.UUID); uuid != "" {
+		return strings.ToLower(uuid)
+	}
+	if key := strings.TrimSpace(tenant.Key); key != "" {
+		return strings.ToLower(key)
+	}
+	return fmt.Sprintf("%d", tenant.ID)
+}
+
+func (d *LocalDirectory) findTenantByIdentifier(ctx context.Context, identifier string) (*iamm.Tenant, error) {
+	search := strings.TrimSpace(identifier)
+	var tenant iamm.Tenant
+	if search != "" {
+		if err := d.db.WithContext(ctx).Where("lower(key) = ?", strings.ToLower(search)).First(&tenant).Error; err == nil {
+			return &tenant, nil
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+	}
+	if id, err := strconv.ParseUint(search, 10, 64); err == nil && id > 0 {
+		if err := d.db.WithContext(ctx).Where("id = ?", id).First(&tenant).Error; err == nil {
+			return &tenant, nil
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+	}
+	return nil, ErrUnauthorized
+}
+
+func (d *LocalDirectory) lookupRefreshToken(ctx context.Context, token string) (*iamm.RefreshToken, error) {
+	hash := hashToken(token)
+	var rec iamm.RefreshToken
+	if err := d.db.WithContext(ctx).Where("token_hash = ?", hash).First(&rec).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrUnauthorized
+		}
+		return nil, err
+	}
+	if rec.ExpiresAt.Before(time.Now()) {
+		_ = d.db.WithContext(ctx).Delete(&iamm.RefreshToken{}, rec.ID).Error
+		return nil, ErrUnauthorized
+	}
+	return &rec, nil
+}
+
+func (d *LocalDirectory) loadSessionPrincipals(ctx context.Context, rec *iamm.RefreshToken) (*iamm.Member, *iamm.User, *iamm.Tenant, error) {
+	tenant, err := d.findTenantByIdentifier(ctx, rec.TenantUuid)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	var member iamm.Member
+	if err := d.db.WithContext(ctx).Where("id = ?", rec.UserRecord).First(&member).Error; err != nil {
+		return nil, nil, nil, err
+	}
+	var user iamm.User
+	if err := d.db.WithContext(ctx).Where("id = ?", rec.UserID).First(&user).Error; err != nil {
+		return nil, nil, nil, err
+	}
+	return &member, &user, tenant, nil
+}
+
+func generateRandomToken() (string, error) {
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "", fmt.Errorf("iam: rand: %w", err)
+	}
+	return hex.EncodeToString(buf), nil
+}
+
+func hashToken(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
+}
+
+func (d *LocalDirectory) formatPermissionCode(resource, action string) string {
+	res := strings.TrimSpace(resource)
+	act := strings.TrimSpace(action)
+	if res == "" || act == "" {
+		return ""
+	}
+	return res + ":" + act
+}
+
+func valueOrDefault(values ...string) string {
+	return firstNonEmpty(values...)
+}
+
+func resolvePluginID() string {
+	envs := []string{
+		os.Getenv("POWERX_PLUGIN_ID"),
+		os.Getenv("PLUGIN_ID"),
+	}
+	for _, candidate := range envs {
+		if trimmed := strings.TrimSpace(candidate); trimmed != "" {
+			return trimmed
+		}
+	}
+	return defaultPluginID
+}

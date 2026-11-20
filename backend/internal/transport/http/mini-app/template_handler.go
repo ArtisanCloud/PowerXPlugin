@@ -1,0 +1,78 @@
+package miniapp
+
+import (
+	"errors"
+	"github.com/google/uuid"
+
+	"github.com/example.com/framework-ci-fixture/backend/internal/contracts"
+	miniappsvc "github.com/example.com/framework-ci-fixture/backend/internal/services/mini-app"
+	"github.com/example.com/framework-ci-fixture/backend/internal/shared/app"
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+)
+
+type TemplateListRequest struct {
+	Page     int    `form:"page,default=1"`
+	PageSize int    `form:"page_size,default=20"`
+	Q        string `form:"q"`
+}
+
+type MiniAppTemplateHandler struct {
+	service *miniappsvc.TemplateService
+}
+
+func NewMiniAppTemplateHandler(deps *app.Deps) *MiniAppTemplateHandler {
+	if deps == nil || deps.DB == nil {
+		return &MiniAppTemplateHandler{service: nil}
+	}
+	return &MiniAppTemplateHandler{service: miniappsvc.NewTemplateService(deps.DB)}
+}
+
+func (h *MiniAppTemplateHandler) ListPublished(c *gin.Context) {
+	if h == nil || h.service == nil {
+		contracts.ResponseServiceUnavailable(c, "template service not available", nil)
+		return
+	}
+	var q TemplateListRequest
+	if err := c.ShouldBindQuery(&q); err != nil {
+		contracts.ResponseBadRequest(c, "invalid query: "+err.Error())
+		return
+	}
+	res, err := h.service.ListPublished(c.Request.Context(), q.Q, q.Page, q.PageSize)
+	if err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, res)
+}
+
+func (h *MiniAppTemplateHandler) GetPublished(c *gin.Context) {
+	if h == nil || h.service == nil {
+		contracts.ResponseServiceUnavailable(c, "template service not available", nil)
+		return
+	}
+	id, err := parseTemplateUUID(c.Param("uuid"))
+	if err != nil {
+		contracts.ResponseBadRequest(c, "invalid id")
+		return
+	}
+	tpl, err := h.service.GetPublishedByUUID(c.Request.Context(), id)
+	if err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			contracts.ResponseNotFound(c, "not found")
+		default:
+			contracts.ResponseInternalError(c, err)
+		}
+		return
+	}
+	contracts.ResponseSuccess(c, tpl)
+}
+
+func parseTemplateUUID(s string) (string, error) {
+	u, err := uuid.Parse(s)
+	if err != nil || u == uuid.Nil || u.String() != s {
+		return "", gorm.ErrInvalidData
+	}
+	return s, nil
+}

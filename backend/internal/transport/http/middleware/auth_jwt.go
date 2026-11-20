@@ -1,0 +1,47 @@
+package middleware
+
+import (
+	"log"
+	"net/http"
+	"os"
+	"strings"
+
+	authx "github.com/example.com/framework-ci-fixture/backend/internal/middleware"
+	"github.com/gin-gonic/gin"
+)
+
+func JWTAuth(cfg authx.JWTAuthConfig) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 第一通道：标准解析（Bearer -> HS256 claims / 或签名上下文）
+		if tc, bearer, ok := authx.ParseFromHeaders(c.GetHeader, cfg); ok {
+			authx.SetTenantContext(c, tc)
+			if strings.TrimSpace(tc.TenantUUID) != "" {
+				c.Request = c.Request.WithContext(authx.ContextWithTenantUUID(c.Request.Context(), tc.TenantUUID))
+				c.Set("tenant_uuid", strings.TrimSpace(tc.TenantUUID))
+			}
+			authx.SetRawBearerToken(c, bearer)
+			c.Next()
+			return
+		}
+
+		if cfg.Optional {
+			c.Next()
+			return
+		}
+
+		rawAuth := c.GetHeader("Authorization")
+		log.Printf("[PLUGIN-JWT-AUTH] JWTAuth failed. cfg{Issuer=%s, AcceptAudiences=%v, Optional=%v}. has_bearer=%t",
+			cfg.Issuer, cfg.AcceptAudiences, cfg.Optional, strings.HasPrefix(strings.ToLower(rawAuth), "bearer "),
+		)
+		if os.Getenv("POWERX_DEBUG_TRAFFIC") == "1" && strings.HasPrefix(strings.ToLower(rawAuth), "bearer ") {
+			tok := strings.TrimSpace(rawAuth[len("Bearer "):])
+			if m, err := decodeJWTClaims(tok); err == nil {
+				log.Printf("[PLUGIN-JWT-AUTH][TOKEN] iss=%v aud=%v sub=%v iat=%v nbf=%v exp=%v",
+					m["iss"], m["aud"], m["sub"], m["iat"], m["nbf"], m["exp"])
+			}
+			log.Printf("[PLUGIN-JWT-AUTH][CFG] issuer=%s audiences=%v secret.len=%d",
+				cfg.Issuer, cfg.AcceptAudiences, len(cfg.HMACSecret))
+		}
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "jwt Unauthorized"})
+	}
+}

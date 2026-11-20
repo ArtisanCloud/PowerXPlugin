@@ -1,0 +1,427 @@
+package integration
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/example.com/framework-ci-fixture/backend/internal/config"
+	domain "github.com/example.com/framework-ci-fixture/backend/internal/entity/models/integration"
+	idrepo "github.com/example.com/framework-ci-fixture/backend/internal/entity/repository/integration"
+	pxlog "github.com/example.com/framework-ci-fixture/backend/internal/logger"
+	obsintegration "github.com/example.com/framework-ci-fixture/backend/internal/observability/integration"
+	"github.com/google/uuid"
+	"gorm.io/datatypes"
+)
+
+// HostInvoker 定义调用宿主接口的抽象。
+type HostInvoker interface {
+	Invoke(ctx context.Context, envelope *domain.IntegrationEnvelope) (*HostInvocationResult, error)
+}
+
+// HostInvocationResult 描述宿主调用的结果。
+type HostInvocationResult struct {
+	Status   string          `json:"status"`
+	Payload  json.RawMessage `json:"payload,omitempty"`
+	Metadata map[string]any  `json:"metadata,omitempty"`
+}
+
+// DispatchOutcome 封装 service 返回给 Handler 的结果。
+type DispatchOutcome struct {
+	Status        string
+	TraceID       string
+	CorrelationID string
+	Replay        bool
+	Latency       time.Duration
+	Payload       json.RawMessage
+	Metadata      map[string]any
+}
+
+// DispatchService orchestrates envelope validation, idempotency, GrantMatrix checks and host invocation.
+type DispatchService struct {
+	cfg            *config.Config
+	grants         *GrantMatrixService
+	idempotency    *idrepo.IdempotencyRepository
+	invoker        HostInvoker
+	logger         *pxlog.Entry
+	now            func() time.Time
+	payloadLimiter int64
+}
+
+// NewDispatchService builds a new service instance.
+func NewDispatchService(
+	cfg *config.Config,
+	grants *GrantMatrixService,
+	idempotency *idrepo.IdempotencyRepository,
+	invoker HostInvoker,
+	logger *pxlog.Entry,
+) *DispatchService {
+	if logger == nil {
+		logger = pxlog.WithComponent("integration.dispatch_service")
+	}
+	payloadThreshold := int64(1 << 20) // default 1 MB
+	if cfg != nil {
+		payloadThreshold = cfg.IntegrationPayloadThreshold()
+	}
+
+	return &DispatchService{
+		cfg:            cfg,
+		grants:         grants,
+		idempotency:    idempotency,
+		invoker:        invoker,
+		logger:         logger,
+		now:            time.Now,
+		payloadLimiter: payloadThreshold,
+	}
+}
+
+// Dispatch validates and executes an integration request.
+func (s *DispatchService) Dispatch(ctx context.Context, channel, resource, action string, envelope *domain.IntegrationEnvelope) (*DispatchOutcome, error) {
+	start := s.now().UTC()
+	channel = strings.ToUpper(strings.TrimSpace(channel))
+
+	if envelope == nil {
+		return nil, errors.New("envelope cannot be nil")
+	}
+
+	if err := envelope.ValidateOrError(start, s.payloadLimiter); err != nil {
+		obsintegration.RecordEnvelope(channel, "invalid")
+		return nil, err
+	}
+
+	if s.grants == nil {
+		obsintegration.RecordEnvelope(channel, "error")
+		return nil, errors.New("grant matrix service not configured")
+	}
+
+	if _, err := s.grants.EnsureAccess(ctx, envelope.ToolScope, channel, resource, action); err != nil {
+		obsintegration.RecordEnvelope(channel, "denied")
+		return nil, err
+	}
+
+	outcome := &DispatchOutcome{
+		Status:        "accepted",
+		TraceID:       envelope.TraceID.String(),
+		CorrelationID: envelope.CorrelationID.String(),
+	}
+
+	replay, err := s.handleIdempotencyClaim(ctx, channel, resource, envelope, outcome)
+	if err != nil {
+		obsintegration.RecordEnvelope(channel, "error")
+		return nil, err
+	}
+	outcome.Replay = replay
+
+	if replay {
+		obsintegration.RecordEnvelope(channel, "accepted")
+		return outcome, nil
+	}
+
+	if s.invoker == nil {
+		obsintegration.RecordEnvelope(channel, "error")
+		return nil, errors.New("dispatch invoker not configured")
+	}
+
+	result, err := s.invoker.Invoke(ctx, envelope)
+	if err != nil {
+		obsintegration.RecordEnvelope(channel, "error")
+		return nil, err
+	}
+	if result != nil {
+		if len(result.Payload) > 0 {
+			outcome.Payload = result.Payload
+		}
+		if len(result.Metadata) > 0 {
+			outcome.Metadata = result.Metadata
+		}
+	}
+
+	if result != nil && strings.TrimSpace(result.Status) != "" {
+		outcome.Status = result.Status
+	}
+	outcome.Latency = time.Since(start)
+	if outcome.Latency < 0 {
+		outcome.Latency = 0
+	}
+
+	if err := s.persistIdempotentResponse(ctx, channel, envelope, outcome, result); err != nil {
+		pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+			"module":      "integration",
+			"biz_scene":   "dispatch_envelope",
+			"biz_domain":  "integration",
+			"component":   "integration.dispatch_service",
+			"tenant_uuid": envelope.TenantUuid,
+			"tool_scope":  envelope.ToolScope,
+			"error":       err.Error(),
+		}), "failed to persist idempotent response")
+	}
+
+	obsintegration.RecordEnvelope(channel, "accepted")
+	return outcome, nil
+}
+
+// InvokeCapability executes a capability owned by this plugin from PowerX Core's
+// local debug callback path. It intentionally does not proxy back to Core.
+func (s *DispatchService) InvokeCapability(ctx context.Context, capabilityID, action string, payload map[string]any, meta map[string]any, tenantUUID string) (*DispatchOutcome, error) {
+	if s == nil {
+		return nil, errors.New("dispatch service unavailable")
+	}
+	if s.invoker == nil {
+		return nil, errors.New("dispatch invoker not configured")
+	}
+	capabilityID = strings.TrimSpace(capabilityID)
+	if capabilityID == "" {
+		return nil, errors.New("capability_id is required")
+	}
+	tenantUUID = strings.TrimSpace(tenantUUID)
+	if tenantUUID == "" {
+		return nil, errors.New("tenant_uuid is required for local capability invoke")
+	}
+	if payload == nil {
+		payload = map[string]any{}
+	}
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("invalid capability payload: %w", err)
+	}
+
+	metadata := make(map[string]any, len(meta)+2)
+	for k, v := range meta {
+		key := strings.TrimSpace(k)
+		if key != "" {
+			metadata[key] = v
+		}
+	}
+	metadata["capability_id"] = capabilityID
+	if strings.TrimSpace(action) != "" {
+		metadata["action"] = strings.TrimSpace(action)
+	}
+
+	traceID := uuid.New()
+	if raw := normalizeMetadataString(metadata["trace_id"]); raw != "" {
+		if parsed, err := uuid.Parse(raw); err == nil {
+			traceID = parsed
+		}
+	}
+	correlationID := traceID
+	if raw := normalizeMetadataString(metadata["correlation_id"]); raw != "" {
+		if parsed, err := uuid.Parse(raw); err == nil {
+			correlationID = parsed
+		}
+	}
+
+	start := s.now().UTC()
+	envelope := &domain.IntegrationEnvelope{
+		MessageID:     uuid.New(),
+		TraceID:       traceID,
+		CorrelationID: correlationID,
+		TenantUuid:    tenantUUID,
+		ToolScope:     inferToolScopeFromCapability(capabilityID, metadata),
+		IssuedAt:      start,
+		PayloadRef:    string(payloadBytes),
+		Metadata:      metadata,
+		Signature:     "powerx-core-local-capability-invoke",
+	}
+	envelope.Normalize()
+
+	result, err := s.invoker.Invoke(ctx, envelope)
+	if err != nil {
+		obsintegration.RecordEnvelope("LOCAL", "error")
+		return nil, err
+	}
+	outcome := &DispatchOutcome{
+		Status:        "accepted",
+		TraceID:       traceID.String(),
+		CorrelationID: correlationID.String(),
+		Latency:       time.Since(start),
+	}
+	if result != nil {
+		if strings.TrimSpace(result.Status) != "" {
+			outcome.Status = result.Status
+		}
+		outcome.Payload = result.Payload
+		outcome.Metadata = result.Metadata
+	}
+	if outcome.Latency < 0 {
+		outcome.Latency = 0
+	}
+	obsintegration.RecordEnvelope("LOCAL", "accepted")
+	return outcome, nil
+}
+
+func inferToolScopeFromCapability(capabilityID string, meta map[string]any) string {
+	if raw := normalizeMetadataString(meta["tool_scope"]); raw != "" {
+		return raw
+	}
+	id := strings.Replace(strings.TrimSpace(capabilityID), ".local.", ".", 1)
+	if idx := strings.LastIndex(id, ".template."); idx >= 0 {
+		action := strings.TrimSpace(id[idx+len(".template."):])
+		if action != "" && !strings.Contains(action, ".") {
+			return "agent.template." + action
+		}
+	}
+	return "capability." + strings.TrimSpace(capabilityID)
+}
+
+func normalizeMetadataString(v any) string {
+	switch value := v.(type) {
+	case string:
+		return strings.TrimSpace(value)
+	case fmt.Stringer:
+		return strings.TrimSpace(value.String())
+	default:
+		return ""
+	}
+}
+
+func (s *DispatchService) handleIdempotencyClaim(
+	ctx context.Context,
+	channel, resource string,
+	envelope *domain.IntegrationEnvelope,
+	outcome *DispatchOutcome,
+) (bool, error) {
+	if envelope.IdempotencyKey == "" || s.idempotency == nil {
+		return false, nil
+	}
+
+	key := buildIdempotencyKey(envelope.TenantUuid, envelope.ToolScope, envelope.IdempotencyKey)
+	metadata := datatypes.JSONMap{
+		"trace_id":       envelope.TraceID.String(),
+		"correlation_id": envelope.CorrelationID.String(),
+		"channel":        channel,
+	}
+
+	record := &domain.IdempotencyRecord{
+		Key:         key,
+		TenantUuid:  envelope.TenantUuid,
+		Scope:       envelope.ToolScope,
+		Operation:   fmt.Sprintf("%s:%s", channel, normalizeResource(resource)),
+		PayloadHash: hashPayloadRef(envelope.PayloadRef),
+		Metadata:    metadata,
+	}
+
+	res, err := s.idempotency.Claim(ctx, record)
+	if err != nil {
+		obsintegration.RecordIdempotency("error")
+		return false, err
+	}
+	if res == nil || res.Record == nil {
+		obsintegration.RecordIdempotency("error")
+		return false, errors.New("idempotency claim returned no record")
+	}
+
+	if res.Status == idrepo.ClaimStatusExisting {
+		obsintegration.RecordIdempotency("hit")
+		outcome.Replay = true
+		outcome.Status = getStoredStatus(res.Record.Response, outcome.Status)
+		if latency := getStoredLatency(res.Record.Response); latency > 0 {
+			outcome.Latency = latency
+		}
+		pxlog.InfoCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+			"module":          "integration",
+			"biz_scene":       "dispatch_idempotency_replay",
+			"biz_domain":      "integration",
+			"component":       "integration.dispatch_service",
+			"idempotency_key": envelope.IdempotencyKey,
+			"tenant_uuid":     envelope.TenantUuid,
+			"tool_scope":      envelope.ToolScope,
+			"channel":         channel,
+		}), "integration dispatch replayed from idempotency record")
+		return true, nil
+	}
+
+	obsintegration.RecordIdempotency("miss")
+	return false, nil
+}
+
+func (s *DispatchService) persistIdempotentResponse(
+	ctx context.Context,
+	channel string,
+	envelope *domain.IntegrationEnvelope,
+	outcome *DispatchOutcome,
+	result *HostInvocationResult,
+) error {
+	if envelope.IdempotencyKey == "" || s.idempotency == nil {
+		return nil
+	}
+
+	payload := map[string]any{
+		"status":     outcome.Status,
+		"latency_ms": outcome.Latency.Milliseconds(),
+		"channel":    channel,
+	}
+	if result != nil {
+		if len(result.Payload) > 0 {
+			payload["payload"] = json.RawMessage(result.Payload)
+		}
+		if len(result.Metadata) > 0 {
+			payload["metadata"] = result.Metadata
+		}
+	}
+
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	_, saveErr := s.idempotency.SaveResponse(
+		ctx,
+		buildIdempotencyKey(envelope.TenantUuid, envelope.ToolScope, envelope.IdempotencyKey),
+		json.RawMessage(raw),
+		map[string]any{
+			"status": outcome.Status,
+		},
+	)
+	return saveErr
+}
+
+func buildIdempotencyKey(tenantID, scope, key string) string {
+	return strings.Join([]string{strings.TrimSpace(tenantID), strings.TrimSpace(scope), strings.TrimSpace(key)}, "|")
+}
+
+func hashPayloadRef(payloadRef string) string {
+	sum := sha256.Sum256([]byte(payloadRef))
+	return hex.EncodeToString(sum[:])
+}
+
+func getStoredStatus(data datatypes.JSON, defaultStatus string) string {
+	if len(data) == 0 {
+		return defaultStatus
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return defaultStatus
+	}
+	if status, ok := payload["status"].(string); ok && status != "" {
+		return status
+	}
+	return defaultStatus
+}
+
+func getStoredLatency(data datatypes.JSON) time.Duration {
+	if len(data) == 0 {
+		return 0
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return 0
+	}
+	if v, ok := payload["latency_ms"]; ok {
+		switch value := v.(type) {
+		case float64:
+			return time.Duration(value) * time.Millisecond
+		case int64:
+			return time.Duration(value) * time.Millisecond
+		case json.Number:
+			if parsed, err := value.Int64(); err == nil {
+				return time.Duration(parsed) * time.Millisecond
+			}
+		}
+	}
+	return 0
+}

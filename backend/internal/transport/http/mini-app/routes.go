@@ -1,0 +1,50 @@
+package miniapp
+
+import (
+	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
+	"github.com/example.com/framework-ci-fixture/backend/internal/contracts"
+	"github.com/example.com/framework-ci-fixture/backend/internal/shared/app"
+	httpmw "github.com/example.com/framework-ci-fixture/backend/internal/transport/http/middleware"
+	"github.com/example.com/framework-ci-fixture/backend/internal/transport/http/mini-app/customerhttp"
+	"github.com/gin-gonic/gin"
+)
+
+// RegisterAPIRoutes registers /mini-app routes.
+// 注意：本阶段仅完成路由组与上下文注入，具体 token 校验逻辑会在后续任务中完善。
+func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {
+	if rg == nil {
+		return
+	}
+
+	base := rg.Group("/mini-app")
+
+	// Auth endpoints (Skeleton/local only) should not require existing customer token.
+	auth := base.Group("/auth")
+	handler := NewCustomerHandler(deps)
+	auth.POST("/register", handler.Register)
+	auth.POST("/login", handler.Login)
+	auth.POST("/validate", handler.Validate)
+	base.POST("/bootstrap/resolve", handler.ResolveBootstrap)
+
+	// Protected mini-app endpoints require a validated customer token.
+	protected := base.Group(
+		"",
+		customerhttp.Authenticate(deps),
+		customerhttp.RequireMembership(deps),
+		httpmw.EnsureTenant(),
+	)
+	protected.GET("/ping", ping)
+
+	templates := NewMiniAppTemplateHandler(deps)
+	protected.GET("/templates", templates.ListPublished)
+	protected.GET("/templates/:uuid", templates.GetPublished)
+}
+
+func ping(c *gin.Context) {
+	tenantUUID, _ := httpmw.TenantUUIDString(c)
+	cc, _ := customerfw.ContextFromGin(c)
+	contracts.ResponseSuccess(c, gin.H{
+		"tenant_uuid": tenantUUID,
+		"customer":    cc,
+	})
+}

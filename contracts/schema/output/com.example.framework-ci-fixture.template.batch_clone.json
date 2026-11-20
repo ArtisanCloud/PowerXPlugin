@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TemplateBatchCloneOutput",
+  "type": "object",
+  "properties": {
+    "created_uuids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "description": "成功克隆出的模板 ID 列表。"
+    },
+    "failed": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "source_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_uuid",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "description": "失败的模板 ID 以及原因。"
+    }
+  },
+  "required": [
+    "created_uuids",
+    "failed"
+  ],
+  "additionalProperties": false
+}

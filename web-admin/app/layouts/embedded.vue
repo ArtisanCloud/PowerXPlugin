@@ -1,0 +1,21 @@
+<script setup lang="ts">
+import { computed } from 'vue';
+import { useRuntimeConfig } from '#imports';
+import { isPowerXEmbedded } from '@artisan-cloud/plugin-framework-client';
+import { useAuth } from '~/composables/useAuth';
+import DelegatedAuthBanner from '~/components/DelegatedAuthBanner.vue';
+const config = useRuntimeConfig();
+const { t } = useI18n();
+const auth = useAuth();
+const insidePowerX = computed(() => isPowerXEmbedded(config.public.insidePowerX));
+const delegatedBannerMessage = computed(() => auth.delegatedError.value || '');
+const showDelegatedBanner = computed(() => insidePowerX.value && Boolean(delegatedBannerMessage.value));
+const handleDelegatedRetry = async () => { try { await auth.restoreFromStorage(); } catch { /* Error is exposed by useAuth. */ } };
+</script>
+<template>
+  <div class="min-h-0">
+    <DelegatedAuthBanner v-if="showDelegatedBanner" :message="delegatedBannerMessage" @retry="handleDelegatedRetry" @dismiss="auth.clearDelegatedError" />
+    <slot v-if="!insidePowerX || auth.isAuthenticated.value" />
+    <p v-else-if="!showDelegatedBanner" class="p-4 text-gray-600 dark:text-slate-200">{{ t('hostSession.loading') }}</p>
+  </div>
+</template>

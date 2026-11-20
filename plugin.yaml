@@ -1,0 +1,183 @@
+id: com.example.framework-ci-fixture
+name: Example Framework Ci Fixture Plugin
+version: 0.1.0
+notification_presentations: []
+description: "PowerX 基础模板插件，提供模板 CRUD、能力注册与多协议暴露示例。"
+runtime:
+  pin_executable: true
+  kind: process
+  entry: backend/bin/plugin
+  env:
+    POWERX_BIND_ADDR: ":__POWERX_DYNAMIC_PORT__"
+    POWERX_PLUGIN_ID: com.example.framework-ci-fixture
+    POWERX_PLUGIN_REGISTRATION_MODE: installed
+    POWERX_PROXY: "1"
+    POWERX_PROVIDER_MODE: delegated
+    POWERX_SECURITY_JWT_AUDIENCE: plugin:com.example.framework-ci-fixture
+backend:
+  entry: backend/bin/plugin
+  # 0 means the PowerX host allocates and injects the runtime port.
+  port: 0
+  health: /healthz
+
+endpoints:
+  http_base_path: /api/v1
+
+catalogs:
+  capabilities: ./plugin.d/capabilities.yaml
+  exposure: ./plugin.d/exposure.yaml
+  agent_tools: ./plugin.d/agent_tools.yaml
+  events: ./plugin.d/events.yaml
+  rbac: ./plugin.d/rbac.yaml
+
+frontend:
+  admin:
+    kind: process
+    process:
+      entry: node
+      args: ["./web-admin/.output/server/index.mjs"]
+      env:
+        NODE_ENV: production
+        NITRO_HOST: 127.0.0.1
+        POWERX_PROXY: "1"
+        NUXT_PUBLIC_INSIDE_POWERX: "1"
+        NUXT_PUBLIC_POWERX_PROVIDER_MODE: delegated
+      health:
+        http: /healthz
+        interval: 5s
+        timeout: 2s
+    static_dir: web-admin/.output/public
+    i18n:
+      dir: web-admin/i18n
+      format: i18next
+      default_namespace: menus
+      namespaces:
+        - menus
+      locales:
+        - zh-CN
+        - en
+    menus:
+      - id: console
+        title: Example Framework Ci Fixture Plugin
+        title_i18n:
+          namespace: menus
+          key: menu.com.example.framework-ci-fixture.template
+          default: Example Framework Ci Fixture Plugin Console
+        icon: i-heroicons-clipboard-document-check
+        path: /intro
+        route: intro
+        order: 20
+        slot: group.plugins
+        required_policies:
+          - menu.console:view
+        children:
+          - id: intro
+            title: Example Framework Ci Fixture Plugin Intro
+            title_i18n:
+              namespace: menus
+              key: menu.com.example.framework-ci-fixture.intro
+              default: Example Framework Ci Fixture Plugin Intro
+            icon: i-heroicons-information-circle
+            path: /intro
+            route: intro
+            order: 1
+          - id: templates
+            title: 模版
+            title_i18n:
+              namespace: menus
+              key: menu.com.example.framework-ci-fixture.templates.title
+              default: Templates
+            icon: i-heroicons-clipboard-document-list
+            path: /templates
+            route: templates
+            order: 2
+            children:
+              - id: develop
+                title: 开发介绍
+                title_i18n:
+                  namespace: menus
+                  key: menu.com.example.framework-ci-fixture.templates.develop
+                  default: Templates Develop Intro
+                icon: i-heroicons-document-text
+                path: /templates/develop
+                route: templates/develop
+                order: 1
+              - id: crud
+                title: 模版 CRUD
+                title_i18n:
+                  namespace: menus
+                  key: menu.com.example.framework-ci-fixture.templates.crud
+                  default: Templates CRUD
+                icon: i-heroicons-wrench
+                path: /templates/crud
+                route: templates/crud
+                order: 2
+              - id: framework_lab
+                title: framework功能测试
+                title_i18n:
+                  namespace: menus
+                  key: menu.com.example.framework-ci-fixture.templates.framework_lab
+                  default: Framework Function Test
+                icon: i-heroicons-beaker
+                path: /admin/templates/framework-lab
+                route: admin/templates/framework-lab
+                order: 3
+                required_policies:
+                  - menu.console.templates.framework_lab:view
+          - id: regression
+            title_i18n:
+              namespace: menus
+              key: menu.com.example.framework-ci-fixture.regression
+            icon: i-heroicons-beaker
+            path: /admin/regression
+            route: admin/regression
+            order: 3
+            required_policies:
+              - menu.console.regression:view
+          - id: powerx
+            title: PowerX底座能力
+            title_i18n:
+              namespace: menus
+              key: menu.com.example.framework-ci-fixture.powerx.title
+              default: Example Framework Ci Fixture Plugin Capabilities
+            icon: i-heroicons-cpu-chip
+            path: /powerx/knowledge-lab
+            route: powerx/knowledge-lab
+            order: 3
+            required_policies:
+              - menu.console.powerx:view
+            children:
+              - id: knowledge_lab
+                title: 知识库调试
+                title_i18n:
+                  namespace: menus
+                  key: menu.com.example.framework-ci-fixture.powerx.knowledge_lab
+                  default: Knowledge Lab
+                icon: i-heroicons-circle-stack
+                path: /powerx/knowledge-lab
+                route: powerx/knowledge-lab
+                order: 1
+                required_policies:
+                  - menu.console.powerx.knowledge_lab:view
+assets:
+  public_dir: ./web-admin/public
+  webAdminPath: ./web-admin/.output
+
+migrations:
+  driver: go
+  entry: backend/bin/migrate
+  args: ["setup"]
+  workdir: ./backend
+  once: true
+  timeout: 60s
+
+checksums:
+  package_sha256: ""
+
+signature:
+  enabled: false
+
+metadata:
+  author: Example Framework Ci Fixture Plugin Team
+  license: MIT
+  icon: icon.svg

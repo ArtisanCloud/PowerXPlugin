@@ -1,0 +1,44 @@
+id: com.example.framework-ci-fixture.template.delete
+type: API
+version: 1.0.0
+title_i18n:
+  zh-CN: 删除模板
+  zh: 删除模板
+  en: Delete Template
+description: "删除模板的原子能力，供 REST/gRPC 使用。"
+description_i18n:
+  zh-CN: 删除模板的原子能力，供 REST/gRPC 使用。
+  zh: 删除模板的原子能力，供 REST/gRPC 使用。
+  en: Delete a template through REST or gRPC entry points.
+rbac:
+  resource: template
+  actions: [delete]
+provides:
+  - id: schema/input/com.example.framework-ci-fixture.template.delete.v1
+    path: schema/input/com.example.framework-ci-fixture.template.delete.json
+    kind: input
+    version: 1.0.0
+  - id: schema/output/com.example.framework-ci-fixture.template.delete.v1
+    path: schema/output/com.example.framework-ci-fixture.template.delete.json
+    kind: output
+    version: 1.0.0
+metadata:
+  agent_response:
+    content: '已删除模板。[查看模板列表](/templates/crud)'
+    links:
+      - kind: template_list
+        label: 查看模板列表
+        href: /templates/crud
+  protocols:
+    rest:
+      method: POST
+      path: /api/v1/integration/capabilities/invoke
+      description: "PowerX Gateway 统一鉴权后的插件能力入口"
+    grpc:
+      service: powerx.template.TemplateService
+      method: DeleteTemplate
+    agent_tool:
+      id: base.template.delete
+      scope: agent.template.delete
+      transport: http
+      endpoint: /api/v1/integration/capabilities/invoke

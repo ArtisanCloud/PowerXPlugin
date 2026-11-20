@@ -1,0 +1,24 @@
+{
+  "providers": {
+    "contract_version": 1,
+    "catalog_kind": "ai_settings",
+    "env": "dev",
+    "modality": "llm",
+    "providers": [
+      { "id": "fixture-cloud", "name": "fixture.core.cloud", "apps": [] },
+      { "id": "ollama", "name": "Ollama (Local)", "apps": [] }
+    ]
+  },
+  "models": {
+    "contract_version": 1,
+    "catalog_kind": "ai_settings",
+    "env": "dev",
+    "modality": "llm",
+    "provider": "ollama",
+    "app": "",
+    "items": [
+      { "model_key": "ollama/private-instance:14b", "provider": "ollama", "model": "private-instance:14b", "label": "private-instance:14b" },
+      { "model_key": "ollama/qwen3:14b", "provider": "ollama", "model": "qwen3:14b", "label": "qwen3:14b" }
+    ]
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "zh": {
+    "DIST_TARGET_PAIR_REQUIRED": "DIST_OS 和 DIST_ARCH 必须成对提供且不能为空。",
+    "DIST_TARGET_INVALID_OS": "不支持的目标系统：{value}；只允许 linux、darwin、windows。",
+    "DIST_TARGET_INVALID_ARCH": "不支持的目标架构：{value}；只允许 amd64、arm64。",
+    "DIST_TARGET_INVALID_PLATFORM": "不支持的 PLATFORM：{value}；Go 构建只支持 host 或 linux。",
+    "DIST_TARGET_INVALID_ARGUMENT": "dist target 命令参数无效。",
+    "DIST_TARGET_SOURCE_OVERWRITE": "产物目录或清单不能覆盖源码清单：{path}。",
+    "DIST_TARGET_INVALID_MANIFEST": "产物清单不是有效的 YAML 对象：{path}。",
+    "DIST_TARGET_YAML_DEPENDENCY": "缺少 yaml 依赖；请先安装前端依赖：{path}。",
+    "DIST_TARGET_BINARY_METADATA": "无法读取 Go 二进制的 GOOS/GOARCH：{path}。",
+    "DIST_TARGET_BINARY_REQUIRED": "Go 产物必须提供至少一个待校验的二进制。",
+    "DIST_TARGET_MANIFEST_MISMATCH": "产物清单的 target 与本次构建目标不一致：{path}。",
+    "DIST_TARGET_BINARY_MISMATCH": "二进制目标不一致：{path}，实际 {actual}，要求 {expected}。",
+    "DIST_TARGET_IO_ERROR": "dist target 文件操作失败：{path}。",
+    "DIST_TARGET_VALID": "目标参数有效：{target}。",
+    "DIST_TARGET_WRITTEN": "已写入产物 target：{target} -> {path}。",
+    "DIST_TARGET_VERIFIED": "产物 target 与二进制校验通过：{target}。"
+  },
+  "en": {
+    "DIST_TARGET_PAIR_REQUIRED": "DIST_OS and DIST_ARCH must be provided together and must not be empty.",
+    "DIST_TARGET_INVALID_OS": "Unsupported target OS: {value}; allowed values are linux, darwin, windows.",
+    "DIST_TARGET_INVALID_ARCH": "Unsupported target architecture: {value}; allowed values are amd64, arm64.",
+    "DIST_TARGET_INVALID_PLATFORM": "Unsupported PLATFORM: {value}; Go builds support host or linux.",
+    "DIST_TARGET_INVALID_ARGUMENT": "Invalid dist target command arguments.",
+    "DIST_TARGET_SOURCE_OVERWRITE": "The artifact directory or manifest must not overwrite the source manifest: {path}.",
+    "DIST_TARGET_INVALID_MANIFEST": "The artifact manifest is not a valid YAML object: {path}.",
+    "DIST_TARGET_YAML_DEPENDENCY": "Missing yaml dependency; install frontend dependencies first: {path}.",
+    "DIST_TARGET_BINARY_METADATA": "Cannot read GOOS/GOARCH from the Go binary: {path}.",
+    "DIST_TARGET_BINARY_REQUIRED": "A Go artifact must provide at least one binary to verify.",
+    "DIST_TARGET_MANIFEST_MISMATCH": "The artifact target does not match this build target: {path}.",
+    "DIST_TARGET_BINARY_MISMATCH": "Binary target mismatch: {path}, actual {actual}, expected {expected}.",
+    "DIST_TARGET_IO_ERROR": "Dist target file operation failed: {path}.",
+    "DIST_TARGET_VALID": "Target parameters are valid: {target}.",
+    "DIST_TARGET_WRITTEN": "Artifact target written: {target} -> {path}.",
+    "DIST_TARGET_VERIFIED": "Artifact target and binary checks passed: {target}."
+  }
+}

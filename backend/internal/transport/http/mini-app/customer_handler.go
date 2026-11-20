@@ -1,0 +1,347 @@
+package miniapp
+
+import (
+	"errors"
+	"net/http"
+	"strings"
+
+	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
+	"github.com/example.com/framework-ci-fixture/backend/internal/contracts"
+	customerrepo "github.com/example.com/framework-ci-fixture/backend/internal/entity/repository/customer"
+	customersvc "github.com/example.com/framework-ci-fixture/backend/internal/services/customer"
+	"github.com/example.com/framework-ci-fixture/backend/internal/shared/app"
+	httpmw "github.com/example.com/framework-ci-fixture/backend/internal/transport/http/middleware"
+	"github.com/gin-gonic/gin"
+)
+
+type CustomerHandler struct {
+	deps      *app.Deps
+	svc       *customersvc.LocalAuthService
+	auth      customerfw.CustomerAuthClient
+	bootstrap customerfw.MiniAppBootstrapClient
+}
+
+func NewCustomerHandler(deps *app.Deps) *CustomerHandler {
+	var svc *customersvc.LocalAuthService
+	if deps != nil && deps.DB != nil {
+		svc = customersvc.NewLocalAuthService(deps.Config, customerrepo.NewRepository(deps.DB))
+	}
+	factory := customersvc.NewAuthenticatorFactory(nil, nil)
+	if deps != nil && deps.Config != nil {
+		factory = customersvc.NewAuthenticatorFactory(deps.Config, nil)
+	}
+	validator := customersvc.NewFrameworkValidator(factory.Build())
+	var auth customerfw.CustomerAuthClient = customersvc.NewLocalFrameworkAuthClient(svc, validator)
+	if deps != nil && deps.CustomerRuntime != nil {
+		auth = deps.CustomerRuntime.AuthClient()
+	} else if (&CustomerHandler{deps: deps}).useDelegate() {
+		// Missing runtime is a configuration error, never a local fallback.
+		auth = (*customerfw.Runtime)(nil).AuthClient()
+	}
+	return &CustomerHandler{deps: deps, svc: svc, auth: auth, bootstrap: customersvc.NewBootstrapAdapter()}
+}
+
+type registerRequest struct {
+	TenantUUID  string         `json:"tenant_uuid"`
+	Email       string         `json:"email"`
+	Phone       string         `json:"phone"`
+	Password    string         `json:"password" binding:"required"`
+	DisplayName string         `json:"display_name"`
+	Nickname    string         `json:"nickname"`
+	GivenName   string         `json:"given_name"`
+	FamilyName  string         `json:"family_name"`
+	AvatarURL   string         `json:"avatar_url"`
+	Locale      string         `json:"locale"`
+	Timezone    string         `json:"timezone"`
+	Metadata    map[string]any `json:"metadata"`
+}
+
+type loginRequest struct {
+	TenantUUID string `json:"tenant_uuid"`
+	Login      string `json:"login"`
+	// Identifier is a backward-compatible alias of "login" (email or phone).
+	Identifier string `json:"identifier"`
+	Password   string `json:"password"`
+}
+
+type validateRequest struct {
+	Token string `json:"token"`
+}
+
+type bootstrapResolveRequest struct {
+	Scene      string            `json:"scene"`
+	InviteCode string            `json:"invite_code"`
+	OrgCode    string            `json:"org_code"`
+	TenantHint string            `json:"tenant_hint"`
+	Channel    string            `json:"channel"`
+	Metadata   map[string]string `json:"metadata"`
+}
+
+func (h *CustomerHandler) Register(c *gin.Context) {
+	if h == nil {
+		contracts.ResponseInternalError(c, errors.New("customer service unavailable"))
+		return
+	}
+
+	var req registerRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "invalid request payload")
+		return
+	}
+
+	tenantUUID, ok, err := resolveTenantFromHeaderOrBodyOptional(c, req.TenantUUID)
+	if err != nil {
+		contracts.ResponseError(c, http.StatusForbidden, contracts.ErrCodeTenantMismatch, err.Error())
+		return
+	}
+	if !ok || strings.TrimSpace(tenantUUID) == "" {
+		contracts.ResponseBadRequest(c, "tenant_uuid is required")
+		return
+	}
+
+	var out any
+	if h.useDelegate() {
+		out, err = h.auth.Register(c.Request.Context(), customerfw.RegisterInput{
+			TenantUUID: tenantUUID,
+			Identifier: firstNonEmpty(req.Email, req.Phone),
+			Password:   req.Password,
+			Profile: customerfw.CustomerAttributes{
+				DisplayName: strings.TrimSpace(req.DisplayName),
+				Nickname:    strings.TrimSpace(req.Nickname),
+				GivenName:   strings.TrimSpace(req.GivenName),
+				FamilyName:  strings.TrimSpace(req.FamilyName),
+				AvatarURL:   strings.TrimSpace(req.AvatarURL),
+				Locale:      strings.TrimSpace(req.Locale),
+				Timezone:    strings.TrimSpace(req.Timezone),
+			},
+			Attributes: req.Metadata,
+		})
+	} else if h.svc != nil {
+		out, err = h.svc.Register(c.Request.Context(), customersvc.RegisterInput{
+			TenantUUID:  tenantUUID,
+			Email:       req.Email,
+			Phone:       req.Phone,
+			Password:    req.Password,
+			DisplayName: strings.TrimSpace(req.DisplayName),
+			Nickname:    strings.TrimSpace(req.Nickname),
+			GivenName:   strings.TrimSpace(req.GivenName),
+			FamilyName:  strings.TrimSpace(req.FamilyName),
+			AvatarURL:   strings.TrimSpace(req.AvatarURL),
+			Locale:      strings.TrimSpace(req.Locale),
+			Timezone:    strings.TrimSpace(req.Timezone),
+			Metadata:    req.Metadata,
+		})
+	} else {
+		err = errors.New("customer service unavailable")
+	}
+	if err != nil {
+		switch {
+		case h.useDelegate():
+			writeFrameworkCustomerError(c, err)
+		case errors.Is(err, customerrepo.ErrCustomerExists):
+			contracts.ResponseError(c, http.StatusConflict, contracts.ErrCodeConflict, "customer already exists")
+		case errors.Is(err, customersvc.ErrCustomerMode):
+			contracts.ResponseNotFound(c, "customer register is only available in local mode")
+		default:
+			contracts.ResponseBadRequest(c, err.Error())
+		}
+		return
+	}
+
+	contracts.ResponseSuccess(c, out)
+}
+
+func (h *CustomerHandler) Login(c *gin.Context) {
+	if h == nil {
+		contracts.ResponseInternalError(c, errors.New("customer service unavailable"))
+		return
+	}
+
+	var req loginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "invalid request payload")
+		return
+	}
+
+	login := strings.TrimSpace(req.Login)
+	if login == "" {
+		login = strings.TrimSpace(req.Identifier)
+	}
+	password := req.Password
+	if login == "" || strings.TrimSpace(password) == "" {
+		contracts.ResponseBadRequest(c, "invalid request payload")
+		return
+	}
+
+	tenantUUID, _, err := resolveTenantFromHeaderOrBodyOptional(c, req.TenantUUID)
+	if err != nil {
+		contracts.ResponseError(c, http.StatusForbidden, contracts.ErrCodeTenantMismatch, err.Error())
+		return
+	}
+
+	var out any
+	if h.useDelegate() {
+		out, err = h.auth.Login(c.Request.Context(), customerfw.LoginInput{
+			TenantUUID: tenantUUID,
+			Identifier: login,
+			Password:   password,
+		})
+	} else if h.svc != nil {
+		out, err = h.svc.Login(c.Request.Context(), customersvc.LoginInput{
+			TenantUUID: tenantUUID,
+			Login:      login,
+			Password:   password,
+		})
+	} else {
+		err = errors.New("customer service unavailable")
+	}
+	if err != nil {
+		var selectionErr *customersvc.TenantSelectionRequiredError
+		if h.useDelegate() {
+			writeFrameworkCustomerError(c, err)
+			return
+		}
+		if errors.As(err, &selectionErr) {
+			tenants := make([]map[string]string, 0, len(selectionErr.Tenants))
+			for _, t := range selectionErr.Tenants {
+				tt := strings.TrimSpace(t)
+				if tt == "" {
+					continue
+				}
+				tenants = append(tenants, map[string]string{"tenant_uuid": tt})
+			}
+			contracts.ResponseErrorWithDetails(c, http.StatusConflict, contracts.ErrCodeTenantSelectionRequired, "tenant selection required", gin.H{
+				"tenants": tenants,
+			})
+			return
+		}
+		switch {
+		case errors.Is(err, customersvc.ErrInvalidCredentials):
+			contracts.ResponseUnauthorized(c, "invalid credentials")
+		case errors.Is(err, customersvc.ErrCustomerDisabled):
+			contracts.ResponseError(c, http.StatusLocked, "CUSTOMER_DISABLED", "customer account disabled")
+		case errors.Is(err, customersvc.ErrCustomerDeleted):
+			contracts.ResponseUnauthorized(c, "invalid credentials")
+		case errors.Is(err, customersvc.ErrCustomerMode):
+			contracts.ResponseNotFound(c, "customer login is only available in local mode")
+		default:
+			contracts.ResponseInternalError(c, err)
+		}
+		return
+	}
+
+	contracts.ResponseSuccess(c, out)
+}
+
+func (h *CustomerHandler) Validate(c *gin.Context) {
+	if h == nil || h.auth == nil {
+		contracts.ResponseInternalError(c, errors.New("customer service unavailable"))
+		return
+	}
+	var req validateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "invalid request payload")
+		return
+	}
+	token := strings.TrimSpace(req.Token)
+	if token == "" {
+		token = bearerFromHeader(c.GetHeader("Authorization"))
+	}
+	if token == "" {
+		contracts.ResponseUnauthorized(c, "customer token missing")
+		return
+	}
+	cc, err := h.auth.Validate(c.Request.Context(), token)
+	if err != nil {
+		writeFrameworkCustomerError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{"context": cc})
+}
+
+func (h *CustomerHandler) ResolveBootstrap(c *gin.Context) {
+	if h == nil || h.bootstrap == nil {
+		contracts.ResponseInternalError(c, errors.New("customer bootstrap unavailable"))
+		return
+	}
+	var req bootstrapResolveRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "invalid request payload")
+		return
+	}
+	metadata := req.Metadata
+	if metadata == nil {
+		metadata = map[string]string{}
+	}
+	if strings.TrimSpace(req.TenantHint) != "" {
+		metadata["tenant_uuid"] = strings.TrimSpace(req.TenantHint)
+	}
+	out, err := h.bootstrap.ResolveEntry(c.Request.Context(), customerfw.BootstrapInput{
+		Scene:      req.Scene,
+		InviteCode: req.InviteCode,
+		OrgCode:    req.OrgCode,
+		Channel:    req.Channel,
+		Metadata:   metadata,
+	})
+	if err != nil {
+		writeFrameworkCustomerError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, out)
+}
+
+func resolveTenantFromHeaderOrBodyOptional(c *gin.Context, bodyTenantUUID string) (string, bool, error) {
+	headerTenantUUID, ok := httpmw.TenantUUIDString(c)
+	bodyTenantUUID = strings.ToLower(strings.TrimSpace(bodyTenantUUID))
+	if ok && strings.TrimSpace(headerTenantUUID) != "" {
+		headerTenantUUID = strings.ToLower(strings.TrimSpace(headerTenantUUID))
+		if bodyTenantUUID == "" {
+			return headerTenantUUID, true, nil
+		}
+		if bodyTenantUUID != headerTenantUUID {
+			return "", false, errors.New("tenant mismatch")
+		}
+		return headerTenantUUID, true, nil
+	}
+
+	if bodyTenantUUID == "" {
+		return "", false, nil
+	}
+	return bodyTenantUUID, true, nil
+}
+
+func writeFrameworkCustomerError(c *gin.Context, err error) {
+	contracts.ResponseErrorWithReason(c, customerfw.HTTPStatus(err), string(customerfw.CodeOf(err)), customerfw.ReasonOf(err))
+}
+
+func bearerFromHeader(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if strings.HasPrefix(strings.ToLower(raw), "bearer ") {
+		return strings.TrimSpace(raw[len("Bearer "):])
+	}
+	return ""
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
+func (h *CustomerHandler) useDelegate() bool {
+	if h != nil && h.deps != nil {
+		if h.deps.CustomerRuntime != nil {
+			return h.deps.CustomerRuntime.Mode() == provider.ModeDelegated
+		}
+		if h.deps.ProviderMode == provider.ModeDelegated {
+			return true
+		}
+	}
+	return h != nil && h.deps != nil && h.deps.Config != nil && h.deps.Config.CustomerAuth != nil &&
+		strings.TrimSpace(strings.ToLower(h.deps.Config.CustomerAuth.Mode)) != "local" &&
+		strings.TrimSpace(strings.ToLower(h.deps.Config.CustomerAuth.Mode)) != "local_dev"
+}

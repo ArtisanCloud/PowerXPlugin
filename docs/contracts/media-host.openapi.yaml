@@ -1,0 +1,141 @@
+openapi: 3.0.3
+info: {title: PowerX Tenant Media Host Contract, version: 1.0.0}
+servers: [{url: /api/v1}]
+security: [{bearerAuth: []}, {apiKeyAuth: []}]
+paths:
+  /tenant/media/assets:
+    get: {operationId: listTenantMediaAssets, responses: {'200': {$ref: '#/components/responses/AssetList'}, '401': {$ref: '#/components/responses/Unauthorized'}, '403': {$ref: '#/components/responses/Forbidden'}}}
+    post:
+      operationId: createTenantMediaAsset
+      description: >-
+        Content-checksum deduplication is tenant scoped. A matching failed or expired upload
+        starts a new pending_upload attempt under a row lock only when size, MIME and checksum
+        match the original constraints. Failure history and ownership remain intact, and old
+        transfer tickets are revoked. Ready assets are reused without reopening upload.
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AssetCreate'}}}}
+      responses: {'201': {$ref: '#/components/responses/Asset'}, '400': {$ref: '#/components/responses/InvalidArgument'}, '401': {$ref: '#/components/responses/Unauthorized'}, '403': {$ref: '#/components/responses/Forbidden'}, '409': {$ref: '#/components/responses/StateInvalid'}}
+  /tenant/media/assets/{asset_uuid}:
+    parameters: [{$ref: '#/components/parameters/AssetUUID'}]
+    get: {operationId: getTenantMediaAsset, responses: {'200': {$ref: '#/components/responses/Asset'}, '401': {$ref: '#/components/responses/Unauthorized'}, '403': {$ref: '#/components/responses/Forbidden'}, '404': {$ref: '#/components/responses/NotFound'}}}
+    patch:
+      operationId: updateTenantMediaAsset
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AssetUpdate'}}}}
+      responses: {'200': {$ref: '#/components/responses/Asset'}, '400': {$ref: '#/components/responses/InvalidArgument'}, '401': {$ref: '#/components/responses/Unauthorized'}, '403': {$ref: '#/components/responses/Forbidden'}, '404': {$ref: '#/components/responses/NotFound'}}
+    delete: {operationId: deleteTenantMediaAsset, responses: {'204': {description: Deleted and transfer tickets revoked.}, '401': {$ref: '#/components/responses/Unauthorized'}, '403': {$ref: '#/components/responses/Forbidden'}, '404': {$ref: '#/components/responses/NotFound'}}}
+  /tenant/media/assets/{asset_uuid}/presign-upload:
+    post: {operationId: presignTenantMediaAssetUpload, parameters: [{$ref: '#/components/parameters/AssetUUID'}], responses: {'200': {$ref: '#/components/responses/Ticket'}, '409': {$ref: '#/components/responses/StateInvalid'}}}
+  /tenant/media/assets/{asset_uuid}/complete-upload:
+    post:
+      operationId: completeTenantMediaAssetUpload
+      description: >-
+        Verifies stored bytes, size and SHA256. MIME parameters are normalized; Markdown and CSV
+        must contain plain text. XLSX, DOCX and PPTX require bounded ZIP directory, content-type
+        and main XML validation. Office limits are 64 MiB compressed, 4096 entries, 512 MiB total
+        declared expanded size, 256 KiB content-type XML and 4 MiB main XML. Failure returns 422
+        and preserves diagnostics; a new create request with the same constraints can retry.
+      parameters: [{$ref: '#/components/parameters/AssetUUID'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CompleteUpload'}}}}
+      responses: {'200': {$ref: '#/components/responses/Asset'}, '422': {$ref: '#/components/responses/UploadValidationFailed'}, '409': {$ref: '#/components/responses/StateInvalid'}}
+  /tenant/media/assets/{asset_uuid}/presign-download:
+    post: {operationId: presignTenantMediaAssetDownload, parameters: [{$ref: '#/components/parameters/AssetUUID'}], responses: {'200': {$ref: '#/components/responses/Ticket'}, '404': {$ref: '#/components/responses/NotFound'}, '409': {$ref: '#/components/responses/StateInvalid'}}}
+  /tenant/media/assets/{asset_uuid}/variants:
+    post:
+      operationId: createTenantMediaAssetVariant
+      description: Matching failed or expired variants can start a new pending_upload attempt with unchanged checksum, MIME and size; old tickets are revoked and failure history is retained.
+      parameters: [{$ref: '#/components/parameters/AssetUUID'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/VariantCreate'}}}}
+      responses: {'201': {$ref: '#/components/responses/Variant'}, '400': {$ref: '#/components/responses/InvalidArgument'}, '403': {$ref: '#/components/responses/Forbidden'}, '404': {$ref: '#/components/responses/NotFound'}, '409': {$ref: '#/components/responses/StateInvalid'}}
+  /tenant/media/assets/variants/{variant_uuid}:
+    get: {operationId: getTenantMediaAssetVariant, parameters: [{$ref: '#/components/parameters/VariantUUID'}], responses: {'200': {$ref: '#/components/responses/Variant'}, '401': {$ref: '#/components/responses/Unauthorized'}, '403': {$ref: '#/components/responses/Forbidden'}, '404': {$ref: '#/components/responses/NotFound'}}}
+  /media/transfers/{asset_uuid}/upload:
+    put: {security: [], operationId: uploadMediaAssetByTicket, parameters: [{$ref: '#/components/parameters/AssetUUID'}, {$ref: '#/components/parameters/Ticket'}, {$ref: '#/components/parameters/Expiry'}, {$ref: '#/components/parameters/Version'}], responses: {'204': {description: Stored; complete-upload still required.}, '422': {$ref: '#/components/responses/UploadValidationFailed'}, '404': {$ref: '#/components/responses/NotFound'}, '409': {$ref: '#/components/responses/StateInvalid'}}}
+  /media/transfers/{asset_uuid}/download:
+    get: {security: [], operationId: downloadMediaAssetByTicket, parameters: [{$ref: '#/components/parameters/AssetUUID'}, {$ref: '#/components/parameters/Ticket'}, {$ref: '#/components/parameters/Expiry'}, {$ref: '#/components/parameters/Version'}], responses: {'200': {description: Media bytes}, '404': {$ref: '#/components/responses/NotFound'}, '409': {$ref: '#/components/responses/StateInvalid'}}}
+  /tenant/media/assets/{asset_uuid}/variants/{variant_uuid}/presign-upload:
+    parameters: [{$ref: '#/components/parameters/AssetUUID'}, {$ref: '#/components/parameters/VariantUUID'}]
+    post:
+      operationId: presignTenantMediaVariantUpload
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/VariantPresign'}}}}
+      responses: {'200': {$ref: '#/components/responses/VariantTicket'}, '400': {$ref: '#/components/responses/InvalidArgument'}, '401': {$ref: '#/components/responses/Unauthorized'}, '403': {$ref: '#/components/responses/Forbidden'}, '404': {$ref: '#/components/responses/NotFound'}, '409': {$ref: '#/components/responses/StateInvalid'}, '422': {$ref: '#/components/responses/UploadValidationFailed'}, '503': {$ref: '#/components/responses/UpstreamDependency'}}
+  /tenant/media/assets/{asset_uuid}/variants/{variant_uuid}/complete-upload:
+    parameters: [{$ref: '#/components/parameters/AssetUUID'}, {$ref: '#/components/parameters/VariantUUID'}]
+    post:
+      operationId: completeTenantMediaVariantUpload
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CompleteUpload'}}}}
+      responses: {'200': {$ref: '#/components/responses/VariantCompletion'}, '400': {$ref: '#/components/responses/InvalidArgument'}, '401': {$ref: '#/components/responses/Unauthorized'}, '403': {$ref: '#/components/responses/Forbidden'}, '404': {$ref: '#/components/responses/NotFound'}, '409': {$ref: '#/components/responses/StateInvalid'}, '422': {$ref: '#/components/responses/UploadValidationFailed'}, '503': {$ref: '#/components/responses/UpstreamDependency'}}
+  /tenant/media/assets/{asset_uuid}/variants/{variant_uuid}/presign-download:
+    parameters: [{$ref: '#/components/parameters/AssetUUID'}, {$ref: '#/components/parameters/VariantUUID'}]
+    post:
+      operationId: presignTenantMediaVariantDownload
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/VariantPresign'}}}}
+      responses: {'200': {$ref: '#/components/responses/VariantTicket'}, '400': {$ref: '#/components/responses/InvalidArgument'}, '401': {$ref: '#/components/responses/Unauthorized'}, '403': {$ref: '#/components/responses/Forbidden'}, '404': {$ref: '#/components/responses/NotFound'}, '409': {$ref: '#/components/responses/StateInvalid'}, '422': {$ref: '#/components/responses/UploadValidationFailed'}, '503': {$ref: '#/components/responses/UpstreamDependency'}}
+  /media/transfers/{asset_uuid}/variants/{variant_uuid}/upload:
+    parameters: [{$ref: '#/components/parameters/AssetUUID'}, {$ref: '#/components/parameters/VariantUUID'}, {$ref: '#/components/parameters/Ticket'}, {$ref: '#/components/parameters/Expiry'}, {$ref: '#/components/parameters/Version'}, {$ref: '#/components/parameters/ParentVersion'}]
+    put:
+      security: []
+      operationId: uploadMediaVariantByTicket
+      responses: {'204': {description: MEDIA_VARIANT_TRANSFER}, '400': {$ref: '#/components/responses/InvalidArgument'}, '404': {$ref: '#/components/responses/NotFound'}, '409': {$ref: '#/components/responses/StateInvalid'}, '422': {$ref: '#/components/responses/UploadValidationFailed'}, '503': {$ref: '#/components/responses/UpstreamDependency'}}
+  /media/transfers/{asset_uuid}/variants/{variant_uuid}/download:
+    parameters: [{$ref: '#/components/parameters/AssetUUID'}, {$ref: '#/components/parameters/VariantUUID'}, {$ref: '#/components/parameters/Ticket'}, {$ref: '#/components/parameters/Expiry'}, {$ref: '#/components/parameters/Version'}, {$ref: '#/components/parameters/ParentVersion'}]
+    get:
+      security: []
+      operationId: downloadMediaVariantByTicket
+      responses: {'200': {description: MEDIA_VARIANT_TRANSFER}, '400': {$ref: '#/components/responses/InvalidArgument'}, '404': {$ref: '#/components/responses/NotFound'}, '409': {$ref: '#/components/responses/StateInvalid'}, '422': {$ref: '#/components/responses/UploadValidationFailed'}, '503': {$ref: '#/components/responses/UpstreamDependency'}}
+components:
+  securitySchemes:
+    bearerAuth: {type: http, scheme: bearer}
+    apiKeyAuth: {type: apiKey, in: header, name: X-API-Key}
+  parameters:
+    ParentVersion: {name: parent_version, in: query, required: true, schema: {type: integer, minimum: 1}}
+    AssetUUID: {name: asset_uuid, in: path, required: true, schema: {type: string, format: uuid}}
+    VariantUUID: {name: variant_uuid, in: path, required: true, schema: {type: string, format: uuid}}
+    Ticket: {name: ticket, in: query, required: true, schema: {type: string}}
+    Expiry: {name: exp, in: query, required: true, schema: {type: integer}}
+    Version: {name: version, in: query, required: true, schema: {type: integer}}
+  schemas:
+    AssetCreate:
+      type: object
+      additionalProperties: false
+      required: [name, mime_type, size_bytes, checksum]
+      properties: {name: {type: string}, mime_type: {type: string}, size_bytes: {type: integer, format: int64}, checksum: {type: string}}
+    AssetUpdate: {type: object, additionalProperties: false, properties: {name: {type: string}, tags: {type: array, items: {type: string}}}}
+    CompleteUpload: {type: object, additionalProperties: false, required: [checksum], properties: {checksum: {type: string}}}
+    VariantCreate:
+      description: 'thumbnail_64 requires JPEG/PNG, 1..32768 bytes and decoded width/height <=64. Core-generated variants can be reused; consume the returned MIME and size.'
+      type: object
+      additionalProperties: false
+      required: [variant_type, mime_type, size_bytes, checksum]
+      properties: {variant_type: {type: string, enum: [preview, thumbnail, thumbnail_64]}, name: {type: string}, mime_type: {type: string}, size_bytes: {type: integer, format: int64, minimum: 1}, checksum: {type: string, pattern: '^[a-fA-F0-9]{64}$'}}
+    VariantPresign: {type: object, additionalProperties: false, properties: {expires_in_seconds: {type: integer, minimum: 60, maximum: 3600, default: 900}}}
+    Asset:
+      type: object
+      required: [asset_uuid, name, size_bytes, mime_type, status]
+      properties:
+        asset_uuid: {type: string, format: uuid}
+        name: {type: string}
+        size_bytes: {type: integer, format: int64}
+        mime_type: {type: string}
+        owner_subject_uuid: {type: string, format: uuid}
+        status: {type: string, enum: [pending_upload, uploaded, ready, failed, deleted], description: 原图上传状态；预览失败不改变此字段}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+        derivatives: {$ref: './image-derivatives.openapi.yaml#/components/schemas/ImageDerivatives'}
+    Variant:
+      type: object
+      required: [variant_uuid, asset_uuid, mime_type, size_bytes, status]
+      properties: {variant_uuid: {type: string, format: uuid}, asset_uuid: {type: string, format: uuid}, name: {type: string}, mime_type: {type: string}, size_bytes: {type: integer, format: int64}, status: {type: string, enum: [pending_upload, uploaded, ready, failed, deleted]}, completed_at: {type: string, format: date-time, nullable: true}}
+    Ticket: {type: object, properties: {url: {type: string, format: uri}, method: {type: string, enum: [GET, PUT]}, expires_at: {type: string, format: date-time}, headers: {type: object, additionalProperties: {type: string}}}}
+  responses:
+    VariantTicket: {description: MEDIA_TRANSFER_TICKET, content: {application/json: {schema: {type: object, required: [data], properties: {data: {$ref: '#/components/schemas/Ticket'}}}}}}
+    VariantCompletion: {description: MEDIA_VARIANT_READY, content: {application/json: {schema: {type: object, required: [data], properties: {data: {type: object, required: [asset_uuid, variant_uuid, status, completed_at], properties: {asset_uuid: {type: string, format: uuid}, variant_uuid: {type: string, format: uuid}, status: {type: string, enum: [ready]}, completed_at: {type: string, format: date-time}}}}}}}}
+    UpstreamDependency: {description: MEDIA_UPSTREAM_DEPENDENCY}
+    Asset: {description: Media asset, content: {application/json: {schema: {$ref: '#/components/schemas/Asset'}}}}
+    AssetList: {description: Media assets, content: {application/json: {schema: {type: object, properties: {items: {type: array, items: {$ref: '#/components/schemas/Asset'}}, total: {type: integer}, page: {type: integer}, page_size: {type: integer}}}}}}
+    Variant: {description: Media variant, content: {application/json: {schema: {$ref: '#/components/schemas/Variant'}}}}
+    Ticket: {description: Temporary transfer ticket, content: {application/json: {schema: {$ref: '#/components/schemas/Ticket'}}}}
+    InvalidArgument: {description: MEDIA_INVALID_ARGUMENT}
+    Unauthorized: {description: MEDIA_UNAUTHORIZED}
+    Forbidden: {description: MEDIA_FORBIDDEN}
+    NotFound: {description: MEDIA_ASSET_NOT_FOUND}
+    StateInvalid: {description: MEDIA_ASSET_STATE_INVALID}
+    UploadValidationFailed: {description: MEDIA_UPLOAD_VALIDATION_FAILED}

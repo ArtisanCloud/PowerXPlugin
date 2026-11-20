@@ -1,0 +1,9 @@
+{
+  "recommendations": [
+    "golang.go",
+    "vue.volar",
+    "nuxtr.nuxtr-vscode",
+    "ms-python.python",
+    "dbaeumer.vscode-eslint"
+  ]
+}

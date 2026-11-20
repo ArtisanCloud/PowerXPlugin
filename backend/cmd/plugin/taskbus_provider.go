@@ -1,0 +1,197 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"strings"
+	"time"
+
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/event"
+	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
+	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
+	fwtaskbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/taskbus"
+	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
+	"github.com/example.com/framework-ci-fixture/backend/internal/config"
+	"github.com/example.com/framework-ci-fixture/backend/internal/grpc/client"
+	pxlog "github.com/example.com/framework-ci-fixture/backend/internal/logger"
+)
+
+type notConfiguredTaskBusProvider struct {
+	reason string
+}
+
+func (p notConfiguredTaskBusProvider) NewEmitter() (fweventbridge.Emitter, error) {
+	reason := strings.TrimSpace(p.reason)
+	if reason == "" {
+		reason = "taskbus provider is not configured"
+	}
+	return nil, errors.New(reason)
+}
+
+type taskBusRuntime struct {
+	Provider      fweventbridge.TaskBusProvider
+	StartConsumer func(ctx context.Context)
+}
+
+func resolveTaskBusRuntime(cfg *config.Config, wsHub fwwsbus.LocalHub, log *pxlog.Entry, pxc *client.PowerXServiceClient, descriptors []frameworkrealtime.Descriptor) taskBusRuntime {
+	mode := resolveTaskBusProviderMode(cfg)
+	switch mode {
+	case "host":
+		return taskBusRuntime{
+			Provider: newHostTaskBusProvider(cfg, pxc),
+		}
+	case "redis":
+		return taskBusRuntime{
+			Provider:      newRedisTaskBusProvider(cfg),
+			StartConsumer: newRedisConsumerStarter(cfg, wsHub, log, descriptors),
+		}
+	default:
+		if log != nil {
+			log.WithField("provider_mode", mode).Warn("unknown taskbus provider mode")
+		}
+		return taskBusRuntime{
+			Provider: notConfiguredTaskBusProvider{reason: "unknown taskbus provider mode"},
+		}
+	}
+}
+
+func resolveTaskBusProvider(cfg *config.Config, log *pxlog.Entry) fweventbridge.TaskBusProvider {
+	return resolveTaskBusRuntime(cfg, nil, log, nil, nil).Provider
+}
+
+func resolveTaskBusProviderMode(cfg *config.Config) string {
+	return resolveTaskBusProviderModeByProxy(cfg, "")
+}
+
+func resolveTaskBusProviderModeByProxy(cfg *config.Config, powerXProxy string) string {
+	if strings.TrimSpace(powerXProxy) == "1" {
+		return "host"
+	}
+	if cfg != nil && cfg.EventBridge != nil {
+		providerMode := strings.ToLower(strings.TrimSpace(cfg.EventBridge.TaskBusProvider))
+		if providerMode != "" {
+			return providerMode
+		}
+	}
+	return "redis"
+}
+
+func validateTaskBusProviderConflict(cfg *config.Config, powerXProxy string) error {
+	if cfg == nil || cfg.EventBridge == nil {
+		return nil
+	}
+	resolved := resolveTaskBusProviderModeByProxy(cfg, powerXProxy)
+	if strings.TrimSpace(cfg.EventBridge.TaskBusProvider) != resolved {
+		cfg.EventBridge.TaskBusProvider = resolved
+	}
+	return nil
+}
+
+func newHostTaskBusProvider(cfg *config.Config, pxc *client.PowerXServiceClient) fweventbridge.TaskBusProvider {
+	gateway := &config.GatewayConfig{}
+	eventCfg := &config.EventBridgeConfig{}
+	if cfg != nil {
+		if cfg.Gateway != nil {
+			gateway = cfg.Gateway
+		}
+		if cfg.EventBridge != nil {
+			eventCfg = cfg.EventBridge
+		}
+	}
+	hostCfg := fwtaskbus.HostProviderConfig{
+		BaseURL:          strings.TrimSpace(gateway.BaseURL),
+		TopicBindings:    eventCfg.TopicBindings,
+		PublishTopicKeys: append([]string(nil), eventCfg.PublishTopicKeys...),
+		ConsumeTopicKeys: append([]string(nil), eventCfg.ConsumeTopicKeys...),
+		APIPrefix:        strings.TrimSpace(gateway.APIPrefix),
+		AuthScheme:       strings.ToLower(strings.TrimSpace(gateway.AuthScheme)),
+		APIKey:           strings.TrimSpace(gateway.APIKey),
+		UserAgent:        strings.TrimSpace(gateway.UserAgent),
+		Timeout:          gateway.Timeout,
+		SourcePlugin:     strings.TrimSpace(eventCfg.SourcePlugin),
+		PayloadVersion:   strings.TrimSpace(eventCfg.PayloadVersion),
+	}
+	if cfg != nil && cfg.GRPCUpstream != nil {
+		hostCfg.TenantUUID = cfg.GRPCUpstream.TenantUUID
+	}
+	switch hostCfg.AuthScheme {
+	case "api_key", "api-key":
+		hostCfg.AuthScheme = "apikey"
+	}
+	if hostCfg.AuthScheme != "apikey" && cfg != nil && cfg.Context != nil && strings.EqualFold(strings.TrimSpace(cfg.Context.ProviderMode), "delegated") {
+		hostCfg.TokenProvider = client.NewPowerXSTSTokenProvider(pxc).TokenFunc()
+	}
+	return fwtaskbus.NewHostProvider(hostCfg)
+}
+
+func newRedisTaskBusProvider(cfg *config.Config) fweventbridge.TaskBusProvider {
+	eventCfg := &config.EventBridgeConfig{}
+	if cfg != nil && cfg.EventBridge != nil {
+		eventCfg = cfg.EventBridge
+	}
+	return fwtaskbus.NewRedisProvider(fwtaskbus.RedisProviderConfig{
+		RedisURL:       strings.TrimSpace(eventCfg.RedisURL),
+		StreamKey:      strings.TrimSpace(eventCfg.RedisStream),
+		SourcePlugin:   strings.TrimSpace(eventCfg.SourcePlugin),
+		PayloadVersion: strings.TrimSpace(eventCfg.PayloadVersion),
+		MaxLenApprox:   eventCfg.RedisMaxLen,
+	})
+}
+
+func newRedisConsumerStarter(cfg *config.Config, wsHub fwwsbus.LocalHub, log *pxlog.Entry, descriptors []frameworkrealtime.Descriptor) func(ctx context.Context) {
+	if cfg == nil || cfg.EventBridge == nil || wsHub == nil {
+		return nil
+	}
+	eventCfg := cfg.EventBridge
+	return func(ctx context.Context) {
+		consumer, err := fwtaskbus.NewRedisConsumer(fwtaskbus.RedisConsumerConfig{
+			RedisURL:    strings.TrimSpace(eventCfg.RedisURL),
+			StreamKey:   strings.TrimSpace(eventCfg.RedisStream),
+			Group:       strings.TrimSpace(eventCfg.RedisGroup),
+			Consumer:    strings.TrimSpace(eventCfg.RedisConsumer),
+			Block:       2 * time.Second,
+			BatchSize:   16,
+			StartID:     "$",
+			DeleteOnAck: true,
+		})
+		if err != nil {
+			if log != nil {
+				log.WithError(err).Warn("taskbus redis consumer start failed")
+			}
+			return
+		}
+		publisher := frameworkrealtime.NewAuthorizedWSPublisher(fwwsbus.NewLocalPublisher(wsHub, nil), descriptors, "message")
+		err = consumer.Consume(ctx, func(handlerCtx context.Context, ev event.Event) error {
+			payload, payloadErr := decodeEventPayload(ev.Payload)
+			if payloadErr != nil {
+				return payloadErr
+			}
+			result := publisher.Publish(handlerCtx, string(ev.Topic), payload, fwwsbus.PublishOptions{
+				TenantUUID: ev.Meta.TenantUUID,
+				TraceID:    ev.Meta.TraceID,
+			})
+			if !result.OK {
+				return errors.New(result.ErrorCode + ": " + result.ErrorMessage)
+			}
+			return nil
+		})
+		if err != nil && log != nil && !errors.Is(err, context.Canceled) {
+			log.WithError(err).Warn("taskbus redis consumer stopped")
+		}
+	}
+}
+
+func decodeEventPayload(raw json.RawMessage) (any, error) {
+	if len(raw) == 0 {
+		return map[string]any{}, nil
+	}
+	var payload any
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil, err
+	}
+	if payload == nil {
+		return map[string]any{}, nil
+	}
+	return payload, nil
+}

@@ -1,0 +1,169 @@
+package ai_settings
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"strings"
+
+	fwsettings "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/aisettings"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/hostapi"
+	powerxai "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/ai"
+	"github.com/example.com/framework-ci-fixture/backend/internal/config"
+	"github.com/example.com/framework-ci-fixture/backend/internal/entity/models"
+	repository "github.com/example.com/framework-ci-fixture/backend/internal/entity/repository/ai_settings"
+	"github.com/example.com/framework-ci-fixture/backend/internal/services/runtimeexample"
+	"gorm.io/datatypes"
+)
+
+type SaveInput struct {
+	Environment   string         `json:"environment"`
+	Modality      string         `json:"modality"`
+	Provider      string         `json:"provider"`
+	App           string         `json:"app"`
+	ModelKey      string         `json:"model_key"`
+	Endpoint      string         `json:"endpoint"`
+	CredentialRef string         `json:"credential_ref"`
+	Parameters    map[string]any `json:"parameters"`
+}
+type LocalSettingsService struct {
+	Repository            *repository.LocalSettingsRepository
+	models                map[string]config.LocalAIModel
+	ai                    *runtimeexample.LocalAI
+	Catalog               *Catalog
+	credentials           []config.LocalAICredential
+	catalogTimeoutSeconds int
+}
+
+func NewLocalSettingsService(repo *repository.LocalSettingsRepository, cfg *config.LocalAIConfig, ai *runtimeexample.LocalAI) (*LocalSettingsService, error) {
+	if repo == nil || ai == nil {
+		return nil, errors.New("local AI settings service dependencies are required")
+	}
+	modelsByKey := map[string]config.LocalAIModel{}
+	if cfg != nil {
+		for _, model := range cfg.Models {
+			modelsByKey[model.Key] = model
+		}
+	}
+	s := &LocalSettingsService{Repository: repo, models: modelsByKey, ai: ai}
+	if cfg != nil {
+		s.credentials = append([]config.LocalAICredential(nil), cfg.Credentials...)
+		s.catalogTimeoutSeconds = cfg.CatalogTimeoutSeconds
+		if err := s.validateCredentials(); err != nil {
+			return nil, err
+		}
+	}
+	return s, nil
+}
+
+func (s *LocalSettingsService) CatalogProviders(modality string) []map[string]any {
+	if s == nil || s.Catalog == nil {
+		return []map[string]any{}
+	}
+	return s.Catalog.Providers(modality)
+}
+func (s *LocalSettingsService) CatalogModels(modality, provider, app string) []map[string]string {
+	if s == nil || s.Catalog == nil {
+		return []map[string]string{}
+	}
+	return s.Catalog.Models(modality, provider, app)
+}
+
+func (s *LocalSettingsService) Get(ctx context.Context, tenantUUID, environment, modality, source string) (*models.LocalAISetting, error) {
+	return s.Repository.Get(ctx, tenantUUID, environment, modality, source)
+}
+
+// Save persists a plugin-owned profile in its local or PowerX source partition.
+// The page source is not a global preference; it identifies this profile.
+func (s *LocalSettingsService) Save(ctx context.Context, tenantUUID, catalogSource string, in SaveInput) (*models.LocalAISetting, error) {
+	in.Environment, in.Modality, in.Provider, in.App, in.ModelKey = strings.TrimSpace(in.Environment), strings.TrimSpace(in.Modality), strings.TrimSpace(in.Provider), strings.TrimSpace(in.App), strings.TrimSpace(in.ModelKey)
+	in.Endpoint, in.CredentialRef = strings.TrimSpace(in.Endpoint), strings.TrimSpace(in.CredentialRef)
+	catalogSource = strings.TrimSpace(catalogSource)
+	if tenantUUID == "" || in.Environment == "" || in.Modality == "" || in.Provider == "" || in.ModelKey == "" {
+		return nil, errors.New("tenant UUID, environment, modality, provider and model key are required")
+	}
+	switch catalogSource {
+	case "local":
+		if s.Catalog != nil {
+			items, err := s.ListLocalCatalog(ctx, tenantUUID, OnlineCatalogInput{Environment: in.Environment, Modality: in.Modality, Provider: in.Provider, App: in.App, Endpoint: in.Endpoint, CredentialRef: in.CredentialRef})
+			if err != nil {
+				return nil, err
+			}
+			found := false
+			for _, item := range items {
+				if item["id"] == in.ModelKey {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return nil, onlineError(422, "AI_MODEL_NOT_IN_CATALOG")
+			}
+		}
+		if model, isLocalRuntimeModel := s.models[in.ModelKey]; isLocalRuntimeModel && !supports(model, in.Modality) {
+			return nil, errors.New("selected local runtime model does not support this modality")
+		}
+		if s.Catalog == nil {
+			if model, ok := s.models[in.ModelKey]; !ok || model.Provider != in.Provider || !supports(model, in.Modality) {
+				return nil, errors.New("selected model is not declared in the local runtime configuration")
+			}
+		}
+	case "powerx":
+		// The selected model was supplied by the explicitly selected PowerX
+		// catalog endpoint. It is deliberately not validated against this
+		// plugin's local package or local runtime configuration.
+	default:
+		return nil, errors.New("invalid AI catalog source")
+	}
+	params, err := json.Marshal(in.Parameters)
+	if err != nil {
+		return nil, err
+	}
+	return s.Repository.Upsert(ctx, &models.LocalAISetting{TenantUUID: tenantUUID, Environment: in.Environment, Modality: in.Modality, Source: catalogSource, Provider: in.Provider, App: in.App, ModelKey: in.ModelKey, Endpoint: in.Endpoint, CredentialRef: in.CredentialRef, Parameters: datatypes.JSON(params)})
+}
+func (s *LocalSettingsService) TestConnection(ctx context.Context, in SaveInput) error {
+	return s.ai.TestConnectionWithProfile(ctx, profileRuntimeModel(in))
+}
+
+func (s *LocalSettingsService) ProbeConnection(ctx context.Context, environment string, in fwsettings.ConnectionTestInput, endpoint string) (*fwsettings.ConnectionTestResult, error) {
+	if err := in.Validate(); err != nil {
+		return nil, err
+	}
+	verification, err := s.ai.ProbeProviderConnection(ctx, in.Provider, endpoint)
+	if err != nil {
+		return nil, err
+	}
+	return &fwsettings.ConnectionTestResult{ContractVersion: 1, OK: true, Environment: environment, Modality: in.Modality, Verification: *verification}, nil
+}
+func (s *LocalSettingsService) QuickCall(ctx context.Context, in SaveInput) (string, error) {
+	if in.Modality != "llm" {
+		return "", &hostapi.HTTPError{StatusCode: 422, ReasonCode: "AI_MODEL_CAPABILITY_UNSUPPORTED"}
+	}
+	return s.ai.QuickCallWithProfile(ctx, profileRuntimeModel(in))
+}
+
+func (s *LocalSettingsService) InvokeLLM(ctx context.Context, in SaveInput, inputs []powerxai.ContentItem) (*powerxai.LLMInvokeOutput, error) {
+	if in.Modality != "llm" {
+		return nil, &hostapi.HTTPError{StatusCode: 422, ReasonCode: "AI_MODEL_CAPABILITY_UNSUPPORTED"}
+	}
+	return s.ai.InvokeLLMWithProfile(ctx, profileRuntimeModel(in), powerxai.LLMInvokeInput{ModelKey: in.ModelKey, Inputs: inputs, Params: in.Parameters})
+}
+
+func profileRuntimeModel(in SaveInput) config.LocalAIModel {
+	return config.LocalAIModel{
+		Key:            strings.TrimSpace(in.ModelKey),
+		Provider:       strings.TrimSpace(in.Provider),
+		Model:          strings.TrimSpace(in.ModelKey),
+		Endpoint:       strings.TrimSpace(in.Endpoint),
+		Modalities:     []string{"llm"},
+		TimeoutSeconds: 120,
+	}
+}
+func supports(model config.LocalAIModel, modality string) bool {
+	for _, value := range model.Modalities {
+		if value == modality {
+			return true
+		}
+	}
+	return false
+}

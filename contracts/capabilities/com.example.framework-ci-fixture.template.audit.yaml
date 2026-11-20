@@ -1,0 +1,35 @@
+id: com.example.framework-ci-fixture.template.audit
+type: Tool
+version: 1.0.0
+title_i18n:
+  zh-CN: 模板巡检
+  zh: 模板巡检
+  en: Template Audit
+description: "巡检既有模板并自动修复的 Workflow 场景。"
+description_i18n:
+  zh-CN: 巡检既有模板并自动修复的 Workflow 场景。
+  zh: 巡检既有模板并自动修复的 Workflow 场景。
+  en: Inspect existing templates and run an automated repair workflow.
+rbac:
+  resource: template
+  actions: [read]
+provides:
+  - id: schema/input/com.example.framework-ci-fixture.template.audit.v1
+    path: schema/input/com.example.framework-ci-fixture.template.audit.json
+    kind: input
+    version: 1.0.0
+  - id: schema/output/com.example.framework-ci-fixture.template.audit.v1
+    path: schema/output/com.example.framework-ci-fixture.template.audit.json
+    kind: output
+    version: 1.0.0
+metadata:
+  protocols:
+    workflow:
+      template: contracts/exposure/workflow/template-audit.json
+    agent_tool:
+      id: base.template.audit
+      scope: agent.template.audit
+      transport: workflow
+      endpoint: contracts/exposure/workflow/template-audit.json
+    agent_stream:
+      channel: contracts/exposure/agent-streams/template-audit.yaml

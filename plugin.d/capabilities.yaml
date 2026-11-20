@@ -1,0 +1,142 @@
+capabilities:
+  imports:
+    - contracts/capabilities/com.example.framework-ci-fixture.parcel.volume.yaml
+    - contracts/capabilities/com.example.framework-ci-fixture.auth.me_context.yaml
+    - contracts/capabilities/com.example.framework-ci-fixture.template.audit.yaml
+    - contracts/capabilities/com.example.framework-ci-fixture.template.batch_clone.yaml
+    - contracts/capabilities/com.example.framework-ci-fixture.template.compose.yaml
+    - contracts/capabilities/com.example.framework-ci-fixture.template.create.yaml
+    - contracts/capabilities/com.example.framework-ci-fixture.template.delete.yaml
+    - contracts/capabilities/com.example.framework-ci-fixture.template.list.yaml
+    - contracts/capabilities/com.example.framework-ci-fixture.template.prepare.yaml
+    - contracts/capabilities/com.example.framework-ci-fixture.template.publish.yaml
+    - contracts/capabilities/com.example.framework-ci-fixture.template.quality_distribute.yaml
+    - contracts/capabilities/com.example.framework-ci-fixture.template.read.yaml
+    - contracts/capabilities/com.example.framework-ci-fixture.template.review.yaml
+    - contracts/capabilities/com.example.framework-ci-fixture.template.update.yaml
+    - contracts/capabilities/com.example.framework-ci-fixture.template.validate.yaml
+  provides:
+    - descriptor: contracts/capabilities/com.example.framework-ci-fixture.parcel.volume.yaml
+      id: com.example.framework-ci-fixture.parcel.volume
+      schemas:
+        input: contracts/tools/parcel-volume.v1.json
+        output: contracts/tools/parcel-volume.v1.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/com.example.framework-ci-fixture.auth.me_context.yaml
+      id: com.example.framework-ci-fixture.auth.me_context
+      schemas:
+        input: contracts/schema/input/com.example.framework-ci-fixture.auth.me_context.json
+        output: contracts/schema/output/com.example.framework-ci-fixture.auth.me_context.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/com.example.framework-ci-fixture.template.audit.yaml
+      id: com.example.framework-ci-fixture.template.audit
+      schemas:
+        input: contracts/schema/input/com.example.framework-ci-fixture.template.audit.json
+        output: contracts/schema/output/com.example.framework-ci-fixture.template.audit.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/com.example.framework-ci-fixture.template.batch_clone.yaml
+      id: com.example.framework-ci-fixture.template.batch_clone
+      schemas:
+        input: contracts/schema/input/com.example.framework-ci-fixture.template.batch_clone.json
+        output: contracts/schema/output/com.example.framework-ci-fixture.template.batch_clone.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/com.example.framework-ci-fixture.template.compose.yaml
+      id: com.example.framework-ci-fixture.template.compose
+      schemas:
+        input: contracts/schema/input/com.example.framework-ci-fixture.template.compose.json
+        output: contracts/schema/output/com.example.framework-ci-fixture.template.compose.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/com.example.framework-ci-fixture.template.create.yaml
+      id: com.example.framework-ci-fixture.template.create
+      schemas:
+        input: contracts/schema/input/com.example.framework-ci-fixture.template.create.json
+        output: contracts/schema/output/com.example.framework-ci-fixture.template.create.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/com.example.framework-ci-fixture.template.delete.yaml
+      id: com.example.framework-ci-fixture.template.delete
+      schemas:
+        input: contracts/schema/input/com.example.framework-ci-fixture.template.delete.json
+        output: contracts/schema/output/com.example.framework-ci-fixture.template.delete.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/com.example.framework-ci-fixture.template.list.yaml
+      id: com.example.framework-ci-fixture.template.list
+      schemas:
+        input: contracts/schema/input/com.example.framework-ci-fixture.template.list.json
+        output: contracts/schema/output/com.example.framework-ci-fixture.template.list.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/com.example.framework-ci-fixture.template.prepare.yaml
+      id: com.example.framework-ci-fixture.template.prepare
+      schemas:
+        input: contracts/schema/input/com.example.framework-ci-fixture.template.prepare.json
+        output: contracts/schema/output/com.example.framework-ci-fixture.template.prepare.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/com.example.framework-ci-fixture.template.publish.yaml
+      id: com.example.framework-ci-fixture.template.publish
+      schemas:
+        input: contracts/schema/input/com.example.framework-ci-fixture.template.publish.json
+        output: contracts/schema/output/com.example.framework-ci-fixture.template.publish.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/com.example.framework-ci-fixture.template.quality_distribute.yaml
+      id: com.example.framework-ci-fixture.template.quality_distribute
+      schemas:
+        input: contracts/schema/input/com.example.framework-ci-fixture.template.quality_distribute.json
+        output: contracts/schema/output/com.example.framework-ci-fixture.template.quality_distribute.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/com.example.framework-ci-fixture.template.read.yaml
+      id: com.example.framework-ci-fixture.template.read
+      schemas:
+        input: contracts/schema/input/com.example.framework-ci-fixture.template.read.json
+        output: contracts/schema/output/com.example.framework-ci-fixture.template.read.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/com.example.framework-ci-fixture.template.review.yaml
+      id: com.example.framework-ci-fixture.template.review
+      schemas:
+        input: contracts/schema/input/com.example.framework-ci-fixture.template.review.json
+        output: contracts/schema/output/com.example.framework-ci-fixture.template.review.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/com.example.framework-ci-fixture.template.update.yaml
+      id: com.example.framework-ci-fixture.template.update
+      schemas:
+        input: contracts/schema/input/com.example.framework-ci-fixture.template.update.json
+        output: contracts/schema/output/com.example.framework-ci-fixture.template.update.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/com.example.framework-ci-fixture.template.validate.yaml
+      id: com.example.framework-ci-fixture.template.validate
+      schemas:
+        input: contracts/schema/input/com.example.framework-ci-fixture.template.validate.json
+        output: contracts/schema/output/com.example.framework-ci-fixture.template.validate.json
+      version: 1.0.0
+  required:
+    - com.corex.agent.invoke
+    - com.corex.agent.session.manage
+    - com.corex.ai.catalog.models.read
+    - com.corex.ai.catalog.providers.read
+    - com.corex.ai.connection.test
+    - com.corex.ai.vlm.invoke
+    - com.corex.ai.image.invoke
+    - com.corex.ai.video.invoke
+    - com.corex.ai.tts.invoke
+    - com.corex.ai.media.tasks.read
+    - com.corex.ai.media.tasks.cancel
+    - com.corex.capabilities.catalog.read
+    - com.corex.capabilities.grant_status.read
+    - com.corex.customer.memberships.delegated_read
+    - com.corex.eventfabric.publish
+    - com.corex.iam.authorization.check
+    - com.corex.iam.directory.read
+    - com.corex.iam.identity_context.service_read
+    - com.corex.iam.members.read
+    - com.corex.knowledge.catalog.read
+    - com.corex.knowledge.directory.read
+    - com.corex.knowledge.document.manage
+    - com.corex.knowledge.search.read
+    - com.corex.knowledge.space.create
+    - com.corex.media.assets.manage
+    - com.corex.media.assets.read
+    - com.corex.notifications.create
+    - com.corex.notifications.invalidate_card
+    - com.corex.notifications.read_receipts
+    - com.corex.runtime.cache.manage
+    - com.corex.runtime.cache.read
+    - com.corex.runtime.taskcenter.manage
+    - com.corex.runtime.taskcenter.read

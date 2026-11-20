@@ -1,0 +1,30 @@
+package templates
+
+import (
+	"github.com/example.com/framework-ci-fixture/backend/internal/shared/app"
+	httpmw "github.com/example.com/framework-ci-fixture/backend/internal/transport/http/middleware"
+	"github.com/gin-gonic/gin"
+)
+
+func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {
+	h := NewTemplateHandler(deps)
+
+	g := rg.Group("/templates", httpmw.EnsureTenant())
+	{
+		g.GET("", h.GetTemplates)
+		g.GET("/:uuid", h.GetTemplate)
+	}
+
+	manage := rg.Group("/templates", httpmw.EnsureTenant())
+	{
+		manage.POST("", h.CreateTemplate)
+		manage.PUT("/:uuid", h.UpdateTemplate)
+		manage.DELETE("/:uuid", h.DeleteTemplate)
+	}
+
+	adminGroup := rg.Group("/admin/templates", httpmw.EnsureTenant(), httpmw.RequireRoot())
+	{
+		adminGroup.POST("/batch-clone", h.BatchCloneTemplates)
+		adminGroup.POST("/:uuid/validate", h.ValidateTemplateCapability)
+	}
+}

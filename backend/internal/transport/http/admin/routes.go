@@ -1,0 +1,67 @@
+package admin
+
+import (
+	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
+	"github.com/example.com/framework-ci-fixture/backend/internal/shared/app"
+	adminaisettings "github.com/example.com/framework-ci-fixture/backend/internal/transport/http/admin/ai_settings"
+	admincapability "github.com/example.com/framework-ci-fixture/backend/internal/transport/http/admin/capability"
+	adminconsole "github.com/example.com/framework-ci-fixture/backend/internal/transport/http/admin/console"
+	admincustomer "github.com/example.com/framework-ci-fixture/backend/internal/transport/http/admin/customer"
+	adminhostcontract "github.com/example.com/framework-ci-fixture/backend/internal/transport/http/admin/host_contract"
+	adminiam "github.com/example.com/framework-ci-fixture/backend/internal/transport/http/admin/iam"
+	adminintegration "github.com/example.com/framework-ci-fixture/backend/internal/transport/http/admin/integration"
+	adminlocalknowledge "github.com/example.com/framework-ci-fixture/backend/internal/transport/http/admin/local_knowledge"
+	adminlocalagent "github.com/example.com/framework-ci-fixture/backend/internal/transport/http/admin/localagent"
+	adminmarketplace "github.com/example.com/framework-ci-fixture/backend/internal/transport/http/admin/marketplace"
+	adminmetadata "github.com/example.com/framework-ci-fixture/backend/internal/transport/http/admin/metadata"
+	adminoperations "github.com/example.com/framework-ci-fixture/backend/internal/transport/http/admin/operations"
+	Regression "github.com/example.com/framework-ci-fixture/backend/internal/transport/http/admin/regression"
+	adminruntime "github.com/example.com/framework-ci-fixture/backend/internal/transport/http/admin/runtime_ops"
+	adminsecurity "github.com/example.com/framework-ci-fixture/backend/internal/transport/http/admin/security"
+	httpmw "github.com/example.com/framework-ci-fixture/backend/internal/transport/http/middleware"
+	"github.com/gin-gonic/gin"
+)
+
+// Register 注册 Admin 路由
+func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {
+	adminHandler := NewAdminHandler(deps)
+	admin := rg.Group("/admin")
+	Regression.RegisterRoutes(admin, deps)
+	{
+		// 基础管理功能
+		admin.GET("/manifest", adminHandler.GetManifest) // 获取插件清单
+		admin.GET("/rbac", adminHandler.GetRBACInfo)     // 获取权限信息
+		admin.POST("/notifications/test", httpmw.EnsureTenant(), adminruntime.NotificationTestHandler(deps))
+
+		runtimeOps := admin.Group("/runtime", httpmw.EnsureTenant())
+		adminruntime.RegisterRoutes(runtimeOps, deps)
+
+		adminmarketplace.RegisterRoutes(adminTenantGroup(admin, deps), deps)
+		adminoperations.RegisterRoutes(admin, deps)
+		adminconsole.RegisterRoutes(admin, deps)
+		admincapability.RegisterRoutes(adminTenantGroup(admin, deps), deps)
+		admincustomer.RegisterRoutes(adminTenantGroup(admin, deps), deps)
+		adminhostcontract.RegisterRoutes(admin, deps)
+		adminmetadata.RegisterRoutes(adminTenantGroup(admin, deps), deps)
+		adminaisettings.RegisterRoutes(adminTenantGroup(admin, deps), deps)
+		adminlocalknowledge.RegisterRoutes(adminTenantGroup(admin, deps), deps)
+		adminlocalagent.RegisterRoutes(adminTenantGroup(admin, deps), deps)
+		adminintegration.RegisterRoutes(admin, deps)
+		adminsecurity.RegisterRoutes(adminTenantGroup(admin, deps), deps)
+		adminiam.RegisterRoutes(admin, deps)
+	}
+}
+
+func adminTenantGroup(parent *gin.RouterGroup, deps *app.Deps) *gin.RouterGroup {
+	if parent == nil {
+		return nil
+	}
+	needTenant := false
+	if deps != nil && deps.ProviderMode == fwprovider.ModeDelegated {
+		needTenant = true
+	}
+	if !needTenant {
+		return parent.Group("")
+	}
+	return parent.Group("", httpmw.EnsureTenant())
+}

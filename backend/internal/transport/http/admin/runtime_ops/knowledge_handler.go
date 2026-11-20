@@ -1,0 +1,2229 @@
+package runtime_ops
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"math"
+	"net/http"
+	"net/url"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+	"unicode"
+
+	fwgateway "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/gateway"
+	fwmedia "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/media"
+	fwknowledge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/knowledge"
+	dto "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/ai"
+	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
+	"github.com/example.com/framework-ci-fixture/backend/internal/config"
+	"github.com/example.com/framework-ci-fixture/backend/internal/entity/models"
+	iammodels "github.com/example.com/framework-ci-fixture/backend/internal/entity/models/iam"
+	capgateway "github.com/example.com/framework-ci-fixture/backend/internal/integrations/gateway"
+	authx "github.com/example.com/framework-ci-fixture/backend/internal/middleware"
+	knowledgeSvc "github.com/example.com/framework-ci-fixture/backend/internal/services/admin/knowledge"
+	"github.com/example.com/framework-ci-fixture/backend/internal/shared/app"
+	admincommon "github.com/example.com/framework-ci-fixture/backend/internal/transport/http/admin/common"
+	"github.com/gin-gonic/gin"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
+)
+
+const (
+	knowledgeCapabilityListFusionStrategies = "com.corex.rest.admin.gin.get_api_v1_admin_knowledge_spaces_spaceid_fusion_strategies"
+	knowledgeCapabilityPlanRetrieval        = "com.corex.rest.admin.gin.post_api_v1_admin_knowledge_spaces_spaceid_playground_retrieval"
+	knowledgeCapabilityListIngestionJobs    = "com.corex.rest.admin.gin.get_api_v1_admin_knowledge_spaces_spaceid_ingestion_jobs"
+	knowledgeCapabilityCreateIngestionJob   = "com.corex.rest.admin.gin.post_api_v1_admin_knowledge_spaces_spaceid_ingestion_jobs"
+)
+
+var localVectorTablePattern = regexp.MustCompile(`^local_knowledge_vectors_v1_[1-9][0-9]*$`)
+
+type KnowledgeHandler struct {
+	deps                *app.Deps
+	labOnly             bool
+	providerOnce        sync.Once
+	knowledgeProvider   fwknowledge.KnowledgeProvider
+	providerErr         error
+	departmentDirectory knowledgeLabDepartmentDirectory
+}
+
+type knowledgeSearchRequest struct {
+	Query      string          `json:"query"`
+	SpaceID    string          `json:"space_id"`
+	TenantUUID string          `json:"tenant_uuid"`
+	PluginID   string          `json:"plugin_id"`
+	AgentUUID  string          `json:"agent_uuid"`
+	SkillID    string          `json:"skill_id"`
+	Visibility string          `json:"visibility"`
+	Limit      int             `json:"limit"`
+	Tags       []string        `json:"tags"`
+	Fixture    *fixturePayload `json:"fixture"`
+	Filters    map[string]any  `json:"filters"`
+}
+
+type localSearchRow struct {
+	models.LocalKnowledgeChunk
+	Title              string
+	Vector             datatypes.JSON
+	EffectiveFrom      *time.Time
+	EffectiveTo        *time.Time
+	AccessScope        string
+	AllowedMemberUUIDs datatypes.JSON
+	Tags               datatypes.JSON
+}
+
+type knowledgeCreateSpaceRequest struct {
+	TenantUUID              string   `json:"tenant_uuid"`
+	SpaceName               string   `json:"spaceName"`
+	Description             string   `json:"description"`
+	DepartmentCode          string   `json:"departmentCode"`
+	Visibility              string   `json:"visibility"`
+	PolicyTemplateVersionID string   `json:"policyTemplateVersionId"`
+	IngestionProfileKey     string   `json:"ingestionProfileKey"`
+	IndexProfileKey         string   `json:"indexProfileKey"`
+	RAGProfileKey           string   `json:"ragProfileKey"`
+	CPUCores                int      `json:"cpuCores"`
+	StorageGB               int      `json:"storageGb"`
+	IngestionConcurrency    int      `json:"ingestionConcurrency"`
+	FeatureFlags            []string `json:"featureFlags"`
+	RequestedBy             string   `json:"requestedBy"`
+}
+
+type knowledgeRetireSpaceRequest struct {
+	Reason      string `json:"reason"`
+	RequestedBy string `json:"requestedBy"`
+	DropVectors bool   `json:"dropVectors"`
+}
+
+type knowledgeDeleteSpaceRequest struct {
+	RequestedBy string `json:"requestedBy"`
+	Force       bool   `json:"force"`
+	DropVectors bool   `json:"dropVectors"`
+}
+
+type knowledgeIngestSpaceRequest struct {
+	Format           string `json:"format"`
+	SourceURI        string `json:"sourceUri"`
+	IngestionProfile string `json:"ingestionProfile"`
+	RequestedBy      string `json:"requestedBy"`
+}
+
+type knowledgeMediaGatewayAdapter struct {
+	gateway interface {
+		Invoke(ctx context.Context, params capgateway.InvokeParams) (*capgateway.InvokeResult, error)
+	}
+}
+
+func (a knowledgeMediaGatewayAdapter) Invoke(ctx context.Context, req fwgateway.InvokeRequest) (*fwgateway.Response, error) {
+	if a.gateway == nil {
+		return nil, fmt.Errorf("PowerX Gateway 客户端未配置")
+	}
+	result, err := a.gateway.Invoke(ctx, capgateway.InvokeParams{
+		CapabilityID:      req.CapabilityID,
+		PreferredProtocol: req.PreferredProtocol,
+		Payload:           req.Payload,
+		Headers:           req.Headers,
+		RequestID:         req.RequestID,
+		TenantUUID:        req.TenantUUID,
+		AuthRequired:      !req.DisableAuth,
+		TenantScoped:      false,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if result == nil {
+		return nil, fmt.Errorf("PowerX Gateway 返回空 media 响应")
+	}
+	return &fwgateway.Response{
+		TraceID: result.TraceID,
+		Status:  result.Status,
+		Data:    result.Data,
+		RawData: result.Raw,
+	}, nil
+}
+
+type knowledgeSpaceDebugRow struct {
+	ID                      string         `json:"id"`
+	Name                    string         `json:"name"`
+	SpaceID                 string         `json:"spaceId"`
+	SpaceName               string         `json:"spaceName"`
+	TenantUUID              string         `json:"tenant_uuid,omitempty"`
+	Department              string         `json:"department,omitempty"`
+	DepartmentCode          string         `json:"departmentCode,omitempty"`
+	Type                    string         `json:"type"`
+	TypeLabel               string         `json:"type_label"`
+	Status                  string         `json:"status"`
+	StatusLabel             string         `json:"status_label"`
+	Provider                string         `json:"provider"`
+	ProviderMode            string         `json:"provider_mode"`
+	PolicyTemplateVersionID string         `json:"policyTemplateVersionId,omitempty"`
+	IngestionProfileKey     string         `json:"ingestionProfileKey,omitempty"`
+	IndexProfileKey         string         `json:"indexProfileKey,omitempty"`
+	RAGProfileKey           string         `json:"ragProfileKey,omitempty"`
+	FeatureFlags            []string       `json:"featureFlags,omitempty"`
+	Quotas                  map[string]any `json:"quotas,omitempty"`
+	Operations              []string       `json:"operations,omitempty"`
+	ContractGaps            []string       `json:"contract_gaps,omitempty"`
+	Icon                    string         `json:"icon,omitempty"`
+}
+
+func NewKnowledgeHandler(deps *app.Deps) *KnowledgeHandler {
+	// Normal bootstrap sets ProviderMode before constructing handlers. Keep
+	// isolated handler construction deterministic by resolving an explicitly
+	// configured knowledge source once here; requests never select a mode.
+	if deps != nil && deps.ProviderMode == "" && deps.Config != nil && deps.Config.Knowledge != nil {
+		switch strings.ToLower(strings.TrimSpace(deps.Config.Knowledge.Mode)) {
+		case fwknowledge.ProviderModeDelegated, fwknowledge.ProviderModeThirdParty:
+			deps.ProviderMode = fwprovider.ModeDelegated
+		case fwknowledge.ProviderModeLocal, fwknowledge.ProviderModeMock:
+			deps.ProviderMode = fwprovider.ModeLocal
+		}
+	}
+	return &KnowledgeHandler{deps: deps}
+}
+
+func (h *KnowledgeHandler) Provider(c *gin.Context) {
+	provider, err := h.provider()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	caps := provider.Capabilities(c.Request.Context())
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"provider":     provider.Name(),
+			"mode":         provider.Mode(),
+			"capabilities": caps,
+			"production":   h.deps != nil && h.deps.Config != nil && h.deps.Config.IsProduction(),
+		},
+	})
+}
+
+func knowledgeSpaceRow(space fwknowledge.KnowledgeSpace, provider fwknowledge.KnowledgeProvider, caps fwknowledge.ProviderCapabilities) knowledgeSpaceDebugRow {
+	spaceID := firstNonEmpty(space.SpaceID, "unknown")
+	name := firstNonEmpty(space.SpaceName, spaceID)
+	visibility := firstNonEmpty(space.Visibility, fwknowledge.VisibilityTenant)
+	status := firstNonEmpty(space.Status, "active")
+	department := firstNonEmpty(space.DepartmentCode, "-")
+	return knowledgeSpaceDebugRow{
+		ID:                      spaceID,
+		Name:                    name,
+		SpaceID:                 spaceID,
+		SpaceName:               name,
+		TenantUUID:              space.TenantUUID,
+		Department:              department,
+		DepartmentCode:          department,
+		Type:                    visibility,
+		TypeLabel:               knowledgeVisibilityLabel(visibility),
+		Status:                  status,
+		StatusLabel:             knowledgeStatusLabel(status),
+		Provider:                provider.Name(),
+		ProviderMode:            provider.Mode(),
+		PolicyTemplateVersionID: space.PolicyTemplateVersionID,
+		IngestionProfileKey:     space.IngestionProfileKey,
+		IndexProfileKey:         space.IndexProfileKey,
+		RAGProfileKey:           space.RAGProfileKey,
+		FeatureFlags:            append([]string(nil), space.FeatureFlags...),
+		Quotas:                  copyMap(space.Quotas),
+		Operations:              append([]string(nil), caps.Operations...),
+		Icon:                    knowledgeSpaceIcon(provider.Mode()),
+	}
+}
+
+func knowledgeVisibilityLabel(visibility string) string {
+	switch visibility {
+	case fwknowledge.VisibilityTenant:
+		return "租户知识"
+	case fwknowledge.VisibilityPlugin:
+		return "插件知识"
+	case fwknowledge.VisibilityPublic:
+		return "公共知识"
+	case fwknowledge.VisibilityPrivate:
+		return "私有知识"
+	default:
+		return firstNonEmpty(visibility, "知识空间")
+	}
+}
+
+func knowledgeStatusLabel(status string) string {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "active", "ready":
+		return "可用"
+	case "pending_iam":
+		return "待权限配置"
+	case "pending":
+		return "处理中"
+	case "retired":
+		return "已归档"
+	case "unavailable":
+		return "不可用"
+	default:
+		return firstNonEmpty(status, "未知")
+	}
+}
+
+func knowledgeSpaceIcon(mode string) string {
+	if mode == fwknowledge.ProviderModeDelegated {
+		return "i-heroicons-cloud"
+	}
+	return "i-heroicons-circle-stack"
+}
+
+func copyMap(in map[string]any) map[string]any {
+	if len(in) == 0 {
+		return map[string]any{}
+	}
+	out := make(map[string]any, len(in))
+	for key, value := range in {
+		out[key] = value
+	}
+	return out
+}
+
+func (h *KnowledgeHandler) Spaces(c *gin.Context) {
+	provider, err := h.provider()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	tenantUUID, tenantMismatch := resolveKnowledgeTenantUUID(c, c.Query("tenant_uuid"))
+	if tenantMismatch {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "tenant_uuid mismatch", "code": fwknowledge.CodeForbidden})
+		return
+	}
+	caps := provider.Capabilities(c.Request.Context())
+	spaces, err := provider.ListSpaces(c.Request.Context(), fwknowledge.ListSpacesInput{
+		TenantUUID: tenantUUID,
+		PluginID:   c.Query("plugin_id"),
+		Visibility: c.Query("visibility"),
+		Status:     c.Query("status"),
+		Limit:      100,
+		TraceID:    c.GetString("request_id"),
+	})
+	if err != nil {
+		status := fwknowledge.HTTPStatusForCode(fwknowledge.CodeOf(err))
+		c.JSON(status, gin.H{"success": false, "error": err.Error(), "code": fwknowledge.CodeOf(err)})
+		return
+	}
+	rows := make([]knowledgeSpaceDebugRow, 0, len(spaces))
+	for _, space := range spaces {
+		rows = append(rows, knowledgeSpaceRow(space, provider, caps))
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{
+		"spaces": rows,
+		"source": provider.Mode(),
+	}})
+}
+
+func (h *KnowledgeHandler) Catalog(c *gin.Context) {
+	provider, err := h.provider()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	catalog, err := provider.Catalog(c.Request.Context())
+	if err != nil {
+		if h.labOnly {
+			writeLabKnowledgeError(c, err)
+			return
+		}
+		status := fwknowledge.HTTPStatus(err)
+		message := err.Error()
+		if h.labOnly && fwknowledge.CodeOf(err) == fwknowledge.CodeUnsupportedCapability {
+			message = "knowledgeLab.catalogNotExposed"
+		}
+		c.JSON(status, gin.H{"success": false, "error": message, "code": fwknowledge.CodeOf(err)})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": catalog})
+}
+
+func (h *KnowledgeHandler) CreateSpace(c *gin.Context) {
+	if h.labOnly {
+		h.LabCreateSpace(c)
+		return
+	}
+	var req knowledgeCreateSpaceRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid knowledge space create request"})
+		return
+	}
+	if strings.TrimSpace(req.SpaceName) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "spaceName is required"})
+		return
+	}
+	if strings.TrimSpace(req.DepartmentCode) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "departmentCode is required"})
+		return
+	}
+	provider, err := h.provider()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	if provider.Mode() != fwknowledge.ProviderModeDelegated {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "知识空间创建只支持 PowerX delegated 模式；local 模式请使用本地入库模拟"})
+		return
+	}
+	if !h.gatewayReady() {
+		c.JSON(http.StatusBadGateway, gin.H{"success": false, "error": "PowerX Gateway 客户端未配置", "code": fwknowledge.CodeProviderUnavailable})
+		return
+	}
+	tenantUUID, tenantMismatch := resolveKnowledgeTenantUUID(c, req.TenantUUID)
+	if tenantMismatch {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "tenant_uuid mismatch", "code": fwknowledge.CodeForbidden})
+		return
+	}
+	record, err := h.deps.CapabilityGateway.CreateKnowledgeSpace(c.Request.Context(), capgateway.KnowledgeSpaceCreateParams{
+		TenantUUID:              tenantUUID,
+		SpaceName:               req.SpaceName,
+		Description:             req.Description,
+		DepartmentCode:          req.DepartmentCode,
+		Visibility:              firstNonEmpty(req.Visibility, fwknowledge.VisibilityTenant),
+		PolicyTemplateVersionID: firstNonEmpty(req.PolicyTemplateVersionID, "default-v1"),
+		IngestionProfileKey:     firstNonEmpty(req.IngestionProfileKey, "default"),
+		IndexProfileKey:         firstNonEmpty(req.IndexProfileKey, "default"),
+		RAGProfileKey:           firstNonEmpty(req.RAGProfileKey, "p1_general"),
+		CPUCores:                positiveOrDefault(req.CPUCores, 1),
+		StorageGB:               positiveOrDefault(req.StorageGB, 50),
+		IngestionConcurrency:    positiveOrDefault(req.IngestionConcurrency, 1),
+		FeatureFlags:            append([]string(nil), req.FeatureFlags...),
+		RequestedBy:             firstNonEmpty(req.RequestedBy, "plugin-knowledge-lab"),
+	})
+	if err != nil {
+		status, code := knowledgeGatewayErrorStatus(err)
+		c.JSON(status, gin.H{"success": false, "error": err.Error(), "code": code})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"success": true, "data": record})
+}
+
+func (h *KnowledgeHandler) RetireSpace(c *gin.Context) {
+	spaceID := strings.TrimSpace(c.Param("spaceID"))
+	if spaceID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "knowledge space_id is required", "code": fwknowledge.CodeInvalidDocument})
+		return
+	}
+	var req knowledgeRetireSpaceRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid knowledge space retire request", "code": fwknowledge.CodeInvalidDocument})
+		return
+	}
+	provider, err := h.provider()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	if provider.Mode() != fwknowledge.ProviderModeDelegated {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "知识空间归档只支持 PowerX delegated 模式；local 模式请重置本地 fixture", "code": fwknowledge.CodeUnsupportedCapability})
+		return
+	}
+	if !h.gatewayReady() {
+		c.JSON(http.StatusBadGateway, gin.H{"success": false, "error": "PowerX Gateway 客户端未配置", "code": fwknowledge.CodeProviderUnavailable})
+		return
+	}
+	tenantUUID, tenantMismatch := resolveKnowledgeTenantUUID(c, "")
+	if tenantMismatch {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "tenant_uuid mismatch", "code": fwknowledge.CodeForbidden})
+		return
+	}
+	record, err := h.deps.CapabilityGateway.RetireKnowledgeSpace(c.Request.Context(), capgateway.KnowledgeSpaceRetireParams{
+		TenantUUID:  tenantUUID,
+		SpaceID:     spaceID,
+		Reason:      firstNonEmpty(req.Reason, "retired from plugin knowledge lab"),
+		RequestedBy: firstNonEmpty(req.RequestedBy, "plugin-knowledge-lab"),
+		DropVectors: req.DropVectors,
+	})
+	if err != nil {
+		status, code := knowledgeGatewayErrorStatus(err)
+		c.JSON(status, gin.H{"success": false, "error": err.Error(), "code": code})
+		return
+	}
+	c.JSON(http.StatusAccepted, gin.H{"success": true, "data": record})
+}
+
+func (h *KnowledgeHandler) DeleteSpace(c *gin.Context) {
+	spaceID := strings.TrimSpace(c.Param("spaceID"))
+	if spaceID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "knowledge space_id is required", "code": fwknowledge.CodeInvalidDocument})
+		return
+	}
+	var req knowledgeDeleteSpaceRequest
+	if c.Request != nil && c.Request.ContentLength > 0 {
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid knowledge space delete request", "code": fwknowledge.CodeInvalidDocument})
+			return
+		}
+	}
+	provider, err := h.provider()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	if provider.Mode() != fwknowledge.ProviderModeDelegated {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "知识空间删除只支持 PowerX delegated 模式；local 模式请重置本地 fixture", "code": fwknowledge.CodeUnsupportedCapability})
+		return
+	}
+	if !h.gatewayReady() {
+		c.JSON(http.StatusBadGateway, gin.H{"success": false, "error": "PowerX Gateway 客户端未配置", "code": fwknowledge.CodeProviderUnavailable})
+		return
+	}
+	tenantUUID, tenantMismatch := resolveKnowledgeTenantUUID(c, "")
+	if tenantMismatch {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "tenant_uuid mismatch", "code": fwknowledge.CodeForbidden})
+		return
+	}
+	err = h.deps.CapabilityGateway.DeleteKnowledgeSpace(c.Request.Context(), capgateway.KnowledgeSpaceDeleteParams{
+		TenantUUID:  tenantUUID,
+		SpaceID:     spaceID,
+		RequestedBy: firstNonEmpty(req.RequestedBy, "plugin-knowledge-lab"),
+		Force:       req.Force,
+		DropVectors: req.DropVectors,
+	})
+	if err != nil {
+		status, code := knowledgeGatewayErrorStatus(err)
+		c.JSON(status, gin.H{"success": false, "error": err.Error(), "code": code})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"deleted": true, "spaceId": spaceID}})
+}
+
+func knowledgeGatewayErrorStatus(err error) (int, fwknowledge.ErrorCode) {
+	status := http.StatusBadGateway
+	var apiErr *capgateway.PlatformAPIError
+	var invokeErr *fwgateway.InvocationError
+	if errors.As(err, &apiErr) && apiErr != nil {
+		status = apiErr.StatusCode
+	}
+	if errors.As(err, &invokeErr) && invokeErr != nil {
+		status = invokeErr.StatusCode
+	}
+	switch status {
+	case http.StatusUnauthorized:
+		return status, fwknowledge.CodeUnauthorized
+	case http.StatusForbidden:
+		return status, fwknowledge.CodeForbidden
+	case http.StatusConflict:
+		return status, fwknowledge.CodeConflict
+	case http.StatusNotFound:
+		return status, fwknowledge.CodeNotFound
+	case http.StatusTooManyRequests:
+		return status, fwknowledge.CodeRateLimited
+	default:
+		if status >= 400 && status < 500 {
+			return status, fwknowledge.CodeInvalidDocument
+		}
+	}
+	return http.StatusBadGateway, fwknowledge.CodeProviderUnavailable
+}
+
+func respondKnowledgeGatewayError(c *gin.Context, err error) {
+	status, code := knowledgeGatewayErrorStatus(err)
+	var invokeErr *fwgateway.InvocationError
+	traceID := ""
+	if errors.As(err, &invokeErr) && invokeErr != nil {
+		traceID = invokeErr.TraceID
+	}
+	c.JSON(status, gin.H{"success": false, "error": "knowledgeLab.gatewayFailed", "code": code, "trace_id": traceID})
+}
+
+func (h *KnowledgeHandler) Ingestions(c *gin.Context) {
+	provider, err := h.provider()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	spaceID := strings.TrimSpace(c.Param("spaceID"))
+	if spaceID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "knowledge space_id is required"})
+		return
+	}
+	if provider.Mode() == fwknowledge.ProviderModeDelegated && h.gatewayReady() {
+		limit := strings.TrimSpace(c.DefaultQuery("limit", "20"))
+		result, err := h.invokeKnowledgeCapability(c, knowledgeCapabilityListIngestionJobs, "ListIngestionJobs", map[string]any{
+			"method":   http.MethodGet,
+			"endpoint": "/api/v1/admin/knowledge-spaces/" + url.PathEscape(spaceID) + "/ingestion-jobs",
+			"query": map[string]any{
+				"limit": limit,
+			},
+		})
+		if err != nil {
+			respondKnowledgeGatewayError(c, err)
+			return
+		}
+		records := ingestionJobRecordsFromGatewayResult(result)
+		status := knowledgeGatewayResultStatus(result)
+		c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{
+			"space_id":      spaceID,
+			"provider":      provider.Name(),
+			"provider_mode": provider.Mode(),
+			"source":        "powerx_gateway_capability",
+			"capability_id": knowledgeCapabilityListIngestionJobs,
+			"trace_id":      result.TraceID,
+			"status":        status,
+			"records":       records,
+			"items":         records,
+			"total":         len(records),
+		}})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{
+		"space_id": spaceID,
+		"records": []gin.H{
+			{
+				"id":            "debug-local-fixture",
+				"operation":     fwknowledge.OperationUpsert,
+				"status":        "available_in_local_fixture_mode",
+				"provider":      provider.Name(),
+				"provider_mode": provider.Mode(),
+				"updated_at":    time.Now().UTC().Format(time.RFC3339),
+			},
+		},
+		"note": "PowerX 委托入库历史需要等待底座知识 API 继续补齐",
+	}})
+}
+
+func ingestionJobRecordsFromGatewayResult(result *knowledgeInvokeResult) []any {
+	if result == nil {
+		return []any{}
+	}
+	if records, ok := ingestionJobRecordsFromGatewayMap(result.Data); ok {
+		return records
+	}
+	if len(result.Raw) > 0 && string(result.Raw) != "null" {
+		var records []any
+		if err := json.Unmarshal(result.Raw, &records); err == nil {
+			return records
+		}
+		var envelope map[string]any
+		if err := json.Unmarshal(result.Raw, &envelope); err == nil {
+			if records, ok := ingestionJobRecordsFromGatewayMap(envelope); ok {
+				return records
+			}
+		}
+	}
+	return []any{}
+}
+
+func ingestionJobRecordsFromGatewayMap(data map[string]any) ([]any, bool) {
+	if data == nil {
+		return nil, false
+	}
+	for _, key := range []string{"items", "records", "data"} {
+		if records, ok := anySliceFromGatewayValue(data[key]); ok {
+			return records, true
+		}
+	}
+	for _, key := range []string{"payload", "result"} {
+		if nested, ok := data[key].(map[string]any); ok {
+			if records, ok := ingestionJobRecordsFromGatewayMap(nested); ok {
+				return records, true
+			}
+		}
+	}
+	if records, ok := anySliceFromGatewayValue(data); ok {
+		return records, true
+	}
+	return nil, false
+}
+
+func anySliceFromGatewayValue(value any) ([]any, bool) {
+	switch typed := value.(type) {
+	case []any:
+		return typed, true
+	case []map[string]any:
+		records := make([]any, 0, len(typed))
+		for _, record := range typed {
+			records = append(records, record)
+		}
+		return records, true
+	default:
+		return nil, false
+	}
+}
+
+func knowledgeGatewayResultStatus(result *knowledgeInvokeResult) string {
+	if result == nil {
+		return ""
+	}
+	for _, value := range []any{
+		result.Status,
+		result.Data["status"],
+		result.Data["Status"],
+	} {
+		if text := strings.TrimSpace(fmt.Sprint(value)); text != "" && text != "<nil>" {
+			return text
+		}
+	}
+	for _, key := range []string{"payload", "result"} {
+		if nested, ok := result.Data[key].(map[string]any); ok {
+			for _, statusKey := range []string{"status", "Status"} {
+				if text := strings.TrimSpace(fmt.Sprint(nested[statusKey])); text != "" && text != "<nil>" {
+					return text
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func (h *KnowledgeHandler) IngestSpace(c *gin.Context) {
+	provider, err := h.provider()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	spaceID := strings.TrimSpace(c.Param("spaceID"))
+	if spaceID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "knowledge space_id is required"})
+		return
+	}
+	var req knowledgeIngestSpaceRequest
+	if c.Request != nil && c.Request.ContentLength > 0 {
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid knowledge ingestion request"})
+			return
+		}
+	}
+	if strings.TrimSpace(req.SourceURI) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "knowledge ingestion sourceUri is required"})
+		return
+	}
+	if provider.Mode() == fwknowledge.ProviderModeDelegated && h.gatewayReady() {
+		result, err := h.invokeKnowledgeCapability(c, knowledgeCapabilityCreateIngestionJob, "CreateIngestionJob", map[string]any{
+			"method":   http.MethodPost,
+			"endpoint": "/api/v1/admin/knowledge-spaces/" + url.PathEscape(spaceID) + "/ingestion-jobs",
+			"body": map[string]any{
+				"sourceUri":        strings.TrimSpace(req.SourceURI),
+				"format":           firstNonEmpty(req.Format, "markdown"),
+				"ingestionProfile": firstNonEmpty(req.IngestionProfile, "p1_general"),
+				"requestedBy":      firstNonEmpty(req.RequestedBy, "plugin-knowledge-lab"),
+			},
+		})
+		if err != nil {
+			respondKnowledgeGatewayError(c, err)
+			return
+		}
+		c.JSON(http.StatusAccepted, gin.H{"success": true, "data": gin.H{
+			"space_id":      spaceID,
+			"provider":      provider.Name(),
+			"provider_mode": provider.Mode(),
+			"source":        "powerx_gateway_capability",
+			"capability_id": knowledgeCapabilityCreateIngestionJob,
+			"trace_id":      result.TraceID,
+			"status":        result.Status,
+			"job":           result.Data,
+		}})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{
+		"space_id":      spaceID,
+		"provider":      provider.Name(),
+		"provider_mode": provider.Mode(),
+		"status":        "local_fixture_ready",
+		"note":          "本地模式入库仍由 Playground 的本地入库模拟完成",
+	}})
+}
+
+func (h *KnowledgeHandler) UploadIngestionSource(c *gin.Context) {
+	if !h.gatewayReady() {
+		c.JSON(http.StatusBadGateway, gin.H{"success": false, "error": "PowerX Gateway 客户端未配置", "code": fwknowledge.CodeProviderUnavailable})
+		return
+	}
+	spaceID := strings.TrimSpace(c.PostForm("spaceId"))
+	if spaceID == "" {
+		spaceID = strings.TrimSpace(c.PostForm("space_id"))
+	}
+	if spaceID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "knowledge space_id is required"})
+		return
+	}
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "upload file is required"})
+		return
+	}
+	defer file.Close()
+	raw, err := io.ReadAll(file)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "read upload file failed"})
+		return
+	}
+	if len(raw) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "upload file is empty"})
+		return
+	}
+	fileName := strings.TrimSpace(header.Filename)
+	if fileName == "" {
+		fileName = "knowledge-source"
+	}
+	contentType := strings.TrimSpace(header.Header.Get("Content-Type"))
+	if contentType == "" {
+		contentType = http.DetectContentType(raw)
+	}
+	sourceFormat := firstNonEmpty(c.PostForm("format"), knowledgeFormatFromFilename(fileName), "markdown")
+	requestedBy := firstNonEmpty(c.PostForm("requestedBy"), "plugin-knowledge-lab")
+
+	mediaClient := fwmedia.NewClient(knowledgeMediaGatewayAdapter{gateway: h.deps.CapabilityGateway}, http.DefaultClient)
+	asset, err := mediaClient.CreateAsset(c.Request.Context(), fwmedia.CreateAssetInput{
+		OperatorID:       requestedBy,
+		Name:             fileName,
+		Description:      "PowerX Plugin knowledge ingestion source",
+		Driver:           "local",
+		OwnerSubjectType: "knowledge_space",
+		OwnerSubjectID:   spaceID,
+		Tags:             []string{"knowledge_space", "knowledge_ingestion_source"},
+		UploadChannel:    fwmedia.UploadChannelPresigned,
+		RequestID:        strings.TrimSpace(c.GetHeader("X-Request-ID")),
+	})
+	if err != nil {
+		respondKnowledgeGatewayError(c, err)
+		return
+	}
+	uploadTicket, err := mediaClient.PresignAsset(c.Request.Context(), fwmedia.PresignAssetInput{
+		UUID:             asset.UUID,
+		OperatorID:       requestedBy,
+		Action:           fwmedia.PresignActionUpload,
+		Method:           http.MethodPut,
+		ExpiresInSeconds: 3600,
+		Headers:          map[string]string{"Content-Type": contentType},
+		RequestID:        strings.TrimSpace(c.GetHeader("X-Request-ID")),
+	})
+	if err != nil {
+		respondKnowledgeGatewayError(c, err)
+		return
+	}
+	uploadTicket.URL = h.resolveMediaURL(uploadTicket.URL)
+	if strings.TrimSpace(uploadTicket.URL) == "" {
+		c.JSON(http.StatusBadGateway, gin.H{"success": false, "error": "PowerX Media 上传链接不是有效 URL", "code": fwknowledge.CodeProviderUnavailable})
+		return
+	}
+	if err := mediaClient.UploadBytes(c.Request.Context(), uploadTicket, bytes.NewReader(raw), contentType); err != nil {
+		respondKnowledgeGatewayError(c, err)
+		return
+	}
+	status := fwmedia.BusinessStatusUnderReview
+	_, _ = mediaClient.UpdateAsset(c.Request.Context(), fwmedia.UpdateAssetInput{
+		UUID:           asset.UUID,
+		OperatorID:     requestedBy,
+		BusinessStatus: &status,
+		Tags:           []string{"knowledge_space", "knowledge_ingestion_source"},
+		RequestID:      strings.TrimSpace(c.GetHeader("X-Request-ID")),
+	})
+	downloadTicket, err := mediaClient.PresignAsset(c.Request.Context(), fwmedia.PresignAssetInput{
+		UUID:             asset.UUID,
+		OperatorID:       requestedBy,
+		Action:           fwmedia.PresignActionDownload,
+		Method:           http.MethodGet,
+		ExpiresInSeconds: 24 * 3600,
+		RequestID:        strings.TrimSpace(c.GetHeader("X-Request-ID")),
+	})
+	if err != nil {
+		respondKnowledgeGatewayError(c, err)
+		return
+	}
+	downloadTicket.URL = h.resolveMediaURL(downloadTicket.URL)
+	if strings.TrimSpace(downloadTicket.URL) == "" {
+		c.JSON(http.StatusBadGateway, gin.H{"success": false, "error": "PowerX Media 下载链接不是有效 URL", "code": fwknowledge.CodeProviderUnavailable})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{
+		"mediaUuid":   asset.UUID,
+		"sourceUri":   downloadTicket.URL,
+		"fileName":    fileName,
+		"format":      sourceFormat,
+		"contentType": contentType,
+		"sizeBytes":   len(raw),
+	}})
+}
+
+func (h *KnowledgeHandler) resolveMediaURL(raw string) string {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return ""
+	}
+	if parsed, err := url.Parse(value); err == nil && parsed.IsAbs() {
+		return value
+	}
+	base := ""
+	if h != nil && h.deps != nil && h.deps.Config != nil && h.deps.Config.Gateway != nil {
+		base = strings.TrimSpace(h.deps.Config.Gateway.BaseURL)
+	}
+	if base == "" {
+		return ""
+	}
+	parsedBase, err := url.Parse(base)
+	if err != nil || parsedBase.Scheme == "" || parsedBase.Host == "" {
+		return ""
+	}
+	parsedBase.Path = ""
+	parsedBase.RawQuery = ""
+	parsedBase.Fragment = ""
+	if strings.HasPrefix(value, "/") {
+		parsedBase.Path = value
+	} else {
+		parsedBase.Path = "/" + value
+	}
+	return parsedBase.String()
+}
+
+func knowledgeFormatFromFilename(name string) string {
+	ext := strings.ToLower(strings.TrimPrefix(filepath.Ext(name), "."))
+	switch ext {
+	case "md", "markdown":
+		return "markdown"
+	case "txt":
+		return "text"
+	case "pdf":
+		return "pdf"
+	case "html", "htm":
+		return "html"
+	case "csv":
+		return "csv"
+	default:
+		return ""
+	}
+}
+
+func (h *KnowledgeHandler) Policy(c *gin.Context) {
+	provider, err := h.provider()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	spaceID := strings.TrimSpace(c.Param("spaceID"))
+	if spaceID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "knowledge space_id is required"})
+		return
+	}
+	if provider.Mode() == fwknowledge.ProviderModeDelegated && h.gatewayReady() {
+		result, err := h.invokeKnowledgeCapability(c, knowledgeCapabilityListFusionStrategies, "ListFusionStrategies", map[string]any{
+			"method":   http.MethodGet,
+			"endpoint": "/api/v1/admin/knowledge-spaces/" + spaceID + "/fusion-strategies",
+			"query":    map[string]string{"limit": "20"},
+		})
+		if err != nil {
+			respondKnowledgeGatewayError(c, err)
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{
+			"space_id":        spaceID,
+			"provider":        provider.Name(),
+			"provider_mode":   provider.Mode(),
+			"source":          "powerx_gateway_capability",
+			"capability_id":   knowledgeCapabilityListFusionStrategies,
+			"trace_id":        result.TraceID,
+			"status":          result.Status,
+			"fusion_strategy": result.Data,
+		}})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{
+		"space_id":        spaceID,
+		"provider":        provider.Name(),
+		"provider_mode":   provider.Mode(),
+		"tenant_required": provider.Mode() != fwknowledge.ProviderModeMock,
+		"citation":        "required",
+		"redaction":       "enabled",
+		"fallback":        "disabled",
+	}})
+}
+
+func (h *KnowledgeHandler) Search(c *gin.Context) {
+	var req knowledgeSearchRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid knowledge search request"})
+		return
+	}
+	provider, err := h.provider()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	tenantUUID, tenantMismatch := resolveKnowledgeTenantUUID(c, req.TenantUUID)
+	if tenantMismatch {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "tenant_uuid mismatch", "code": fwknowledge.CodeForbidden})
+		return
+	}
+	req.TenantUUID = tenantUUID
+	// Plugin-local knowledge spaces are durable database records managed from
+	// /admin/knowledge/*. Do not use the former in-memory fixture provider for
+	// a real local-space query.
+	if provider.Mode() == fwknowledge.ProviderModeLocal && h != nil && h.deps != nil && h.deps.DB != nil && strings.TrimSpace(req.SpaceID) != "" {
+		if result, handled, searchErr := h.searchPersistedLocal(c, req); handled {
+			if searchErr != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": searchErr.Error()})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{"success": true, "data": result})
+			return
+		}
+	}
+	if local, ok := provider.(*fwknowledge.LocalProvider); ok && req.Fixture != nil {
+		if _, err := local.UpsertDocument(c.Request.Context(), req.Fixture.document(req)); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+			return
+		}
+	}
+	query := fwknowledge.KnowledgeQuery{
+		Query:      req.Query,
+		SpaceIDs:   singleSpace(req.SpaceID),
+		TenantUUID: req.TenantUUID,
+		PluginID:   req.PluginID,
+		AgentUUID:  req.AgentUUID,
+		SkillID:    req.SkillID,
+		CallerType: fwknowledge.CallerTypeAgent,
+		Visibility: firstNonEmpty(req.Visibility, fwknowledge.VisibilityTenant),
+		Limit:      req.Limit,
+		Tags:       req.Tags,
+		Filters:    req.Filters,
+		TraceID:    c.GetString("request_id"),
+	}
+	result, err := provider.Search(c.Request.Context(), query)
+	if err != nil {
+		status := fwknowledge.HTTPStatusForCode(fwknowledge.CodeOf(err))
+		c.JSON(status, gin.H{"success": false, "error": err.Error(), "code": fwknowledge.CodeOf(err)})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": result})
+}
+
+func (h *KnowledgeHandler) searchPersistedLocal(c *gin.Context, req knowledgeSearchRequest) (*fwknowledge.KnowledgeSearchResult, bool, error) {
+	var space models.LocalKnowledgeSpace
+	if err := h.deps.DB.WithContext(c.Request.Context()).Where("tenant_uuid = ? AND uuid = ?", req.TenantUUID, req.SpaceID).First(&space).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, false, nil
+		}
+		return nil, true, err
+	}
+	var profile models.LocalRAGProfileVersion
+	if err := h.deps.DB.WithContext(c.Request.Context()).Where("tenant_uuid = ? AND profile_key = ? AND status = ?", req.TenantUUID, space.RAGProfileKey, "published").Order("version desc").First(&profile).Error; err != nil {
+		return nil, true, err
+	}
+	var profileConfig struct {
+		TopK     int     `json:"top_k"`
+		MinScore float64 `json:"min_score"`
+		Strategy string  `json:"strategy"`
+	}
+	if len(profile.Config) > 0 {
+		_ = json.Unmarshal(profile.Config, &profileConfig)
+	}
+	strategy := localKnowledgeStrategy(space.FeatureFlags)
+	if strategy == "A1_routing" {
+		target, routeErr := h.resolveLocalKnowledgeRoute(c.Request.Context(), req.TenantUUID, space.UUID, req.Query)
+		if routeErr != nil {
+			return nil, true, routeErr
+		}
+		req.SpaceID = target
+		result, _, err := h.searchPersistedLocal(c, req)
+		if result != nil {
+			if result.Diagnostics == nil {
+				result.Diagnostics = map[string]any{}
+			}
+			result.Diagnostics["routed_from_space"] = space.UUID
+		}
+		return result, true, err
+	}
+	needsDense := strategy == "A_simple" || strategy == "A0_acl" || strategy == "A2_time_aware" || strategy == "B_semantic_chunking" || strategy == "C_context_enriched" || strategy == "E_query_transform" || strategy == "F_rerank" || strategy == "G_rse" || strategy == "H_fusion" || strategy == "I_hyde" || strategy == "J_hier" || strategy == "K_kg" || strategy == "M_adaptive" || strategy == "N_self_rag" || strategy == "O_crag"
+	queryForEmbedding := req.Query
+	if strategy == "E_query_transform" || strategy == "I_hyde" {
+		if h.deps.LocalAI == nil {
+			return nil, true, fmt.Errorf("LOCAL_HYDE_MODEL_NOT_CONFIGURED")
+		}
+		keys := h.deps.LocalAI.LLMModelKeys()
+		if len(keys) == 0 {
+			return nil, true, fmt.Errorf("LOCAL_HYDE_MODEL_NOT_CONFIGURED")
+		}
+		prompt := "Rewrite this knowledge-base search query into concise retrieval terms. Return only the rewritten query.\n\nQuery: " + req.Query
+		if strategy == "I_hyde" {
+			prompt = "Write one concise hypothetical knowledge-base passage that would answer this search query. Return only the passage.\n\nQuery: " + req.Query
+		}
+		generated, generateErr := h.deps.LocalAI.LLMInvoke(c.Request.Context(), dto.LLMInvokeInput{
+			ModelKey: keys[0],
+			Inputs: []dto.ContentItem{
+				{
+					Role:    "user",
+					Type:    "text",
+					Content: prompt,
+				},
+			},
+		})
+		if generateErr != nil || generated == nil || strings.TrimSpace(generated.Text) == "" {
+			return nil, true, fmt.Errorf("LOCAL_QUERY_TRANSFORM_FAILED")
+		}
+		queryForEmbedding = strings.TrimSpace(generated.Text)
+	}
+	queryVector := []float32(nil)
+	if needsDense {
+		if h.deps.LocalAI == nil || strings.TrimSpace(space.EmbeddingProfileKey) == "" {
+			return nil, true, fmt.Errorf("local dense index is not configured")
+		}
+		out, invokeErr := h.deps.LocalAI.EmbeddingInvoke(c.Request.Context(), dto.EmbeddingInvokeInput{ModelKey: space.EmbeddingProfileKey, Inputs: []string{queryForEmbedding}})
+		if invokeErr != nil || out == nil || len(out.Vectors) != 1 || len(out.Vectors[0]) == 0 {
+			return nil, true, fmt.Errorf("local query embedding failed")
+		}
+		queryVector = out.Vectors[0]
+	}
+	vectorTable := ""
+	if needsDense {
+		if h.deps.DB == nil || h.deps.DB.Dialector == nil || h.deps.DB.Dialector.Name() != "postgres" {
+			return nil, true, fmt.Errorf("local dense index requires PostgreSQL pgvector")
+		}
+		var activeIndex models.LocalKnowledgeVectorIndex
+		if strings.TrimSpace(space.ActiveVectorIndexKey) == "" || h.deps.DB.WithContext(c.Request.Context()).Where("tenant_uuid=? AND space_uuid=? AND index_key=? AND status=?", req.TenantUUID, space.UUID, space.ActiveVectorIndexKey, "active").First(&activeIndex).Error != nil {
+			return nil, true, fmt.Errorf("local dense index is not activated")
+		}
+		if !localVectorTablePattern.MatchString(strings.TrimSpace(activeIndex.VectorTable)) || activeIndex.Dimensions != len(queryVector) {
+			return nil, true, fmt.Errorf("local dense index is invalid")
+		}
+		vectorTable = `"` + activeIndex.VectorTable + `"`
+	}
+	var rows []localSearchRow
+	selectColumns := "chunks.*, documents.title, documents.effective_from, documents.effective_to, documents.access_scope, documents.allowed_member_uuids, documents.tags, vectors.vector"
+	if needsDense {
+		selectColumns = "chunks.*, documents.title, documents.effective_from, documents.effective_to, documents.access_scope, documents.allowed_member_uuids, documents.tags, vectors.embedding::text::jsonb AS vector"
+	}
+	db := h.deps.DB.WithContext(c.Request.Context()).Table(models.LocalKnowledgeChunk{}.TableName() + " AS chunks").
+		Select(selectColumns).Joins("JOIN " + models.LocalKnowledgeDocument{}.TableName() + " AS documents ON documents.uuid = chunks.document_uuid AND documents.tenant_uuid = chunks.tenant_uuid")
+	if needsDense {
+		db = db.Joins("JOIN " + vectorTable + " AS vectors ON vectors.chunk_uuid = chunks.uuid AND vectors.space_uuid = chunks.space_uuid")
+	} else {
+		// Dense embeddings are stored exclusively in the active pgvector table.
+		// Sparse-only retrieval must not recreate or depend on the removed JSON
+		// vector compatibility table.
+		db = db.Joins("LEFT JOIN (SELECT NULL AS vector) AS vectors ON 1 = 0")
+	}
+	if err := db.
+		Where("chunks.tenant_uuid = ? AND chunks.space_uuid = ?", req.TenantUUID, space.UUID).Find(&rows).Error; err != nil {
+		return nil, true, err
+	}
+	if needsDense && len(rows) == 0 {
+		return nil, true, fmt.Errorf("local dense index has no indexed chunks")
+	}
+	limit := req.Limit
+	if limit <= 0 {
+		limit = profileConfig.TopK
+	}
+	if limit <= 0 {
+		limit = 5
+	}
+	lexicalScores := localBM25Scores(rows, req.Query)
+	scored := make([]localKnowledgeScoredRow, 0, len(rows))
+	feedbackScores := map[string]float64{}
+	feedbackTotal, feedbackCount := 0.0, 0
+	if strategy == "L_feedback" || strategy == "M_adaptive" {
+		var cases []models.LocalKnowledgeFeedbackCase
+		if err := h.deps.DB.WithContext(c.Request.Context()).Where("space_uuid = ?", space.UUID).Find(&cases).Error; err != nil {
+			return nil, true, err
+		}
+		for _, item := range cases {
+			var ids []string
+			if json.Unmarshal(item.LinkedChunks, &ids) == nil {
+				for _, id := range ids {
+					feedbackScores[id] += item.QualityScore
+					feedbackTotal += item.QualityScore
+					feedbackCount++
+				}
+			}
+		}
+	}
+	acl, aclErr := h.localKnowledgeACL(c, req.TenantUUID, space.DepartmentCode)
+	if strategy == "A0_acl" && aclErr != nil {
+		return nil, true, aclErr
+	}
+	graphScores := map[string]float64{}
+	if strategy == "K_kg" {
+		var graphErr error
+		graphScores, graphErr = h.localKnowledgeGraphBoost(c.Request.Context(), req.TenantUUID, space.UUID, req.Query)
+		if graphErr != nil {
+			return nil, true, graphErr
+		}
+	}
+	for i, row := range rows {
+		if strategy == "A0_acl" && !acl.allows(row) {
+			continue
+		}
+		if strategy == "A2_time_aware" && !localDocumentEffectiveAt(row.EffectiveFrom, row.EffectiveTo, time.Now()) {
+			continue
+		}
+		var score float64
+		switch strategy {
+		case "A_simple", "A2_time_aware", "B_semantic_chunking", "C_context_enriched", "E_query_transform", "F_rerank", "G_rse", "I_hyde", "J_hier":
+			vector, decodeErr := localVector(row.Vector)
+			if decodeErr != nil {
+				return nil, true, decodeErr
+			}
+			score = localCosineSimilarity(queryVector, vector)
+		case "K_kg":
+			vector, decodeErr := localVector(row.Vector)
+			if decodeErr != nil {
+				return nil, true, decodeErr
+			}
+			score = localCosineSimilarity(queryVector, vector) + graphScores[row.UUID]
+		case "H_fusion":
+			vector, decodeErr := localVector(row.Vector)
+			if decodeErr != nil {
+				return nil, true, decodeErr
+			}
+			score = (localNormalizeCosine(localCosineSimilarity(queryVector, vector)) + localNormalizeBM25(lexicalScores[i])) / 2
+		case "N_self_rag":
+			vector, decodeErr := localVector(row.Vector)
+			if decodeErr != nil {
+				return nil, true, decodeErr
+			}
+			score = localCosineSimilarity(queryVector, vector)
+		case "O_crag":
+			vector, decodeErr := localVector(row.Vector)
+			if decodeErr != nil {
+				return nil, true, decodeErr
+			}
+			score = (localNormalizeCosine(localCosineSimilarity(queryVector, vector)) + localNormalizeBM25(lexicalScores[i])) / 2
+		case "D_doc_augmentation":
+			score = lexicalScores[i] + localAugmentedFieldScore(row, req.Query)
+		case "L_feedback":
+			score = lexicalScores[i] + feedbackScores[row.UUID]
+		case "M_adaptive":
+			vector, decodeErr := localVector(row.Vector)
+			if decodeErr != nil {
+				return nil, true, decodeErr
+			}
+			if feedbackCount > 0 && feedbackTotal/float64(feedbackCount) < 0.5 {
+				score = (localNormalizeCosine(localCosineSimilarity(queryVector, vector)) + localNormalizeBM25(lexicalScores[i])) / 2
+			} else {
+				score = localCosineSimilarity(queryVector, vector)
+			}
+		default:
+			score = lexicalScores[i]
+		}
+		if score < profileConfig.MinScore || score == 0 {
+			continue
+		}
+		scored = append(scored, localKnowledgeScoredRow{row: row, score: score})
+	}
+	if strategy == "F_rerank" {
+		// A reranker receives a bounded candidate set, not the entire corpus.
+		// Keep the highest dense candidates before asking the configured model.
+		sort.SliceStable(scored, func(i, j int) bool { return scored[i].score > scored[j].score })
+		if len(scored) > 30 {
+			scored = scored[:30]
+		}
+		reranked, rerankErr := h.localLLMRerank(c.Request.Context(), req.Query, scored, nil)
+		if rerankErr != nil {
+			return nil, true, rerankErr
+		}
+		for i := range scored {
+			score, ok := reranked[scored[i].row.UUID]
+			if !ok {
+				return nil, true, fmt.Errorf("LOCAL_RERANK_RESULT_INCOMPLETE")
+			}
+			scored[i].score = score
+		}
+	}
+	if strategy == "G_rse" {
+		sort.SliceStable(scored, func(i, j int) bool { return scored[i].score > scored[j].score })
+		if len(scored) > 30 {
+			scored = scored[:30]
+		}
+		lexicon := localDomainLexicon(scored)
+		if len(lexicon) == 0 {
+			return nil, true, fmt.Errorf("LOCAL_DOMAIN_LEXICON_REQUIRED")
+		}
+		reranked, rerankErr := h.localLLMRerank(c.Request.Context(), req.Query, scored, lexicon)
+		if rerankErr != nil {
+			return nil, true, rerankErr
+		}
+		for i := range scored {
+			score, ok := reranked[scored[i].row.UUID]
+			if !ok {
+				return nil, true, fmt.Errorf("LOCAL_RERANK_RESULT_INCOMPLETE")
+			}
+			scored[i].score = score
+		}
+	}
+	selfRAGLoopCount := 0
+	if strategy == "N_self_rag" || strategy == "O_crag" {
+		sort.SliceStable(scored, func(i, j int) bool { return scored[i].score > scored[j].score })
+		if len(scored) > 30 {
+			scored = scored[:30]
+		}
+		review, reviewErr := h.localEvidenceReview(c.Request.Context(), req.Query, scored)
+		if reviewErr != nil {
+			return nil, true, reviewErr
+		}
+		selfRAGLoopCount = 1
+		if strategy == "N_self_rag" && !review.Sufficient {
+			if strings.TrimSpace(review.FollowupQuery) == "" {
+				return nil, true, fmt.Errorf("LOCAL_SELF_RAG_FOLLOWUP_REQUIRED")
+			}
+			out, invokeErr := h.deps.LocalAI.EmbeddingInvoke(c.Request.Context(), dto.EmbeddingInvokeInput{ModelKey: space.EmbeddingProfileKey, Inputs: []string{review.FollowupQuery}})
+			if invokeErr != nil || out == nil || len(out.Vectors) != 1 || len(out.Vectors[0]) == 0 {
+				return nil, true, fmt.Errorf("LOCAL_SELF_RAG_FOLLOWUP_EMBEDDING_FAILED")
+			}
+			for i := range scored {
+				vector, decodeErr := localVector(scored[i].row.Vector)
+				if decodeErr != nil {
+					return nil, true, decodeErr
+				}
+				scored[i].score = localCosineSimilarity(out.Vectors[0], vector)
+			}
+			sort.SliceStable(scored, func(i, j int) bool { return scored[i].score > scored[j].score })
+			review, reviewErr = h.localEvidenceReview(c.Request.Context(), review.FollowupQuery, scored)
+			if reviewErr != nil {
+				return nil, true, reviewErr
+			}
+			selfRAGLoopCount = 2
+		}
+		if strategy == "O_crag" && !review.Sufficient {
+			lexicalByChunk := make(map[string]float64, len(rows))
+			for i, row := range rows {
+				lexicalByChunk[row.UUID] = lexicalScores[i]
+			}
+			for i := range scored {
+				scored[i].score = lexicalByChunk[scored[i].row.UUID]
+			}
+			sort.SliceStable(scored, func(i, j int) bool { return scored[i].score > scored[j].score })
+			review, reviewErr = h.localEvidenceReview(c.Request.Context(), req.Query, scored)
+			if reviewErr != nil {
+				return nil, true, reviewErr
+			}
+			selfRAGLoopCount = 2
+		}
+		if !review.Sufficient {
+			return nil, true, fmt.Errorf("LOCAL_EVIDENCE_REJECTED")
+		}
+		approved := map[string]bool{}
+		for _, chunkUUID := range review.ApprovedIDs {
+			approved[chunkUUID] = true
+		}
+		filtered := scored[:0]
+		for _, item := range scored {
+			if approved[item.row.UUID] {
+				filtered = append(filtered, item)
+			}
+		}
+		scored = filtered
+	}
+	sort.SliceStable(scored, func(i, j int) bool { return scored[i].score > scored[j].score })
+	if len(scored) > limit {
+		scored = scored[:limit]
+	}
+	out := make([]fwknowledge.KnowledgeChunk, 0, len(scored))
+	citations := make([]fwknowledge.KnowledgeCitation, 0, len(scored))
+	for _, item := range scored {
+		citation := fwknowledge.KnowledgeCitation{DocumentID: item.row.DocumentUUID, ChunkID: item.row.UUID, Title: item.row.Title, Provider: "plugin_local", RetrievedAt: time.Now()}
+		text := item.row.Content
+		if strategy == "C_context_enriched" {
+			text = localContextEnrichedText(rows, item.row.UUID)
+		}
+		if strategy == "J_hier" {
+			if section := localChunkSection(item.row.Metadata); section != "" {
+				text = section + "\n" + text
+			}
+		}
+		out = append(out, fwknowledge.KnowledgeChunk{ChunkID: item.row.UUID, DocumentID: item.row.DocumentUUID, SpaceID: item.row.SpaceUUID, Text: text, Score: item.score, Citation: &citation, TenantUUID: req.TenantUUID})
+		citations = append(citations, citation)
+	}
+	diagnostics := map[string]any{"strategy": profileConfig.Strategy, "profile": profile.DisplayName, "profile_version": profile.Version}
+	if strategy == "I_hyde" {
+		diagnostics["hyde_generation"] = "local_llm"
+	}
+	if strategy == "E_query_transform" {
+		diagnostics["query_transform"] = "local_llm"
+	}
+	if strategy == "F_rerank" {
+		diagnostics["reranker"] = "local_llm_structured"
+	}
+	if strategy == "G_rse" {
+		diagnostics["rse"] = "local_llm_rerank_with_document_lexicon"
+	}
+	if strategy == "K_kg" {
+		diagnostics["graph_query"] = "local_persisted_kg"
+	}
+	if strategy == "N_self_rag" {
+		diagnostics["self_rag_evidence_loops"] = selfRAGLoopCount
+	}
+	if strategy == "O_crag" {
+		diagnostics["crag_correction"] = "fusion_then_sparse_when_evidence_rejected"
+		diagnostics["evidence_loops"] = selfRAGLoopCount
+	}
+	if strategy == "L_feedback" {
+		diagnostics["feedback_rerank"] = "local_feedback_cases"
+	}
+	if strategy == "M_adaptive" {
+		if feedbackCount > 0 && feedbackTotal/float64(feedbackCount) < 0.5 {
+			diagnostics["adaptive_policy"] = "fusion_low_feedback"
+		} else {
+			diagnostics["adaptive_policy"] = "dense_default"
+		}
+	}
+	return &fwknowledge.KnowledgeSearchResult{QueryID: c.GetString("request_id"), Provider: "plugin_local", SpaceID: space.UUID, Chunks: out, Citations: citations, Total: len(out), TraceID: c.GetString("request_id"), Diagnostics: diagnostics}, true, nil
+}
+
+type localKnowledgeScoredRow struct {
+	row   localSearchRow
+	score float64
+}
+
+// localLLMRerank is intentionally strict: a malformed or partial model result
+// fails the request.  We never quietly substitute the pre-rerank dense order.
+func (h *KnowledgeHandler) localLLMRerank(ctx context.Context, query string, candidates []localKnowledgeScoredRow, lexicon []string) (map[string]float64, error) {
+	if h == nil || h.deps == nil || h.deps.LocalAI == nil {
+		return nil, fmt.Errorf("LOCAL_RERANKER_NOT_CONFIGURED")
+	}
+	keys := h.deps.LocalAI.LLMModelKeys()
+	if len(keys) == 0 {
+		return nil, fmt.Errorf("LOCAL_RERANKER_NOT_CONFIGURED")
+	}
+	if len(candidates) == 0 {
+		return map[string]float64{}, nil
+	}
+	type candidate struct {
+		ID   string `json:"id"`
+		Text string `json:"text"`
+	}
+	items := make([]candidate, 0, len(candidates))
+	for _, item := range candidates {
+		items = append(items, candidate{ID: item.row.UUID, Text: item.row.Content})
+	}
+	rawCandidates, err := json.Marshal(items)
+	if err != nil {
+		return nil, err
+	}
+	prompt := "Rank every candidate for the query. Return JSON only in exactly this shape: {\"scores\":[{\"id\":\"candidate uuid\",\"score\":0.0}]}. Score must be a number from 0 to 1. Include every candidate exactly once.\n\nQuery: " + query
+	if len(lexicon) > 0 {
+		prompt += "\n\nDomain lexicon: " + strings.Join(lexicon, ", ") + "\nUse the lexicon only to expand the query semantics before ranking."
+	}
+	prompt += "\n\nCandidates: " + string(rawCandidates)
+	result, err := h.deps.LocalAI.LLMInvoke(ctx, dto.LLMInvokeInput{ModelKey: keys[0], Inputs: []dto.ContentItem{
+		{Role: "user", Type: "text", Content: prompt},
+	}})
+	if err != nil || result == nil || strings.TrimSpace(result.Text) == "" {
+		return nil, fmt.Errorf("LOCAL_RERANK_FAILED")
+	}
+	var parsed struct {
+		Scores []struct {
+			ID    string  `json:"id"`
+			Score float64 `json:"score"`
+		} `json:"scores"`
+	}
+	if json.Unmarshal([]byte(strings.TrimSpace(result.Text)), &parsed) != nil || len(parsed.Scores) != len(candidates) {
+		return nil, fmt.Errorf("LOCAL_RERANK_INVALID_RESPONSE")
+	}
+	expected := make(map[string]bool, len(candidates))
+	for _, item := range candidates {
+		expected[item.row.UUID] = true
+	}
+	scores := make(map[string]float64, len(candidates))
+	for _, item := range parsed.Scores {
+		if !expected[item.ID] || item.Score < 0 || item.Score > 1 {
+			return nil, fmt.Errorf("LOCAL_RERANK_INVALID_RESPONSE")
+		}
+		if _, exists := scores[item.ID]; exists {
+			return nil, fmt.Errorf("LOCAL_RERANK_INVALID_RESPONSE")
+		}
+		scores[item.ID] = item.Score
+	}
+	if len(scores) != len(candidates) {
+		return nil, fmt.Errorf("LOCAL_RERANK_RESULT_INCOMPLETE")
+	}
+	return scores, nil
+}
+
+func localDomainLexicon(rows []localKnowledgeScoredRow) []string {
+	seen := map[string]bool{}
+	terms := make([]string, 0, 32)
+	for _, item := range rows {
+		var tags []string
+		if json.Unmarshal(item.row.Tags, &tags) != nil {
+			continue
+		}
+		for _, tag := range tags {
+			tag = strings.TrimSpace(strings.ToLower(tag))
+			if tag != "" && !seen[tag] {
+				seen[tag] = true
+				terms = append(terms, tag)
+				if len(terms) == 32 {
+					return terms
+				}
+			}
+		}
+	}
+	return terms
+}
+
+type localEvidenceReviewResult struct {
+	Sufficient    bool     `json:"sufficient"`
+	ApprovedIDs   []string `json:"approved_ids"`
+	FollowupQuery string   `json:"followup_query"`
+}
+
+// localEvidenceReview is shared by N and O.  The model is required to select
+// explicit persisted chunk UUIDs; it cannot manufacture a citation.
+func (h *KnowledgeHandler) localEvidenceReview(ctx context.Context, query string, candidates []localKnowledgeScoredRow) (localEvidenceReviewResult, error) {
+	if h == nil || h.deps == nil || h.deps.LocalAI == nil {
+		return localEvidenceReviewResult{}, fmt.Errorf("LOCAL_EVIDENCE_CHECKER_NOT_CONFIGURED")
+	}
+	keys := h.deps.LocalAI.LLMModelKeys()
+	if len(keys) == 0 {
+		return localEvidenceReviewResult{}, fmt.Errorf("LOCAL_EVIDENCE_CHECKER_NOT_CONFIGURED")
+	}
+	type candidate struct {
+		ID   string `json:"id"`
+		Text string `json:"text"`
+	}
+	items := make([]candidate, 0, len(candidates))
+	expected := make(map[string]bool, len(candidates))
+	for _, item := range candidates {
+		items = append(items, candidate{ID: item.row.UUID, Text: item.row.Content})
+		expected[item.row.UUID] = true
+	}
+	rawCandidates, err := json.Marshal(items)
+	if err != nil {
+		return localEvidenceReviewResult{}, err
+	}
+	prompt := "Check whether the candidate evidence supports the query. Return JSON only in exactly this shape: {\"sufficient\":true,\"approved_ids\":[\"candidate uuid\"],\"followup_query\":\"\"}. approved_ids must contain only supported candidate ids. If insufficient, set sufficient=false and provide a concise followup_query.\n\nQuery: " + query + "\n\nCandidates: " + string(rawCandidates)
+	result, err := h.deps.LocalAI.LLMInvoke(ctx, dto.LLMInvokeInput{ModelKey: keys[0], Inputs: []dto.ContentItem{
+		{Role: "user", Type: "text", Content: prompt},
+	}})
+	if err != nil || result == nil || strings.TrimSpace(result.Text) == "" {
+		return localEvidenceReviewResult{}, fmt.Errorf("LOCAL_EVIDENCE_CHECK_FAILED")
+	}
+	var review localEvidenceReviewResult
+	if json.Unmarshal([]byte(strings.TrimSpace(result.Text)), &review) != nil {
+		return localEvidenceReviewResult{}, fmt.Errorf("LOCAL_EVIDENCE_INVALID_RESPONSE")
+	}
+	seen := map[string]bool{}
+	for _, id := range review.ApprovedIDs {
+		if !expected[id] || seen[id] {
+			return localEvidenceReviewResult{}, fmt.Errorf("LOCAL_EVIDENCE_INVALID_RESPONSE")
+		}
+		seen[id] = true
+	}
+	if review.Sufficient && len(review.ApprovedIDs) == 0 {
+		return localEvidenceReviewResult{}, fmt.Errorf("LOCAL_EVIDENCE_INVALID_RESPONSE")
+	}
+	return review, nil
+}
+
+func (h *KnowledgeHandler) localKnowledgeGraphBoost(ctx context.Context, tenantUUID, spaceUUID, query string) (map[string]float64, error) {
+	var nodes []models.LocalKnowledgeKGNode
+	if err := h.deps.DB.WithContext(ctx).Where("tenant_uuid=? AND space_uuid=?", tenantUUID, spaceUUID).Find(&nodes).Error; err != nil {
+		return nil, err
+	}
+	if len(nodes) == 0 {
+		return nil, fmt.Errorf("LOCAL_KG_GRAPH_NOT_INDEXED")
+	}
+	type nodeProps struct {
+		Name       string   `json:"name"`
+		ChunkUUIDs []string `json:"chunk_uuids"`
+	}
+	matches := map[string]nodeProps{}
+	needle := strings.ToLower(strings.TrimSpace(query))
+	for _, node := range nodes {
+		var props nodeProps
+		if json.Unmarshal(node.Props, &props) != nil || strings.TrimSpace(props.Name) == "" {
+			continue
+		}
+		name := strings.ToLower(strings.TrimSpace(props.Name))
+		if strings.Contains(needle, name) {
+			matches[node.UUID] = props
+		}
+	}
+	boost := map[string]float64{}
+	for _, props := range matches {
+		for _, chunkUUID := range props.ChunkUUIDs {
+			boost[chunkUUID] += 1
+		}
+	}
+	if len(matches) == 0 {
+		return boost, nil
+	}
+	var edges []models.LocalKnowledgeKGEdge
+	if err := h.deps.DB.WithContext(ctx).Where("tenant_uuid=? AND space_uuid=? AND (src_node_uuid IN ? OR dst_node_uuid IN ?)", tenantUUID, spaceUUID, mapsKeys(matches), mapsKeys(matches)).Find(&edges).Error; err != nil {
+		return nil, err
+	}
+	allProps := map[string]nodeProps{}
+	for _, node := range nodes {
+		var props nodeProps
+		if json.Unmarshal(node.Props, &props) == nil {
+			allProps[node.UUID] = props
+		}
+	}
+	for _, edge := range edges {
+		peerUUID := edge.DstNodeUUID
+		if _, hit := matches[peerUUID]; !hit {
+			peerUUID = edge.SrcNodeUUID
+		}
+		if props, ok := allProps[peerUUID]; ok {
+			for _, chunkUUID := range props.ChunkUUIDs {
+				boost[chunkUUID] += .25
+			}
+		}
+	}
+	return boost, nil
+}
+
+func mapsKeys[V any](items map[string]V) []string {
+	keys := make([]string, 0, len(items))
+	for key := range items {
+		keys = append(keys, key)
+	}
+	return keys
+}
+
+func (h *KnowledgeHandler) resolveLocalKnowledgeRoute(ctx context.Context, tenantUUID, routerSpaceUUID, query string) (string, error) {
+	var routes []models.LocalKnowledgeRoute
+	if err := h.deps.DB.WithContext(ctx).Where("tenant_uuid=? AND router_space_uuid=? AND enabled=?", tenantUUID, routerSpaceUUID, true).Order("priority asc").Find(&routes).Error; err != nil {
+		return "", err
+	}
+	needle := strings.ToLower(query)
+	for _, route := range routes {
+		var keywords []string
+		if json.Unmarshal(route.Keywords, &keywords) != nil {
+			continue
+		}
+		for _, keyword := range keywords {
+			if keyword = strings.TrimSpace(strings.ToLower(keyword)); keyword != "" && strings.Contains(needle, keyword) {
+				var target models.LocalKnowledgeSpace
+				if err := h.deps.DB.WithContext(ctx).Where("tenant_uuid=? AND uuid=?", tenantUUID, route.TargetSpaceUUID).First(&target).Error; err != nil {
+					return "", fmt.Errorf("LOCAL_ROUTE_TARGET_UNAVAILABLE")
+				}
+				if localKnowledgeStrategy(target.FeatureFlags) == "A1_routing" {
+					return "", fmt.Errorf("LOCAL_ROUTE_TARGET_INVALID")
+				}
+				return target.UUID, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("LOCAL_ROUTE_NOT_FOUND")
+}
+
+type localKnowledgeACL struct {
+	root            bool
+	memberUUID      string
+	department      string
+	spaceDepartment string
+}
+
+func (h *KnowledgeHandler) localKnowledgeACL(c *gin.Context, tenantUUID, spaceDepartment string) (localKnowledgeACL, error) {
+	tenantContext, ok := authx.GetTenantContext(c)
+	if !ok {
+		return localKnowledgeACL{}, fmt.Errorf("LOCAL_ACL_SUBJECT_REQUIRED")
+	}
+	if tenantContext.IsRoot {
+		return localKnowledgeACL{root: true}, nil
+	}
+	memberUUID := strings.TrimSpace(tenantContext.MemberUUID)
+	if memberUUID == "" {
+		return localKnowledgeACL{}, fmt.Errorf("LOCAL_ACL_SUBJECT_REQUIRED")
+	}
+	var member iammodels.Member
+	if err := h.deps.DB.WithContext(c.Request.Context()).Where("uuid = ?", memberUUID).First(&member).Error; err != nil {
+		return localKnowledgeACL{}, fmt.Errorf("LOCAL_ACL_SUBJECT_NOT_FOUND")
+	}
+	if member.DepartmentUUID == nil || strings.TrimSpace(*member.DepartmentUUID) == "" {
+		return localKnowledgeACL{}, fmt.Errorf("LOCAL_ACL_DEPARTMENT_REQUIRED")
+	}
+	var department iammodels.Department
+	if err := h.deps.DB.WithContext(c.Request.Context()).Where("tenant_uuid = ? AND uuid = ?", tenantUUID, *member.DepartmentUUID).First(&department).Error; err != nil {
+		return localKnowledgeACL{}, fmt.Errorf("LOCAL_ACL_DEPARTMENT_REQUIRED")
+	}
+	return localKnowledgeACL{memberUUID: memberUUID, department: strings.ToLower(strings.TrimSpace(department.Code)), spaceDepartment: strings.ToLower(strings.TrimSpace(spaceDepartment))}, nil
+}
+
+func (acl localKnowledgeACL) allows(row localSearchRow) bool {
+	if acl.root {
+		return true
+	}
+	if strings.EqualFold(strings.TrimSpace(row.AccessScope), "tenant") {
+		return true
+	}
+	var allowed []string
+	_ = json.Unmarshal(row.AllowedMemberUUIDs, &allowed)
+	for _, memberUUID := range allowed {
+		if memberUUID == acl.memberUUID {
+			return true
+		}
+	}
+	// The default document ACL is the knowledge space's owning department.
+	return strings.EqualFold(strings.TrimSpace(row.AccessScope), "space_department") && acl.department == acl.spaceDepartment
+}
+
+func localKnowledgeStrategy(flags datatypes.JSON) string {
+	var values []string
+	if json.Unmarshal(flags, &values) != nil {
+		return "A0_acl"
+	}
+	for _, value := range values {
+		if strings.HasPrefix(value, "rag.strategy_package:") {
+			return strings.TrimPrefix(value, "rag.strategy_package:")
+		}
+	}
+	return "A0_acl"
+}
+
+func localVector(raw datatypes.JSON) ([]float32, error) {
+	var vector []float32
+	if len(raw) == 0 || json.Unmarshal(raw, &vector) != nil || len(vector) == 0 {
+		return nil, fmt.Errorf("invalid local dense vector")
+	}
+	return vector, nil
+}
+
+func localCosineSimilarity(left, right []float32) float64 {
+	if len(left) == 0 || len(left) != len(right) {
+		return 0
+	}
+	var dot, leftNorm, rightNorm float64
+	for i := range left {
+		dot += float64(left[i] * right[i])
+		leftNorm += float64(left[i] * left[i])
+		rightNorm += float64(right[i] * right[i])
+	}
+	if leftNorm == 0 || rightNorm == 0 {
+		return 0
+	}
+	return dot / math.Sqrt(leftNorm*rightNorm)
+}
+
+func localNormalizeCosine(score float64) float64 { return (score + 1) / 2 }
+func localNormalizeBM25(score float64) float64   { return score / (score + 1) }
+
+func localDocumentEffectiveAt(from, to *time.Time, at time.Time) bool {
+	if from != nil && at.Before(*from) {
+		return false
+	}
+	return to == nil || !at.After(*to)
+}
+
+func localChunkSection(metadata datatypes.JSON) string {
+	var data struct {
+		Section string `json:"section"`
+	}
+	if json.Unmarshal(metadata, &data) != nil {
+		return ""
+	}
+	return strings.TrimSpace(data.Section)
+}
+
+func localAugmentedFieldScore(row localSearchRow, query string) float64 {
+	var metadata struct {
+		Title    string   `json:"title"`
+		Keywords []string `json:"augmented_keywords"`
+	}
+	if json.Unmarshal(row.Metadata, &metadata) != nil {
+		return 0
+	}
+	queryTerms := localRetrievalTerms(query)
+	if len(queryTerms) == 0 {
+		return 0
+	}
+	candidates := localRetrievalTerms(metadata.Title)
+	for _, keyword := range metadata.Keywords {
+		candidates = append(candidates, localRetrievalTerms(keyword)...)
+	}
+	if len(candidates) == 0 {
+		return 0
+	}
+	matched := 0
+	for _, term := range queryTerms {
+		for _, candidate := range candidates {
+			if term == candidate {
+				matched++
+				break
+			}
+		}
+	}
+	return float64(matched) / float64(len(queryTerms))
+}
+
+func localContextEnrichedText(rows []localSearchRow, chunkUUID string) string {
+	for _, row := range rows {
+		if row.UUID != chunkUUID {
+			continue
+		}
+		neighbors := make([]string, 0, 3)
+		for _, candidate := range rows {
+			if candidate.DocumentUUID != row.DocumentUUID || candidate.Ordinal < row.Ordinal-1 || candidate.Ordinal > row.Ordinal+1 {
+				continue
+			}
+			neighbors = append(neighbors, candidate.Content)
+		}
+		return strings.Join(neighbors, "\n")
+	}
+	return ""
+}
+
+func localBM25Scores(rows []localSearchRow, query string) []float64 {
+	terms := localRetrievalTerms(query)
+	scores := make([]float64, len(rows))
+	if len(terms) == 0 || len(rows) == 0 {
+		return scores
+	}
+	lengths := make([]int, len(rows))
+	docFrequency := make(map[string]int, len(terms))
+	for i, row := range rows {
+		tokens := localRetrievalTerms(row.Content)
+		lengths[i] = len(tokens)
+		seen := map[string]bool{}
+		for _, token := range tokens {
+			for _, term := range terms {
+				if token == term {
+					seen[term] = true
+				}
+			}
+		}
+		for term := range seen {
+			docFrequency[term]++
+		}
+	}
+	var totalLength int
+	for _, length := range lengths {
+		totalLength += length
+	}
+	averageLength := float64(totalLength) / float64(len(rows))
+	if averageLength == 0 {
+		return scores
+	}
+	const k1, b = 1.2, 0.75
+	for i, row := range rows {
+		tokens := localRetrievalTerms(row.Content)
+		counts := map[string]int{}
+		for _, token := range tokens {
+			counts[token]++
+		}
+		for _, term := range terms {
+			frequency := float64(counts[term])
+			if frequency == 0 {
+				continue
+			}
+			idf := math.Log(1 + (float64(len(rows)-docFrequency[term])+0.5)/(float64(docFrequency[term])+0.5))
+			denominator := frequency + k1*(1-b+b*float64(lengths[i])/averageLength)
+			scores[i] += idf * frequency * (k1 + 1) / denominator
+		}
+	}
+	return scores
+}
+
+func localRetrievalTerms(value string) []string {
+	value = strings.ToLower(value)
+	terms := strings.Fields(value)
+	runes := []rune(value)
+	for start := 0; start < len(runes); {
+		if !unicode.Is(unicode.Han, runes[start]) {
+			start++
+			continue
+		}
+		end := start
+		for end < len(runes) && unicode.Is(unicode.Han, runes[end]) {
+			end++
+		}
+		for i := start; i+1 < end; i++ {
+			terms = append(terms, string(runes[i:i+2]))
+		}
+		if end-start == 1 {
+			terms = append(terms, string(runes[start:end]))
+		}
+		start = end
+	}
+	return terms
+}
+
+func (h *KnowledgeHandler) provider() (fwknowledge.KnowledgeProvider, error) {
+	if h != nil && h.labOnly {
+		return h.knowledgeProvider, h.providerErr
+	}
+	if h != nil && h.deps != nil && h.deps.KnowledgeProvider != nil {
+		return h.deps.KnowledgeProvider, nil
+	}
+	if h == nil {
+		return knowledgeSvc.NewProviderFactory(nil, fwprovider.ModeLocal, nil, nil).Build()
+	}
+	h.providerOnce.Do(func() {
+		var appCfg *config.Config
+		if h.deps != nil {
+			appCfg = h.deps.Config
+		}
+		mode := fwprovider.ModeLocal
+		if h.deps != nil {
+			if h.deps.ProviderMode != "" {
+				mode = h.deps.ProviderMode
+			}
+		}
+		h.knowledgeProvider, h.providerErr = knowledgeSvc.NewProviderFactory(appCfg, mode, h.delegatedKnowledgeClient(), nil).Build()
+	})
+	return h.knowledgeProvider, h.providerErr
+}
+
+func (h *KnowledgeHandler) delegatedKnowledgeClient() fwknowledge.DelegatedClient {
+	if h == nil || h.deps == nil || h.deps.KnowledgeDirectory == nil {
+		return nil
+	}
+	return h.deps.KnowledgeDirectory
+}
+
+func (h *KnowledgeHandler) gatewayReady() bool {
+	return h != nil && h.deps != nil && h.deps.CapabilityGateway != nil && h.deps.CapabilityGateway.Enabled()
+}
+
+func (h *KnowledgeHandler) invokeKnowledgeCapability(c *gin.Context, capabilityID string, action string, payload map[string]any) (*knowledgeInvokeResult, error) {
+	if !h.gatewayReady() {
+		return nil, fmt.Errorf("PowerX Gateway 客户端未配置")
+	}
+	result, err := h.deps.CapabilityGateway.Invoke(c.Request.Context(), knowledgeInvokeParams(capabilityID, action, payload, c))
+	if err != nil {
+		return nil, err
+	}
+	if result == nil {
+		return nil, fmt.Errorf("PowerX Gateway 返回了空的知识响应")
+	}
+	return &knowledgeInvokeResult{
+		TraceID: result.TraceID,
+		Status:  result.Status,
+		Data:    result.Data,
+		Raw:     result.Raw,
+	}, nil
+}
+
+type knowledgeInvokeResult struct {
+	TraceID string
+	Status  string
+	Data    map[string]any
+	Raw     json.RawMessage
+}
+
+func knowledgeInvokeParams(capabilityID string, action string, payload map[string]any, c *gin.Context) capgateway.InvokeParams {
+	// Core's tenant invocation envelope identifies the operation through the
+	// published capability. The retired top-level action field is rejected.
+	return capgateway.InvokeParams{
+		CapabilityID:      capabilityID,
+		PreferredProtocol: knowledgePreferredProtocol(payload),
+		Payload:           payload,
+		RequestID:         strings.TrimSpace(c.GetHeader("X-Request-ID")),
+		AuthRequired:      true,
+		TenantScoped:      false,
+	}
+}
+
+func knowledgePreferredProtocol(payload map[string]any) string {
+	return "rest"
+}
+
+type knowledgeGatewayDelegatedClient struct {
+	gateway interface {
+		Invoke(ctx context.Context, params capgateway.InvokeParams) (*capgateway.InvokeResult, error)
+		ListKnowledgeSpaces(ctx context.Context, opts capgateway.KnowledgeSpaceListOptions) ([]capgateway.KnowledgeSpaceRuntimeRecord, error)
+	}
+}
+
+func (knowledgeGatewayDelegatedClient) DelegatedCapabilities(context.Context) fwknowledge.ProviderCapabilities {
+	return fwknowledge.BasicCapabilities("powerx_plugin_runtime", fwknowledge.ProviderModeDelegated, fwknowledge.OperationRetrieve, fwknowledge.OperationHealth)
+}
+
+func (c knowledgeGatewayDelegatedClient) ListKnowledgeSpaces(ctx context.Context, input fwknowledge.ListSpacesInput) ([]fwknowledge.KnowledgeSpace, error) {
+	if c.gateway == nil {
+		return nil, fwknowledge.NewError(fwknowledge.CodeProviderUnavailable, "PowerX Gateway 客户端未配置")
+	}
+	input = input.Normalized()
+	records, err := c.gateway.ListKnowledgeSpaces(ctx, capgateway.KnowledgeSpaceListOptions{
+		TenantUUID: input.TenantUUID,
+		Status:     input.Status,
+		Keyword:    stringFromAny(input.Filters["keyword"]),
+		Page:       1,
+		PageSize:   input.Limit,
+	})
+	if err != nil {
+		return nil, fwknowledge.NewError(fwknowledge.CodeProviderUnavailable, err.Error())
+	}
+	spaces := make([]fwknowledge.KnowledgeSpace, 0, len(records))
+	for _, record := range records {
+		space := fwknowledge.KnowledgeSpace{
+			SpaceID:        strings.TrimSpace(record.UUID),
+			SpaceName:      strings.TrimSpace(record.SpaceName),
+			TenantUUID:     input.TenantUUID,
+			DepartmentCode: record.DepartmentCode,
+			Visibility:     fwknowledge.VisibilityTenant,
+			Status:         firstNonEmpty(record.Status, "active"),
+			RAGProfileKey:  record.RAGProfileKey,
+			Metadata: map[string]any{
+				"source":     "powerx_plugin_runtime",
+				"created_at": record.CreatedAt,
+				"updated_at": record.UpdatedAt,
+			},
+		}
+		if space.SpaceID != "" && space.SpaceName != "" {
+			spaces = append(spaces, space)
+		}
+	}
+	return spaces, nil
+}
+
+func (c knowledgeGatewayDelegatedClient) GetKnowledgeCatalog(context.Context) (*fwknowledge.KnowledgeCatalog, error) {
+	return nil, fwknowledge.NewError(fwknowledge.CodeUnsupportedCapability, "PowerX delegated knowledge catalog is not exposed by the current Host Contract")
+}
+
+func (c knowledgeGatewayDelegatedClient) SearchKnowledge(ctx context.Context, query fwknowledge.KnowledgeQuery) (*fwknowledge.KnowledgeSearchResult, error) {
+	return nil, fwknowledge.NewError(fwknowledge.CodeUnsupportedCapability, "PowerX delegated knowledge search is not exposed by the current Host Contract")
+}
+
+func (c knowledgeGatewayDelegatedClient) UpsertKnowledgeDocument(ctx context.Context, document fwknowledge.KnowledgeDocument) (*fwknowledge.KnowledgeIndexJob, error) {
+	return nil, fwknowledge.NewError(fwknowledge.CodeUnsupportedCapability, "PowerX delegated knowledge ingestion is not exposed by the current Host Contract")
+}
+
+func (c knowledgeGatewayDelegatedClient) DeleteKnowledgeDocument(context.Context, fwknowledge.DeleteDocumentInput) (*fwknowledge.KnowledgeIndexJob, error) {
+	return nil, fwknowledge.NewError(fwknowledge.CodeUnsupportedCapability, "PowerX delegated knowledge delete is not exposed by the current gateway contract")
+}
+
+func (c knowledgeGatewayDelegatedClient) ReindexKnowledgeDocument(context.Context, fwknowledge.ReindexInput) (*fwknowledge.KnowledgeIndexJob, error) {
+	return nil, fwknowledge.NewError(fwknowledge.CodeUnsupportedCapability, "PowerX delegated knowledge reindex is not exposed by the current gateway contract")
+}
+
+func (c knowledgeGatewayDelegatedClient) GetKnowledgeIndexJob(context.Context, fwknowledge.IndexJobQuery) (*fwknowledge.KnowledgeIndexJob, error) {
+	return nil, fwknowledge.NewError(fwknowledge.CodeUnsupportedCapability, "PowerX delegated knowledge job query is not exposed by the current gateway contract")
+}
+
+func (c knowledgeGatewayDelegatedClient) invokeIndexJob(ctx context.Context, capabilityID, action, tenantUUID string, payload map[string]any) (*fwknowledge.KnowledgeIndexJob, error) {
+	if c.gateway == nil {
+		return nil, fwknowledge.NewError(fwknowledge.CodeProviderUnavailable, "PowerX Gateway 客户端未配置")
+	}
+	result, err := c.gateway.Invoke(ctx, capgateway.InvokeParams{
+		CapabilityID:      capabilityID,
+		Action:            action,
+		PreferredProtocol: knowledgePreferredProtocol(payload),
+		Payload:           payload,
+		TenantUUID:        tenantUUID,
+		AuthRequired:      true,
+		TenantScoped:      false,
+	})
+	if err != nil {
+		return nil, fwknowledge.NewError(fwknowledge.CodeProviderUnavailable, err.Error())
+	}
+	job := &fwknowledge.KnowledgeIndexJob{Operation: fwknowledge.IndexOperationUpsert, Status: fwknowledge.IndexStatusQueued}
+	_ = mapToStruct(firstMap(resultData(result), "job", "index_job", "data"), job)
+	if job.Status == "" {
+		job.Status = firstNonEmpty(result.Status, fwknowledge.IndexStatusQueued)
+	}
+	return job, nil
+}
+
+func decodeKnowledgeSpaces(result *capgateway.InvokeResult) ([]fwknowledge.KnowledgeSpace, error) {
+	data := resultData(result)
+	rawSpaces := firstSlice(data, "spaces", "items", "knowledge_spaces")
+	if len(rawSpaces) == 0 {
+		rawSpaces = firstSlice(firstMap(data, "data", "result", "response"), "spaces", "items", "knowledge_spaces")
+	}
+	spaces := make([]fwknowledge.KnowledgeSpace, 0, len(rawSpaces))
+	for _, raw := range rawSpaces {
+		var space fwknowledge.KnowledgeSpace
+		if err := mapToStruct(raw, &space); err != nil {
+			return nil, fwknowledge.NewError(fwknowledge.CodeProviderUnavailable, "PowerX knowledge space response is invalid")
+		}
+		normalizeDelegatedSpace(&space, raw)
+		if strings.TrimSpace(space.SpaceID) != "" {
+			spaces = append(spaces, space)
+		}
+	}
+	return spaces, nil
+}
+
+func decodeKnowledgeSearchResult(result *capgateway.InvokeResult, query fwknowledge.KnowledgeQuery) *fwknowledge.KnowledgeSearchResult {
+	data := resultData(result)
+	search := &fwknowledge.KnowledgeSearchResult{
+		Provider:  "powerx_delegated",
+		SpaceID:   firstNonEmpty(query.SpaceIDs...),
+		Chunks:    []fwknowledge.KnowledgeChunk{},
+		Citations: []fwknowledge.KnowledgeCitation{},
+		Total:     0,
+		TraceID:   firstNonEmpty(resultTraceID(result), query.TraceID),
+		Diagnostics: map[string]any{
+			"source":        "powerx_gateway_capability",
+			"capability_id": knowledgeCapabilityPlanRetrieval,
+			"status":        resultStatus(result),
+			"qa_plan":       data,
+		},
+	}
+	_ = mapToStruct(firstMap(data, "search_result", "result", "data"), search)
+	if search.Chunks == nil {
+		search.Chunks = []fwknowledge.KnowledgeChunk{}
+	}
+	if search.Citations == nil {
+		search.Citations = []fwknowledge.KnowledgeCitation{}
+	}
+	if search.Provider == "" {
+		search.Provider = "powerx_delegated"
+	}
+	if search.TraceID == "" {
+		search.TraceID = firstNonEmpty(resultTraceID(result), query.TraceID)
+	}
+	if search.Diagnostics == nil {
+		search.Diagnostics = map[string]any{}
+	}
+	search.Diagnostics["source"] = "powerx_gateway_capability"
+	search.Diagnostics["capability_id"] = knowledgeCapabilityPlanRetrieval
+	search.Diagnostics["status"] = resultStatus(result)
+	search.Diagnostics["qa_plan"] = data
+	return search
+}
+
+func normalizeDelegatedSpace(space *fwknowledge.KnowledgeSpace, raw any) {
+	if space == nil {
+		return
+	}
+	values, _ := raw.(map[string]any)
+	space.SpaceID = firstNonEmpty(space.SpaceID, stringFromAny(values["spaceId"]), stringFromAny(values["id"]), stringFromAny(values["uuid"]))
+	space.SpaceName = firstNonEmpty(space.SpaceName, stringFromAny(values["spaceName"]), stringFromAny(values["name"]), space.SpaceID)
+	space.TenantUUID = firstNonEmpty(space.TenantUUID, stringFromAny(values["tenantUUID"]), stringFromAny(values["tenantUuid"]))
+	space.DepartmentCode = firstNonEmpty(space.DepartmentCode, stringFromAny(values["departmentCode"]), stringFromAny(values["department"]))
+	space.Visibility = firstNonEmpty(space.Visibility, stringFromAny(values["type"]), stringFromAny(values["visibility"]), fwknowledge.VisibilityTenant)
+	space.Status = firstNonEmpty(space.Status, stringFromAny(values["status"]), "active")
+	space.PolicyTemplateVersionID = firstNonEmpty(space.PolicyTemplateVersionID, stringFromAny(values["policyTemplateVersionId"]))
+	space.IngestionProfileKey = firstNonEmpty(space.IngestionProfileKey, stringFromAny(values["ingestionProfileKey"]))
+	space.IndexProfileKey = firstNonEmpty(space.IndexProfileKey, stringFromAny(values["indexProfileKey"]))
+	space.RAGProfileKey = firstNonEmpty(space.RAGProfileKey, stringFromAny(values["ragProfileKey"]))
+	if space.Quotas == nil {
+		space.Quotas = map[string]any{}
+	}
+	if space.Metadata == nil {
+		space.Metadata = map[string]any{}
+	}
+}
+
+func resultData(result *capgateway.InvokeResult) map[string]any {
+	if result == nil || result.Data == nil {
+		return map[string]any{}
+	}
+	return result.Data
+}
+
+func resultTraceID(result *capgateway.InvokeResult) string {
+	if result == nil {
+		return ""
+	}
+	return result.TraceID
+}
+
+func resultStatus(result *capgateway.InvokeResult) string {
+	if result == nil {
+		return ""
+	}
+	return result.Status
+}
+
+func firstMap(values map[string]any, keys ...string) map[string]any {
+	for _, key := range keys {
+		if child, ok := values[key].(map[string]any); ok {
+			return child
+		}
+	}
+	return map[string]any{}
+}
+
+func firstSlice(values map[string]any, keys ...string) []any {
+	for _, key := range keys {
+		switch typed := values[key].(type) {
+		case []any:
+			return typed
+		case []map[string]any:
+			out := make([]any, 0, len(typed))
+			for _, item := range typed {
+				out = append(out, item)
+			}
+			return out
+		}
+	}
+	return nil
+}
+
+func mapToStruct(raw any, dest any) error {
+	if raw == nil {
+		return nil
+	}
+	data, err := json.Marshal(raw)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, dest)
+}
+
+func stringFromAny(value any) string {
+	if value == nil {
+		return ""
+	}
+	return strings.TrimSpace(fmt.Sprint(value))
+}
+
+func resolveKnowledgeTenantUUID(c *gin.Context, requested string) (string, bool) {
+	return admincommon.ResolveTenantUUIDStrict(c, firstNonEmpty(requested, knowledgeRequestedTenantUUID(c)))
+}
+
+func knowledgeRequestedTenantUUID(c *gin.Context) string {
+	if c == nil {
+		return ""
+	}
+	for _, value := range []string{
+		c.Query("tenant_uuid"),
+		c.GetHeader("tenant_uuid"),
+		c.GetHeader("X-Tenant-UUID"),
+	} {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	if value, ok := c.Get("tenant_uuid"); ok {
+		if str, ok := value.(string); ok && strings.TrimSpace(str) != "" {
+			return strings.TrimSpace(str)
+		}
+	}
+	return ""
+}
+
+type fixturePayload struct {
+	DocumentID string   `json:"document_id"`
+	Title      string   `json:"title"`
+	Content    string   `json:"content"`
+	Tags       []string `json:"tags"`
+}
+
+func (f fixturePayload) document(req knowledgeSearchRequest) fwknowledge.KnowledgeDocument {
+	return fwknowledge.KnowledgeDocument{
+		SpaceID:     firstNonEmpty(req.SpaceID, "debug"),
+		DocumentID:  firstNonEmpty(f.DocumentID, "debug-fixture"),
+		Title:       firstNonEmpty(f.Title, "调试文档"),
+		Content:     firstNonEmpty(f.Content, req.Query),
+		ContentType: "text/markdown",
+		Tags:        append([]string(nil), f.Tags...),
+		Visibility:  firstNonEmpty(req.Visibility, fwknowledge.VisibilityTenant),
+		TenantUUID:  strings.TrimSpace(req.TenantUUID),
+	}
+}
+
+func singleSpace(spaceID string) []string {
+	if strings.TrimSpace(spaceID) == "" {
+		return nil
+	}
+	return []string{strings.TrimSpace(spaceID)}
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
+func positiveOrDefault(value int, fallback int) int {
+	if value > 0 {
+		return value
+	}
+	return fallback
+}

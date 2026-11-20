@@ -1,0 +1,61 @@
+# OS & IDE noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+!/.vscode/
+!/.vscode/launch.json
+!/.vscode/tasks.json
+!/.vscode/extensions.json
+
+# Environment / secrets
+.env
+.env.*
+*.local
+!.env.example
+
+# CLI & reports
+.px-plugin/
+reports/
+
+# Generic artefacts
+dist/
+coverage/
+coverage.out
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+.cache
+.gocache/
+.gomodcache/
+**/.gocache/
+**/.gomodcache/
+tmp
+
+# Web admin (Nuxt)
+/web-admin/**/test-results/
+/web-admin/**/playwright-report/
+/web-admin/**/blob-report/
+web-admin/node_modules/
+web-admin/.nuxt/
+web-admin/.output/
+web-admin/.cache/
+web-admin/.nitro/
+web-admin/.vercel/
+web-admin/.eslintcache
+web-admin/.stylelintcache
+
+# Backend (Go)
+backend/plugin
+backend/bin/
+backend/.cache/
+backend/logs/
+backend/tmp/
+backend/coverage.out
+backend/etc/config.yaml
+backend/etc/host-values.yaml
+__debug_bin*
+**/__debug_bin*
+
+# Root-level overrides (non-production secrets)
+config/config.yaml

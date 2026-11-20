@@ -1,0 +1,36 @@
+# FastAPI HTTP Ruleset
+kind: ruleset
+id: backend_fastapi_http
+version: 1.0.0
+summary: "FastAPI 后端 HTTP 约束：路径前缀、envelope 与 DDD 分层对齐"
+requires:
+  - rulesets/backend/common/ddd.yaml
+  - rulesets/crud/api_rest.yaml
+checks:
+  - id: fastapi-app-structure
+    desc: FastAPI 结构必须放在 app/ 下并包含分层目录
+    assert:
+      type: dir
+      target: backend/app
+      must_exist:
+        - bootstrap
+        - config
+        - entity
+        - services
+        - transport
+        - observability
+        - middleware
+        - shared
+  - id: fastapi-api-prefix
+    desc: API 必须使用 /api/v1 前缀
+    assert:
+      type: grep
+      target: backend/app
+      pattern:
+        - "/api/v1"
+  - id: fastapi-envelope
+    desc: HTTP 响应需符合统一 envelope（参考 crud/api_rest）
+    assert:
+      type: schema
+      target: backend/app/transport/http/**
+      schema: refs:rulesets/crud/api_rest.yaml#envelope

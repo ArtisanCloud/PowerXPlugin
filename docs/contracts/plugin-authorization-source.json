@@ -1,0 +1,22 @@
+{
+  "contract": "plugin-service-authorization.v1",
+  "source_repo": "../../PowerX",
+  "source_commit": "97ae4d43e0d0e48516d8ffe46bbd7bc388aab0ad",
+  "source_worktree_uncommitted": true,
+  "synced_at": "2026-11-01T17:35:37.749686+00:00",
+  "sha256": {
+    "plugin-service-authorization.md": "a8b1de3bd640f8429cae20923a1a76b79333198b3fbb26763e99b7c0ddd83e58",
+    "plugin-service-authorization.openapi.yaml": "fb5471ea55b93833a2f69a9e7f9ba8f208bbc055306eea8f057572507235aa6f"
+  },
+  "framework_fixture": {
+    "owner": "Framework",
+    "file": "fixtures/plugin-authorization.v1.json",
+    "sha256": "42d0194df0529660b9a221b24ac3f0d024723baacc6ae38fafcea46032ef9038"
+  },
+  "framework_service_fixture": {
+    "owner": "Framework",
+    "file": "fixtures/plugin-service-errors-stream.v1.json",
+    "sha256": "f60a08a8d5e126fc06485615e23a9ab03831ea2f9342aac62d8f55e9885db28a"
+  },
+  "core_validation_reference": "docs/contracts/evidence/plugin-service-errors-stream-validation-20261102.json"
+}

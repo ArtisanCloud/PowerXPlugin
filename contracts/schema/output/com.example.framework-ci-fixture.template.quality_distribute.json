@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TemplateQualityDistributeOutput",
+  "type": "object",
+  "properties": {
+    "scanned_total": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "violations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "template_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "field": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "template_uuid",
+          "field",
+          "message",
+          "severity"
+        ],
+        "additionalProperties": true
+      }
+    },
+    "cloned_uuids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      }
+    },
+    "failed_clones": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "source_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_uuid",
+          "reason"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "publish_status": {
+      "type": "string"
+    },
+    "validated_template_uuid": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "validation_passed": {
+      "type": "boolean"
+    },
+    "created_template_uuids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      }
+    },
+    "updated_template_uuid": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "published_template_uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  },
+  "required": [
+    "scanned_total",
+    "violations",
+    "cloned_uuids",
+    "failed_clones"
+  ],
+  "additionalProperties": false
+}

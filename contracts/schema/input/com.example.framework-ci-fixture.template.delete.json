@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TemplateDeleteInput",
+  "type": "object",
+  "properties": {
+    "template_uuid": {
+      "type": "string",
+      "description": "UUID",
+      "format": "uuid"
+    }
+  },
+  "required": [
+    "template_uuid"
+  ],
+  "additionalProperties": false
+}

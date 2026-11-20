@@ -1,0 +1,548 @@
+<template>
+  <aside
+    class="h-full min-h-0 flex-shrink-0 overflow-y-auto overscroll-contain border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
+    :class="inDrawer ? 'w-full' : 'w-64 min-w-64 max-w-64'"
+  >
+    <nav class="p-4 space-y-6">
+      <div>
+        <UButton
+          to="/intro"
+          variant="ghost"
+          color="neutral"
+          class="w-full justify-start"
+          :class="{
+            'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+              isExactActive('/intro') || isExactActive('/'),
+          }"
+        >
+          <UIcon name="i-heroicons-information-circle" class="w-4 h-4 mr-3" />
+          {{ t('navigation.intro') }}
+        </UButton>
+      </div>
+
+      <div v-if="canReadTemplates || canReadCustomers">
+        <div class="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+          {{ t('navigation.businessOperations') }}
+        </div>
+        <div v-if="canReadTemplates">
+          <div class="space-y-1">
+            <UButton
+              variant="ghost"
+              color="neutral"
+              class="w-full justify-start"
+              @click="toggleTemplatesMenu"
+              :class="{
+                'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                  isGroupActive(['/templates']),
+              }"
+            >
+              <UIcon name="i-heroicons-clipboard-document-list" class="w-4 h-4 mr-3" />
+              {{ t('navigation.templates') }}
+              <UIcon
+                :name="showTemplatesMenu ? 'i-heroicons-chevron-down' : 'i-heroicons-chevron-right'"
+                class="w-4 h-4 ml-auto"
+              />
+            </UButton>
+
+            <div v-show="showTemplatesMenu" class="ml-6 mt-1 space-y-1">
+              <UButton
+                to="/templates"
+                variant="ghost"
+                color="neutral"
+                size="sm"
+                class="w-full justify-start text-sm"
+                :class="{
+                  'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                    isExactActive('/templates'),
+                }"
+              >
+                <UIcon name="i-heroicons-document-text" class="w-3 h-3 mr-2" />
+                {{ t('templates.overview.title') }}
+              </UButton>
+              <UButton
+                to="/templates/develop"
+                variant="ghost"
+                color="neutral"
+                size="sm"
+                class="w-full justify-start text-sm"
+                :class="{
+                  'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                    isExactActive('/templates/develop'),
+                }"
+              >
+                <UIcon name="i-heroicons-cpu-chip" class="w-3 h-3 mr-2" />
+                {{ t('navigation.templatesDevelop') }}
+              </UButton>
+              <UButton
+                to="/templates/crud"
+                variant="ghost"
+                color="neutral"
+                size="sm"
+                class="w-full justify-start text-sm"
+                :class="{
+                  'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                    isExactActive('/templates/crud'),
+                }"
+              >
+                <UIcon name="i-heroicons-wrench" class="w-3 h-3 mr-2" />
+                {{ t('navigation.templatesCrud') }}
+              </UButton>
+            </div>
+          </div>
+        </div>
+        <UButton
+          v-if="canReadCustomers"
+          to="/admin/business/customers"
+          variant="ghost"
+          color="neutral"
+          class="w-full justify-start"
+          :class="{
+            'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+              isExactActive('/admin/business/customers'),
+          }"
+        >
+          <UIcon name="i-heroicons-user-group" class="w-4 h-4 mr-3" />
+          {{ t('navigation.customerBase') }}
+        </UButton>
+      </div>
+
+      <div v-if="isRoot">
+        <div class="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400">{{ t('localIntelligence.category') }}</div>
+        <UButton v-for="entry in ['agents', 'skills']" :key="entry" :to="'/intelligence/' + entry" variant="ghost" color="neutral" class="w-full justify-start mt-1"
+          :class="{ 'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400': isExactActive('/intelligence/' + entry) }">
+          <UIcon :name="entry === 'agents' ? 'i-heroicons-user-circle' : 'i-heroicons-command-line'" class="w-4 h-4 mr-3" />
+          {{ t('localIntelligence.' + entry) }}
+        </UButton>
+      </div>
+
+      <div v-if="isLoggedIn">
+        <div class="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+          {{ t('navigation.knowledgeSpaces') }}
+        </div>
+        <div class="space-y-1">
+          <UButton
+            :to="knowledgeSpacePath"
+            variant="ghost"
+            color="neutral"
+            class="w-full justify-start"
+            :class="{
+              'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                isKnowledgeSpaceRoute,
+            }"
+          >
+            <UIcon name="i-heroicons-circle-stack" class="w-4 h-4 mr-3" />
+            {{ t('navigation.knowledgeSpaces') }}
+          </UButton>
+        </div>
+      </div>
+
+      <div v-if="isRoot">
+        <div class="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+          {{ t('navigation.powerxBaseCapabilities') }}
+        </div>
+        <UButton
+          to="/powerx/host-contract-lab"
+          variant="ghost"
+          color="neutral"
+          class="w-full justify-start"
+          :class="{
+            'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+              isExactActive('/powerx/host-contract-lab'),
+          }"
+        >
+          <UIcon name="i-heroicons-squares-2x2" class="w-4 h-4 mr-3" />
+          {{ t('navigation.hostContractLab') }}
+        </UButton>
+        <UButton
+          to="/admin/templates/framework-lab"
+          variant="ghost"
+          color="neutral"
+          class="w-full justify-start mt-1"
+          :class="{
+            'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+              isExactActive('/admin/templates/framework-lab'),
+          }"
+        >
+          <UIcon name="i-heroicons-beaker" class="w-4 h-4 mr-3" />
+          {{ t('navigation.frameworkLab') }}
+        </UButton>
+        <UButton
+          v-if="showCapabilityLab"
+          to="/powerx/capability-lab"
+          variant="ghost"
+          color="neutral"
+          class="w-full justify-start mt-1"
+          :class="{
+            'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+              isExactActive('/powerx/capability-lab'),
+          }"
+        >
+          <UIcon name="i-heroicons-beaker" class="w-4 h-4 mr-3" />
+          {{ t('navigation.capabilityLab') }}
+        </UButton>
+        <UButton
+          to="/powerx/knowledge-lab"
+          variant="ghost"
+          color="neutral"
+          class="w-full justify-start mt-1"
+          :class="{
+            'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+              isExactActive('/powerx/knowledge-lab'),
+          }"
+        >
+          <UIcon name="i-heroicons-circle-stack" class="w-4 h-4 mr-3" />
+          {{ t('navigation.knowledgeQALab') }}
+        </UButton>
+        <UButton
+          to="/agent-skill-bridge"
+          variant="ghost"
+          color="neutral"
+          class="w-full justify-start mt-1"
+          :class="{
+            'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+              isExactActive('/agent-skill-bridge'),
+          }"
+        >
+          <UIcon name="i-heroicons-chat-bubble-left-right" class="w-4 h-4 mr-3" />
+          {{ t('navigation.agentSkillBridge') }}
+        </UButton>
+      </div>
+
+      <div v-if="isRoot || canReadRegression">
+        <div class="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+          {{ t('navigation.pluginCapabilities') }}
+        </div>
+        <UButton
+          v-if="isRoot"
+          to="/capabilities/register"
+          variant="ghost"
+          color="neutral"
+          class="w-full justify-start"
+          :class="{
+            'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+              isExactActive('/capabilities/register') || isExactActive('/capabilities/register-form'),
+          }"
+        >
+          <UIcon name="i-heroicons-cube-transparent" class="w-4 h-4 mr-3" />
+          {{ t('navigation.capabilities') }}
+        </UButton>
+        <UButton
+          v-if="isRoot"
+          to="/capabilities/lifecycle"
+          variant="ghost"
+          color="neutral"
+          class="w-full justify-start mt-1"
+          :class="{
+            'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+              isExactActive('/capabilities/lifecycle'),
+          }"
+        >
+          <UIcon name="i-heroicons-clock" class="w-4 h-4 mr-3" />
+          {{ t('navigation.capabilitiesLifecycle') }}
+        </UButton>
+        <UButton
+          v-if="canReadRegression"
+          to="/admin/regression"
+          variant="ghost"
+          color="neutral"
+          class="w-full justify-start mt-1"
+          :class="{
+            'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+              isExactActive('/admin/regression'),
+          }"
+        >
+          <UIcon name="i-heroicons-beaker" class="w-4 h-4 mr-3" />
+          {{ t('regression.title') }}
+        </UButton>
+      </div>
+
+      <div v-if="showIAMMenu">
+        <div class="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+          {{ t('navigation.iam') }}
+        </div>
+        <div class="space-y-1">
+          <UButton
+            v-if="canManageIAM"
+            to="/admin/iam/overview"
+            variant="ghost"
+            color="neutral"
+            class="w-full justify-start"
+            :class="{
+              'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                isExactActive('/admin/iam/overview'),
+            }"
+          >
+            <UIcon name="i-heroicons-chart-pie" class="w-4 h-4 mr-3" />
+            {{ t('navigation.iamOverview') }}
+          </UButton>
+          <UButton
+            to="/admin/iam/members"
+            variant="ghost"
+            color="neutral"
+            class="w-full justify-start"
+            :class="{
+              'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                isExactActive('/admin/iam/members'),
+            }"
+          >
+            <UIcon name="i-heroicons-users" class="w-4 h-4 mr-3" />
+            {{ t('navigation.iamMembers') }}
+          </UButton>
+          <UButton
+            v-if="canManageIAM"
+            to="/admin/iam/roles"
+            variant="ghost"
+            color="neutral"
+            class="w-full justify-start"
+            :class="{
+              'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                isExactActive('/admin/iam/roles'),
+            }"
+          >
+            <UIcon name="i-heroicons-key" class="w-4 h-4 mr-3" />
+            {{ t('navigation.iamRoles') }}
+          </UButton>
+          <UButton
+            to="/admin/iam/settings"
+            variant="ghost"
+            color="neutral"
+            class="w-full justify-start"
+            :class="{
+              'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                isExactActive('/admin/iam/settings'),
+            }"
+          >
+            <UIcon name="i-heroicons-cog-6-tooth" class="w-4 h-4 mr-3" />
+            {{ t('navigation.iamSettings') }}
+          </UButton>
+        </div>
+      </div>
+
+      <div v-if="showIAMMenu && canManageIAM">
+        <div class="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+          {{ t('navigation.channelConfig') }}
+        </div>
+        <div class="space-y-1">
+          <UButton
+            variant="ghost"
+            color="neutral"
+            class="w-full justify-start"
+            @click="toggleWecomMenu"
+            :class="{
+              'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                isGroupActive(['/admin/iam/channels/wecom', '/admin/iam/channels/wecom-sync']),
+            }"
+          >
+            <UIcon name="i-lucide-building-2" class="w-4 h-4 mr-3" />
+            {{ t('navigation.channelWecom') }}
+            <UIcon
+              :name="showWecomMenu ? 'i-heroicons-chevron-down' : 'i-heroicons-chevron-right'"
+              class="w-4 h-4 ml-auto"
+            />
+          </UButton>
+          <div v-show="showWecomMenu" class="ml-6 mt-1 space-y-1">
+            <UButton
+              to="/admin/iam/channels/wecom"
+              variant="ghost"
+              color="neutral"
+              size="sm"
+              class="w-full justify-start text-sm"
+              :class="{
+                'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                  isExactActive('/admin/iam/channels/wecom'),
+              }"
+            >
+              <UIcon name="i-lucide-settings-2" class="w-3 h-3 mr-2" />
+              {{ t('navigation.channelWecomConfig') }}
+            </UButton>
+            <UButton
+              to="/admin/iam/channels/wecom-sync"
+              variant="ghost"
+              color="neutral"
+              size="sm"
+              class="w-full justify-start text-sm"
+              :class="{
+                'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                  isExactActive('/admin/iam/channels/wecom-sync'),
+              }"
+            >
+              <UIcon name="i-lucide-refresh-cw" class="w-3 h-3 mr-2" />
+              {{ t('navigation.channelWecomSync') }}
+            </UButton>
+          </div>
+          <UButton
+            to="/admin/iam/channels/dingtalk"
+            variant="ghost"
+            color="neutral"
+            class="w-full justify-start"
+            :class="{
+              'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                isExactActive('/admin/iam/channels/dingtalk'),
+            }"
+          >
+            <UIcon name="i-lucide-message-square-diff" class="w-4 h-4 mr-3" />
+            {{ t('navigation.channelDingtalk') }}
+          </UButton>
+          <UButton
+            to="/admin/iam/channels/lark"
+            variant="ghost"
+            color="neutral"
+            class="w-full justify-start"
+            :class="{
+              'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                isExactActive('/admin/iam/channels/lark'),
+            }"
+          >
+            <UIcon name="i-lucide-bird" class="w-4 h-4 mr-3" />
+            {{ t('navigation.channelLark') }}
+          </UButton>
+        </div>
+      </div>
+
+      <div v-if="isLoggedIn">
+        <div class="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+          {{ t('navigation.settings') }}
+        </div>
+        <div class="space-y-1">
+          <UButton
+            :to="metadataGovernancePath"
+            variant="ghost"
+            color="neutral"
+            class="w-full justify-start"
+            :class="{
+              'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                isExactActive(metadataGovernancePath) || isExactActive('/admin/settings/metadata-governance'),
+            }"
+          >
+            <UIcon name="i-heroicons-circle-stack" class="w-4 h-4 mr-3" />
+            {{ t('navigation.metadataGovernance') }}
+          </UButton>
+          <UButton
+            :to="aiSettingsPath"
+            variant="ghost"
+            color="neutral"
+            class="w-full justify-start"
+            :class="{
+              'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                isExactActive(aiSettingsPath) || isExactActive('/admin/settings/ai-settings'),
+            }"
+          >
+            <UIcon name="i-heroicons-cpu-chip" class="w-4 h-4 mr-3" />
+            {{ t('navigation.aiSettings') }}
+          </UButton>
+        </div>
+      </div>
+    </nav>
+  </aside>
+</template>
+
+<script setup lang="ts">
+withDefaults(defineProps<{ inDrawer?: boolean }>(), { inDrawer: false });
+import { onMounted } from "vue";
+import { storeToRefs } from "pinia";
+import { useUserStore } from "~/stores/user";
+
+const { t } = useI18n();
+const route = useRoute();
+const runtimeConfig = useRuntimeConfig();
+const auth = useAuth();
+
+const showTemplatesMenu = ref(true);
+const showWecomMenu = ref(true);
+const showIAMMenu = computed(() => {
+  const localIAM = auth.localIAMEnabled?.value ?? false;
+  return localIAM && (canManageIAM.value || isLoggedIn.value);
+});
+const userStore = useUserStore();
+const { isRoot, isCurrentTenantAdmin, canReadTemplates, canReadCustomers, isLoggedIn } = storeToRefs(userStore);
+const canReadRegression = computed(() => String(runtimeConfig.public.regressionEnabled) === "true" && (userStore.isRoot || (userStore.context?.permissions || []).some(code => code === "regression.runs:read" || code === "*")));
+const canManageIAM = computed(() => Boolean(isRoot.value) || Boolean(isCurrentTenantAdmin.value));
+const showCapabilityLab = computed(() => {
+  const envFlag = runtimeConfig.public?.showCapabilityLab;
+  if (envFlag === false || envFlag === "false") {
+    return false;
+  }
+  if (envFlag === true || envFlag === "true") {
+    return true;
+  }
+  const localIAM = auth.localIAMEnabled?.value ?? false;
+  const delegated = auth.delegatedIAM?.value ?? false;
+  if (localIAM && !delegated) {
+    return true;
+  }
+  return Boolean(isRoot.value);
+});
+const pluginAdminBase = computed(() => {
+  const configured = String(runtimeConfig.public?.pluginAdminBase || "").trim();
+  return configured || "/_p/com.example.framework-ci-fixture/admin/";
+});
+const adminPath = (path: string) => `${pluginAdminBase.value.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
+const metadataGovernancePath = computed(() => adminPath("settings/metadata-governance"));
+const aiSettingsPath = computed(() => adminPath("settings/ai-settings"));
+const knowledgeSpacePath = computed(() => adminPath("knowledge"));
+const isKnowledgeSpaceRoute = computed(() => {
+  const path = normalizePath(route.path);
+  return path === normalizePath(knowledgeSpacePath.value) || path.startsWith(`${normalizePath(knowledgeSpacePath.value)}/`) || path.startsWith("/admin/knowledge");
+});
+
+onMounted(() => {
+  if (!userStore.context && !userStore.isLoading) {
+    userStore.fetchUserContext().catch(() => {
+      /* ignore sidebar fetch errors */
+    });
+  }
+});
+
+const normalizePath = (value: string) => {
+  if (!value) {
+    return "/";
+  }
+  if (value !== "/" && value.endsWith("/")) {
+    return value.replace(/\/+$/, "");
+  }
+  return value.startsWith("/") ? value : `/${value}`;
+};
+
+const isExactActive = (target: string) => {
+  const current = normalizePath(route.path);
+  const normalizedTarget = normalizePath(target);
+
+  if (normalizedTarget === "/") {
+    return current === "/";
+  }
+
+  return current === normalizedTarget;
+};
+
+const isGroupActive = (prefixes: string | string[]) => {
+  const current = normalizePath(route.path);
+  const list = Array.isArray(prefixes) ? prefixes : [prefixes];
+
+  return list.some((prefix) => {
+    const normalizedPrefix = normalizePath(prefix);
+    return (
+      current === normalizedPrefix || current.startsWith(`${normalizedPrefix}/`)
+    );
+  });
+};
+
+const toggleTemplatesMenu = () => {
+  showTemplatesMenu.value = !showTemplatesMenu.value;
+};
+
+const toggleWecomMenu = () => {
+  showWecomMenu.value = !showWecomMenu.value;
+};
+
+watch(
+  () => route.path,
+  (newPath) => {
+    if (newPath.startsWith("/templates")) {
+      showTemplatesMenu.value = true;
+    }
+    if (newPath.startsWith("/admin/iam/channels/wecom")) {
+      showWecomMenu.value = true;
+    }
+  }
+);
+</script>

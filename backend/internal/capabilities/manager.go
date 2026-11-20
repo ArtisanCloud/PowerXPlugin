@@ -1,0 +1,894 @@
+package capabilities
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/example.com/framework-ci-fixture/backend/internal/config"
+	"github.com/example.com/framework-ci-fixture/backend/internal/logger"
+	"gopkg.in/yaml.v3"
+)
+
+const (
+	defaultCatalogPath  = "capabilities/catalog.json"
+	catalogEnvKey       = "POWERX_CAPABILITY_CATALOG"
+	exposureDir         = "contracts/exposure"
+	agentSDKDir         = "dist/agent-sdk"
+	protocolOpenAPIType = "openapi"
+	protocolProtoType   = "proto"
+	protocolWorkflow    = "workflow"
+	protocolMCP         = "mcp_manifest"
+	protocolAgentStream = "agent_stream"
+)
+
+// Manager exposes high-level capability operations for runtime bootstrap and host sync.
+type Manager interface {
+	ListCapabilities(ctx context.Context) ([]CatalogEntry, error)
+	ExportCatalog(ctx context.Context) (*CatalogSnapshot, error)
+	ExportProtocols(ctx context.Context) ([]ProtocolAsset, error)
+	RegisterWithHost(ctx context.Context, client HostSyncClient) error
+}
+
+// HostSyncClient represents the client used to register capability catalogs with PowerX.
+type HostSyncClient interface {
+	RegisterCatalog(ctx context.Context, catalog *CatalogSnapshot, assets []ProtocolAsset) error
+}
+
+// CatalogLoader resolves catalog snapshots from manifest outputs.
+type CatalogLoader interface {
+	LoadCatalog(ctx context.Context) (*CatalogSnapshot, error)
+}
+
+// AssetExporter enumerates protocol assets (OpenAPI, Proto, Workflow, MCP manifests, etc.).
+type AssetExporter interface {
+	Export(ctx context.Context, catalog *CatalogSnapshot) ([]ProtocolAsset, error)
+}
+
+// CatalogSnapshot is persisted JSON emitted by scripts/capabilities/catalog-parser.ts.
+type CatalogSnapshot struct {
+	PluginID        string         `json:"plugin_id"`
+	ManifestVersion string         `json:"manifest_version"`
+	GeneratedAt     string         `json:"generated_at"`
+	Imports         []string       `json:"imports"`
+	Entries         []CatalogEntry `json:"entries"`
+}
+
+// CatalogEntry describes a single capability definition.
+type CatalogEntry struct {
+	ID               string                 `json:"id"`
+	Version          string                 `json:"version"`
+	Descriptor       string                 `json:"descriptor"`
+	Title            string                 `json:"title,omitempty"`
+	Description      string                 `json:"description,omitempty"`
+	Schemas          map[string]string      `json:"schemas"`
+	Protocols        map[string]interface{} `json:"protocols"`
+	Tags             []string               `json:"tags"`
+	Execution        ExecutionConfig        `json:"execution"`
+	Checksum         string                 `json:"checksum"`
+	Module           string                 `json:"module,omitempty"`
+	Kind             string                 `json:"kind,omitempty"`
+	ProviderPluginID string                 `json:"provider_plugin_id,omitempty"`
+	Source           string                 `json:"source,omitempty"`
+}
+
+// ExecutionConfig controls sync/async semantics of a capability.
+type ExecutionConfig struct {
+	Mode           string `json:"mode"`
+	CallbackURL    string `json:"callback_url,omitempty"`
+	SSEChannel     string `json:"sse_channel,omitempty"`
+	StatusEndpoint string `json:"status_endpoint,omitempty"`
+	TimeoutSeconds int    `json:"timeout_seconds,omitempty"`
+}
+
+// ProtocolAsset captures generated exposure artefacts.
+type ProtocolAsset struct {
+	Type     string `json:"type"`
+	Path     string `json:"path"`
+	DiskPath string `json:"-"`
+}
+
+type manager struct {
+	cfg           *config.Config
+	logger        *logger.Entry
+	catalogLoader CatalogLoader
+	assetExporter AssetExporter
+}
+
+// NewManager builds a filesystem-based manager using repo defaults.
+func NewManager(cfg *config.Config, log *logger.Entry) Manager {
+	catalogPath := resolveCatalogPath(os.Getenv(catalogEnvKey))
+	if strings.TrimSpace(catalogPath) == "" {
+		catalogPath = defaultCatalogPath
+	}
+
+	loader := &fileSystemCatalogLoader{path: catalogPath}
+	exporter := &fileSystemAssetExporter{
+		roots: []assetRoot{
+			{dir: exposureDir, protocolType: protocolOpenAPIType, matcher: func(path string) bool {
+				return strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml")
+			}},
+			{dir: filepath.Join(exposureDir, "proto"), protocolType: protocolProtoType, matcher: func(path string) bool {
+				return strings.HasSuffix(path, ".proto")
+			}},
+			{dir: filepath.Join(exposureDir, "workflow"), protocolType: protocolWorkflow, matcher: nil},
+			{dir: filepath.Join(exposureDir, "mcp-tools.json"), protocolType: protocolMCP, matcher: nil},
+			{dir: filepath.Join(exposureDir, "agent-streams"), protocolType: protocolAgentStream, matcher: nil},
+			{dir: filepath.Join("contracts", "capabilities"), protocolType: "capability_descriptor", matcher: func(path string) bool {
+				return strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml")
+			}},
+			{dir: filepath.Join("contracts", "schema"), protocolType: "schema", matcher: func(path string) bool {
+				return strings.HasSuffix(path, ".json")
+			}},
+			{dir: agentSDKDir, protocolType: "sdk", matcher: nil},
+		},
+	}
+
+	return &manager{
+		cfg:           cfg,
+		logger:        log,
+		catalogLoader: loader,
+		assetExporter: exporter,
+	}
+}
+
+func (m *manager) ListCapabilities(ctx context.Context) ([]CatalogEntry, error) {
+	catalog, err := m.catalogLoader.LoadCatalog(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := normalizeEntries(catalog.Entries); err != nil {
+		return nil, err
+	}
+	return catalog.Entries, nil
+}
+
+func (m *manager) ExportCatalog(ctx context.Context) (*CatalogSnapshot, error) {
+	catalog, err := m.catalogLoader.LoadCatalog(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := normalizeEntries(catalog.Entries); err != nil {
+		return nil, err
+	}
+	return catalog, nil
+}
+
+func (m *manager) ExportProtocols(ctx context.Context) ([]ProtocolAsset, error) {
+	catalog, err := m.catalogLoader.LoadCatalog(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return m.assetExporter.Export(ctx, catalog)
+}
+
+func (m *manager) RegisterWithHost(ctx context.Context, client HostSyncClient) error {
+	if client == nil {
+		return errors.New("host sync client is nil")
+	}
+	catalog, err := m.catalogLoader.LoadCatalog(ctx)
+	if err != nil {
+		return err
+	}
+	if err := normalizeEntries(catalog.Entries); err != nil {
+		return err
+	}
+	assets, err := m.assetExporter.Export(ctx, catalog)
+	if err != nil {
+		return err
+	}
+	return client.RegisterCatalog(ctx, catalog, assets)
+}
+
+// fileSystemCatalogLoader loads catalog snapshots from disk.
+type fileSystemCatalogLoader struct {
+	path string
+}
+
+func (l *fileSystemCatalogLoader) LoadCatalog(ctx context.Context) (*CatalogSnapshot, error) {
+	logCtx := logger.WithLogFields(ctx, map[string]interface{}{
+		"module":     "capability",
+		"biz_scene":  "capability_catalog_load",
+		"biz_domain": "capability",
+		"component":  "capability_catalog_loader",
+	})
+	p := strings.TrimSpace(l.path)
+	if p == "" {
+		p = defaultCatalogPath
+	}
+	originalPath := p
+	p, resolvedBy := resolveCatalogFilePath(p)
+	if resolvedBy != "" {
+		logger.InfoCtx(logger.WithLogFields(logCtx, map[string]interface{}{
+			"catalog_path_from": originalPath,
+			"catalog_path_to":   p,
+			"resolved_by":       resolvedBy,
+		}), "capability catalog path auto-resolved")
+	}
+	logger.DebugCtx(logger.WithLogFields(logCtx, map[string]interface{}{
+		"catalog_path": p,
+	}), "loading capability catalog from disk")
+	data, err := os.ReadFile(p)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			logger.WarnCtx(logger.WithLogFields(logCtx, map[string]interface{}{
+				"catalog_path": p,
+				"error":        err.Error(),
+			}), "capability catalog not found, falling back to plugin.yaml capabilities")
+			logger.InfoCtx(logger.WithLogFields(logCtx, map[string]interface{}{
+				"advice": "开发态可忽略；若需消除告警，请生成 capabilities/catalog.json 或保持 plugin.yaml capabilities 与代码同步",
+			}), "capability catalog fallback hint")
+			snapshot, fallbackErr := loadCatalogFromManifest(logCtx)
+			if fallbackErr != nil {
+				logger.WarnCtx(logger.WithLogFields(logCtx, map[string]interface{}{
+					"error": fallbackErr.Error(),
+				}), "failed to load capability catalog from plugin.yaml, returning empty snapshot")
+				return &CatalogSnapshot{GeneratedAt: time.Now().UTC().Format(time.RFC3339), Entries: []CatalogEntry{}}, nil
+			}
+			return snapshot, nil
+		}
+		logger.ErrorCtx(logger.WithLogFields(logCtx, map[string]interface{}{
+			"catalog_path": p,
+			"error":        err.Error(),
+		}), "failed to read capability catalog")
+		return nil, fmt.Errorf("capabilities: failed to read catalog %s: %w", p, err)
+	}
+	var snapshot CatalogSnapshot
+	if err := json.Unmarshal(data, &snapshot); err != nil {
+		logger.ErrorCtx(logger.WithLogFields(logCtx, map[string]interface{}{
+			"catalog_path": p,
+			"error":        err.Error(),
+		}), "failed to parse capability catalog JSON")
+		return nil, fmt.Errorf("capabilities: invalid catalog JSON %s: %w", p, err)
+	}
+	if strings.TrimSpace(snapshot.GeneratedAt) == "" {
+		snapshot.GeneratedAt = time.Now().UTC().Format(time.RFC3339)
+	}
+	if snapshot.Entries == nil {
+		snapshot.Entries = []CatalogEntry{}
+	}
+	hydrateCatalogEntries(filepath.Dir(p), &snapshot)
+	logger.InfoCtx(logger.WithLogFields(logCtx, map[string]interface{}{
+		"entry_count":  len(snapshot.Entries),
+		"import_count": len(snapshot.Imports),
+		"generated_at": snapshot.GeneratedAt,
+		"plugin_id":    snapshot.PluginID,
+		"manifest_ver": snapshot.ManifestVersion,
+	}), "capability catalog loaded")
+	return &snapshot, nil
+}
+
+func hydrateCatalogEntries(catalogDir string, snapshot *CatalogSnapshot) {
+	if snapshot == nil {
+		return
+	}
+	root := filepath.Dir(catalogDir)
+	for idx := range snapshot.Entries {
+		entry := &snapshot.Entries[idx]
+		if strings.TrimSpace(entry.Descriptor) == "" {
+			continue
+		}
+		_, desc, err := readManifestCapability(root, entry.Descriptor)
+		if err != nil {
+			continue
+		}
+		if strings.TrimSpace(entry.Title) == "" {
+			entry.Title = strings.TrimSpace(desc.Title)
+		}
+		if strings.TrimSpace(entry.Description) == "" {
+			entry.Description = strings.TrimSpace(desc.Description)
+		}
+		if len(entry.Protocols) == 0 {
+			entry.Protocols = manifestCapabilityProtocols(desc)
+		}
+		if len(entry.Tags) == 0 {
+			entry.Tags = desc.Tags
+		}
+	}
+}
+
+type manifestCapability struct {
+	ID          string            `yaml:"id"`
+	Version     string            `yaml:"version"`
+	Title       string            `yaml:"title"`
+	Description string            `yaml:"description"`
+	Descriptor  string            `yaml:"descriptor"`
+	Schemas     map[string]string `yaml:"schemas"`
+	Protocols   map[string]any    `yaml:"protocols"`
+	Metadata    struct {
+		Protocols map[string]any `yaml:"protocols"`
+	} `yaml:"metadata"`
+	Tags      []string `yaml:"tags"`
+	Execution struct {
+		Mode           string `yaml:"mode"`
+		CallbackURL    string `yaml:"callback_url"`
+		SSEChannel     string `yaml:"sse_channel"`
+		StatusEndpoint string `yaml:"status_endpoint"`
+		TimeoutSeconds int    `yaml:"timeout_seconds"`
+	} `yaml:"execution"`
+}
+
+type manifestDoc struct {
+	ID           string `yaml:"id"`
+	Version      string `yaml:"version"`
+	Capabilities struct {
+		Imports  []string             `yaml:"imports"`
+		Provides []manifestCapability `yaml:"provides"`
+	} `yaml:"capabilities"`
+}
+
+func loadCatalogFromManifest(ctx context.Context) (*CatalogSnapshot, error) {
+	manifestPath := resolveManifestPath()
+	if manifestPath == "" {
+		return nil, errors.New("manifest path not found")
+	}
+	raw, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return nil, fmt.Errorf("read manifest %s: %w", manifestPath, err)
+	}
+	var root map[string]any
+	if err := yaml.Unmarshal(raw, &root); err != nil {
+		return nil, fmt.Errorf("parse manifest %s: %w", manifestPath, err)
+	}
+	if err := mergeCatalogReferences(manifestPath, root); err != nil {
+		return nil, fmt.Errorf("merge manifest catalogs: %w", err)
+	}
+	buf, err := yaml.Marshal(root)
+	if err != nil {
+		return nil, fmt.Errorf("marshal merged manifest: %w", err)
+	}
+	var doc manifestDoc
+	if err := yaml.Unmarshal(buf, &doc); err != nil {
+		return nil, fmt.Errorf("decode merged manifest: %w", err)
+	}
+	manifestDir := filepath.Dir(manifestPath)
+	now := time.Now().UTC().Format(time.RFC3339)
+	snapshot := &CatalogSnapshot{
+		PluginID:        strings.TrimSpace(doc.ID),
+		ManifestVersion: strings.TrimSpace(doc.Version),
+		GeneratedAt:     now,
+		Imports:         doc.Capabilities.Imports,
+		Entries:         []CatalogEntry{},
+	}
+
+	for _, cap := range doc.Capabilities.Provides {
+		if strings.TrimSpace(cap.ID) == "" {
+			continue
+		}
+		entry, err := loadCatalogEntryFromProvide(manifestDir, snapshot.ManifestVersion, cap)
+		if err != nil {
+			return nil, err
+		}
+		snapshot.Entries = append(snapshot.Entries, entry)
+	}
+
+	// If provides are empty but imports exist, load descriptors from the filesystem like scripts/capabilities/catalog-parser.ts.
+	if len(snapshot.Entries) == 0 && len(snapshot.Imports) > 0 {
+		for _, importPath := range snapshot.Imports {
+			rel := strings.TrimSpace(importPath)
+			if rel == "" {
+				continue
+			}
+			entry, err := loadCatalogEntryFromImport(manifestDir, snapshot.ManifestVersion, rel)
+			if err != nil {
+				logger.WarnCtx(logger.WithLogFields(ctx, map[string]interface{}{
+					"error":       err.Error(),
+					"import_path": rel,
+				}), "capability import invalid")
+				continue
+			}
+			snapshot.Entries = append(snapshot.Entries, entry)
+		}
+	}
+
+	logger.InfoCtx(logger.WithLogFields(ctx, map[string]interface{}{
+		"manifest_path": manifestPath,
+		"entry_count":   len(snapshot.Entries),
+		"plugin_id":     snapshot.PluginID,
+		"manifest_ver":  snapshot.ManifestVersion,
+	}), "capability catalog loaded from plugin.yaml fallback")
+	return snapshot, nil
+}
+
+func loadCatalogEntryFromProvide(manifestDir string, manifestVersion string, cap manifestCapability) (CatalogEntry, error) {
+	descriptor := strings.TrimSpace(cap.Descriptor)
+	if descriptor == "" {
+		return catalogEntryFromCapability(cap, "", manifestVersion, nil), nil
+	}
+	rawDesc, desc, err := readManifestCapability(manifestDir, descriptor)
+	if err != nil {
+		return CatalogEntry{}, err
+	}
+	merged := mergeManifestCapability(cap, desc)
+	return catalogEntryFromCapability(merged, descriptor, manifestVersion, rawDesc), nil
+}
+
+func loadCatalogEntryFromImport(manifestDir string, manifestVersion string, rel string) (CatalogEntry, error) {
+	rawDesc, desc, err := readManifestCapability(manifestDir, rel)
+	if err != nil {
+		return CatalogEntry{}, err
+	}
+	return catalogEntryFromCapability(desc, rel, manifestVersion, rawDesc), nil
+}
+
+func readManifestCapability(manifestDir string, rel string) ([]byte, manifestCapability, error) {
+	rel = strings.TrimSpace(rel)
+	if rel == "" {
+		return nil, manifestCapability{}, errors.New("capability descriptor path is required")
+	}
+	path := rel
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(manifestDir, filepath.FromSlash(rel))
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, manifestCapability{}, fmt.Errorf("read capability descriptor %s: %w", rel, err)
+	}
+	var desc manifestCapability
+	if err := yaml.Unmarshal(raw, &desc); err != nil {
+		return nil, manifestCapability{}, fmt.Errorf("parse capability descriptor %s: %w", rel, err)
+	}
+	return raw, desc, nil
+}
+
+func mergeManifestCapability(base manifestCapability, desc manifestCapability) manifestCapability {
+	out := base
+	if strings.TrimSpace(out.ID) == "" {
+		out.ID = desc.ID
+	}
+	if strings.TrimSpace(out.Version) == "" {
+		out.Version = desc.Version
+	}
+	if strings.TrimSpace(out.Title) == "" {
+		out.Title = desc.Title
+	}
+	if strings.TrimSpace(out.Description) == "" {
+		out.Description = desc.Description
+	}
+	if len(manifestCapabilityProtocols(out)) == 0 {
+		out.Protocols = manifestCapabilityProtocols(desc)
+	}
+	if len(out.Tags) == 0 {
+		out.Tags = desc.Tags
+	}
+	return out
+}
+
+func manifestCapabilityProtocols(cap manifestCapability) map[string]any {
+	if len(cap.Protocols) > 0 {
+		return cap.Protocols
+	}
+	return cap.Metadata.Protocols
+}
+
+func catalogEntryFromCapability(cap manifestCapability, descriptor string, manifestVersion string, checksumSource []byte) CatalogEntry {
+	version := strings.TrimSpace(cap.Version)
+	if version == "" {
+		version = strings.TrimSpace(manifestVersion)
+	}
+	execMode := strings.ToLower(strings.TrimSpace(cap.Execution.Mode))
+	if execMode == "" {
+		execMode = "sync"
+	}
+	if len(checksumSource) == 0 {
+		checksumSource, _ = yaml.Marshal(cap)
+	}
+	entry := CatalogEntry{
+		ID:          strings.TrimSpace(cap.ID),
+		Version:     version,
+		Descriptor:  strings.TrimSpace(descriptor),
+		Title:       strings.TrimSpace(cap.Title),
+		Description: strings.TrimSpace(cap.Description),
+		Schemas:     cap.Schemas,
+		Protocols:   manifestCapabilityProtocols(cap),
+		Tags:        cap.Tags,
+		Execution: ExecutionConfig{
+			Mode:           execMode,
+			CallbackURL:    cap.Execution.CallbackURL,
+			SSEChannel:     cap.Execution.SSEChannel,
+			StatusEndpoint: cap.Execution.StatusEndpoint,
+			TimeoutSeconds: cap.Execution.TimeoutSeconds,
+		},
+		Checksum: fmt.Sprintf("%x", sha256.Sum256(checksumSource)),
+	}
+	if entry.Schemas == nil {
+		entry.Schemas = map[string]string{}
+	}
+	if entry.Protocols == nil {
+		entry.Protocols = map[string]any{}
+	}
+	if entry.Tags == nil {
+		entry.Tags = []string{}
+	}
+	return entry
+}
+
+func mergeCatalogReferences(manifestPath string, root map[string]any) error {
+	catalogsValue, ok := root["catalogs"]
+	if !ok || catalogsValue == nil {
+		return nil
+	}
+	catalogs, ok := catalogsValue.(map[string]any)
+	if !ok {
+		return errors.New("catalogs must be an object")
+	}
+	manifestDir := filepath.Dir(manifestPath)
+
+	loadCatalog := func(name string) (map[string]any, error) {
+		rawPath, _ := catalogs[name].(string)
+		rawPath = strings.TrimSpace(rawPath)
+		if rawPath == "" {
+			return nil, nil
+		}
+		filePath := rawPath
+		if !filepath.IsAbs(filePath) {
+			filePath = filepath.Join(manifestDir, filepath.FromSlash(rawPath))
+		}
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("read catalogs.%s (%s): %w", name, rawPath, err)
+		}
+		var doc map[string]any
+		if err := yaml.Unmarshal(data, &doc); err != nil {
+			return nil, fmt.Errorf("parse catalogs.%s (%s): %w", name, rawPath, err)
+		}
+		return doc, nil
+	}
+
+	if doc, err := loadCatalog("capabilities"); err != nil {
+		return err
+	} else if doc != nil {
+		if err := mergeCatalogSection(root, doc, "capabilities", "capabilities"); err != nil {
+			return err
+		}
+	}
+	if doc, err := loadCatalog("events"); err != nil {
+		return err
+	} else if doc != nil {
+		if err := mergeCatalogSection(root, doc, "events", "events"); err != nil {
+			return err
+		}
+	}
+	if doc, err := loadCatalog("agent_tools"); err != nil {
+		return err
+	} else if doc != nil {
+		if err := mergeCatalogSection(root, doc, "agent_tools", "agent_tools"); err != nil {
+			return err
+		}
+	}
+	if doc, err := loadCatalog("exposure"); err != nil {
+		return err
+	} else if doc != nil {
+		if err := mergeCatalogSection(root, doc, "exposure", "exposure"); err != nil {
+			return err
+		}
+	}
+	if doc, err := loadCatalog("rbac"); err != nil {
+		return err
+	} else if doc != nil {
+		for _, field := range []string{"rbac", "permissions", "routes"} {
+			if err := mergeCatalogSection(root, doc, "rbac", field); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func mergeCatalogSection(root, catalog map[string]any, catalogName, field string) error {
+	section, ok := catalog[field]
+	if !ok || isEmptyManifestValue(section) {
+		return nil
+	}
+	if existing, exists := root[field]; exists && !isEmptyManifestValue(existing) {
+		return fmt.Errorf("catalog conflict on field %q (catalog=%s)", field, catalogName)
+	}
+	root[field] = section
+	return nil
+}
+
+func isEmptyManifestValue(value any) bool {
+	if value == nil {
+		return true
+	}
+	switch typed := value.(type) {
+	case string:
+		return strings.TrimSpace(typed) == ""
+	case []any:
+		return len(typed) == 0
+	case map[string]any:
+		return len(typed) == 0
+	default:
+		return false
+	}
+}
+
+func resolveManifestPath() string {
+	if p := strings.TrimSpace(os.Getenv("POWERX_PLUGIN_MANIFEST")); p != "" {
+		if info, err := os.Stat(p); err == nil && !info.IsDir() {
+			return p
+		}
+	}
+	if root := strings.TrimSpace(os.Getenv("POWERX_PLUGIN_ROOT")); root != "" {
+		return filepath.Join(root, "plugin.yaml")
+	}
+	cwd, _ := os.Getwd()
+	candidates := []string{
+		filepath.Join(cwd, "plugin.yaml"),
+		filepath.Join(cwd, "skeleton", "plugin.yaml"),
+		filepath.Join(cwd, "..", "plugin.yaml"),
+		filepath.Join(cwd, "..", "..", "plugin.yaml"),
+	}
+	for _, cand := range candidates {
+		if info, err := os.Stat(cand); err == nil && !info.IsDir() {
+			return cand
+		}
+	}
+	if exe, err := os.Executable(); err == nil {
+		if found := findManifestFrom(filepath.Dir(exe)); found != "" {
+			return found
+		}
+	}
+	return ""
+}
+
+func findManifestFrom(start string) string {
+	current := filepath.Clean(start)
+	for i := 0; i < 8; i++ {
+		candidate := filepath.Join(current, "plugin.yaml")
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			return candidate
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			break
+		}
+		current = parent
+	}
+	return ""
+}
+
+// fileSystemAssetExporter walks known roots and emits protocol assets.
+type fileSystemAssetExporter struct {
+	roots []assetRoot
+}
+
+type assetRoot struct {
+	dir          string
+	protocolType string
+	matcher      func(path string) bool
+}
+
+type assetFile struct {
+	relPath  string
+	diskPath string
+}
+
+func (e *fileSystemAssetExporter) Export(ctx context.Context, catalog *CatalogSnapshot) ([]ProtocolAsset, error) {
+	var assets []ProtocolAsset
+	for _, root := range e.roots {
+		if strings.TrimSpace(root.dir) == "" {
+			continue
+		}
+		files, err := walkFiles(root.dir, root.matcher)
+		if err != nil {
+			return nil, err
+		}
+		for _, f := range files {
+			assets = append(assets, ProtocolAsset{Type: root.protocolType, Path: f.relPath, DiskPath: f.diskPath})
+		}
+	}
+	return assets, nil
+}
+
+func walkFiles(dir string, matcher func(string) bool) ([]assetFile, error) {
+	var results []assetFile
+	absRoot, relBase, resolveErr := resolveAssetRoot(dir)
+	if resolveErr != nil {
+		if errors.Is(resolveErr, os.ErrNotExist) {
+			return results, nil
+		}
+		return nil, resolveErr
+	}
+	err := filepath.WalkDir(absRoot, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		rel := path
+		if relBase != "" {
+			if r, err := filepath.Rel(relBase, path); err == nil {
+				rel = r
+			}
+		}
+		rel = filepath.ToSlash(rel)
+		if matcher != nil && !matcher(rel) {
+			return nil
+		}
+		results = append(results, assetFile{
+			relPath:  rel,
+			diskPath: path,
+		})
+		return nil
+	})
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("capabilities: walk %s failed: %w", dir, err)
+	}
+	return results, nil
+}
+
+func resolveAssetRoot(dir string) (absRoot string, relBase string, err error) {
+	root := filepath.Clean(strings.TrimSpace(dir))
+	if root == "" || root == "." {
+		return "", "", os.ErrNotExist
+	}
+	if filepath.IsAbs(root) {
+		if _, err := os.Stat(root); err == nil {
+			return root, filepath.Dir(root), nil
+		}
+		return "", "", os.ErrNotExist
+	}
+	cwd, _ := os.Getwd()
+	if cwd == "" {
+		cwd = "."
+	}
+	for _, base := range candidateAssetBases(cwd) {
+		candidate := filepath.Clean(filepath.Join(base, root))
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate, base, nil
+		}
+	}
+	return "", "", os.ErrNotExist
+}
+
+func candidateAssetBases(start string) []string {
+	start = filepath.Clean(start)
+	out := []string{start}
+	seen := map[string]struct{}{start: {}}
+	current := start
+	for i := 0; i < 8; i++ {
+		parent := filepath.Dir(current)
+		if parent == current {
+			break
+		}
+		if _, ok := seen[parent]; !ok {
+			out = append(out, parent)
+			seen[parent] = struct{}{}
+		}
+		current = parent
+	}
+	return out
+}
+
+// ValidateExecution enforces sync/async constraints and populates defaults.
+func ValidateExecution(entries []CatalogEntry) error {
+	return normalizeEntries(entries)
+}
+
+func normalizeEntries(entries []CatalogEntry) error {
+	for i := range entries {
+		mode := strings.TrimSpace(strings.ToLower(entries[i].Execution.Mode))
+		if mode == "" {
+			entries[i].Execution.Mode = "sync"
+			continue
+		}
+		switch mode {
+		case "sync":
+			entries[i].Execution.Mode = "sync"
+		case "async":
+			if strings.TrimSpace(entries[i].Execution.CallbackURL) == "" && strings.TrimSpace(entries[i].Execution.SSEChannel) == "" {
+				return fmt.Errorf("capabilities: async capability %s missing callback or SSE channel", entries[i].ID)
+			}
+			if strings.TrimSpace(entries[i].Execution.StatusEndpoint) == "" {
+				return fmt.Errorf("capabilities: async capability %s missing status_endpoint", entries[i].ID)
+			}
+			entries[i].Execution.Mode = "async"
+		default:
+			return fmt.Errorf("capabilities: capability %s has invalid execution mode %q", entries[i].ID, entries[i].Execution.Mode)
+		}
+	}
+	return nil
+}
+
+// EnsureManager warms up capability catalog during startup and logs the result.
+func EnsureManager(ctx context.Context, mgr Manager, log *logger.Entry) error {
+	if mgr == nil {
+		return nil
+	}
+	if _, err := mgr.ListCapabilities(ctx); err != nil {
+		return err
+	}
+	if _, err := mgr.ExportProtocols(ctx); err != nil {
+		return err
+	}
+	if log != nil {
+		log.Debug("capabilities: catalog verified")
+	}
+	return nil
+}
+
+func managerLogger(component string) *logger.Entry {
+	return logger.WithComponent(component)
+}
+
+func resolveCatalogPath(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return ""
+	}
+	if strings.Contains(trimmed, "$(pwd)") {
+		if cwd, err := os.Getwd(); err == nil {
+			trimmed = strings.ReplaceAll(trimmed, "$(pwd)", cwd)
+		}
+	}
+	trimmed = os.ExpandEnv(trimmed)
+	return strings.TrimSpace(trimmed)
+}
+
+func resolveCatalogFilePath(pathValue string) (string, string) {
+	trimmed := strings.TrimSpace(pathValue)
+	if trimmed == "" {
+		trimmed = defaultCatalogPath
+	}
+
+	cwd, _ := os.Getwd()
+	if filepath.IsAbs(trimmed) {
+		return trimmed, ""
+	}
+
+	base := trimmed
+	if cwd != "" {
+		base = filepath.Join(cwd, trimmed)
+	}
+	if existsFile(base) {
+		return base, ""
+	}
+
+	candidates := make([]string, 0, 3)
+	if manifestPath := resolveManifestPath(); manifestPath != "" {
+		manifestDir := filepath.Dir(manifestPath)
+		candidates = append(candidates,
+			filepath.Join(manifestDir, "capabilities", "catalog.json"),
+		)
+	}
+	if cwd != "" {
+		candidates = append(candidates,
+			filepath.Join(cwd, "..", "capabilities", "catalog.json"),
+		)
+	}
+
+	seen := map[string]struct{}{}
+	for _, cand := range candidates {
+		clean := filepath.Clean(cand)
+		if _, ok := seen[clean]; ok {
+			continue
+		}
+		seen[clean] = struct{}{}
+		if existsFile(clean) {
+			return clean, "manifest/cwd fallback"
+		}
+	}
+
+	return base, ""
+}
+
+func existsFile(path string) bool {
+	if strings.TrimSpace(path) == "" {
+		return false
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return !info.IsDir()
+}

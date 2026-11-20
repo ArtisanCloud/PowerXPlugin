@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TemplateReviewInput",
+  "type": "object",
+  "properties": {
+    "template_uuid": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "approved": {
+      "type": "boolean"
+    },
+    "comments": {
+      "type": "string"
+    },
+    "reviewer": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "template_uuid",
+    "approved"
+  ],
+  "additionalProperties": false
+}

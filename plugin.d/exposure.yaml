@@ -1,0 +1,102 @@
+exposure:
+  channels:
+    - auth: jwt
+      capability: com.example.framework-ci-fixture.parcel.volume
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/internal/tools/parcel-volumes
+      method: POST
+      rbac: parcel.volumes:compute
+      type: rest
+    - auth: jwt
+      capability: com.example.framework-ci-fixture.auth.me_context
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/admin/user/auth/me/context
+      method: GET
+      rbac: admin:read
+      type: rest
+    - auth: jwt
+      capability: com.example.framework-ci-fixture.template.batch_clone
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
+      method: POST
+      rbac: template:create
+      type: rest
+    - auth: jwt
+      capability: com.example.framework-ci-fixture.template.create
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
+      method: POST
+      rbac: template:create
+      type: rest
+    - auth: jwt
+      capability: com.example.framework-ci-fixture.template.delete
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
+      method: POST
+      rbac: template:delete
+      type: rest
+    - auth: jwt
+      capability: com.example.framework-ci-fixture.template.list
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
+      method: POST
+      rbac: template:read
+      type: rest
+    - auth: jwt
+      capability: com.example.framework-ci-fixture.template.prepare
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
+      method: POST
+      rbac: template:read
+      type: rest
+    - auth: jwt
+      capability: com.example.framework-ci-fixture.template.publish
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
+      method: POST
+      rbac: template:update
+      type: rest
+    - auth: jwt
+      capability: com.example.framework-ci-fixture.template.read
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
+      method: POST
+      rbac: template:read
+      type: rest
+    - auth: jwt
+      capability: com.example.framework-ci-fixture.template.review
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
+      method: POST
+      rbac: template:update
+      type: rest
+    - auth: jwt
+      capability: com.example.framework-ci-fixture.template.update
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
+      method: POST
+      rbac: template:update
+      type: rest
+    - auth: jwt
+      capability: com.example.framework-ci-fixture.template.validate
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
+      method: POST
+      rbac: template:read
+      type: rest
+    - auth: workflow
+      capability: com.example.framework-ci-fixture.template.compose
+      entrypoint: contracts/exposure/workflow/template-compose.json
+      type: workflow
+    - auth: toolgrant
+      capability: com.example.framework-ci-fixture.template.compose
+      entrypoint: contracts/exposure/mcp-tools.json
+      type: agent_tool
+    - auth: workflow
+      capability: com.example.framework-ci-fixture.template.audit
+      entrypoint: contracts/exposure/workflow/template-audit.json
+      type: workflow
+    - auth: toolgrant
+      capability: com.example.framework-ci-fixture.template.audit
+      entrypoint: contracts/exposure/mcp-tools.json
+      type: agent_tool
+    - auth: workflow
+      capability: com.example.framework-ci-fixture.template.quality_distribute
+      entrypoint: contracts/exposure/workflow/template-quality-distribute.json
+      type: workflow
+    - auth: toolgrant
+      capability: com.example.framework-ci-fixture.template.quality_distribute
+      entrypoint: contracts/exposure/mcp-tools.json
+      type: agent_tool
+    - auth: workflow
+      capability: com.example.framework-ci-fixture.template.quality_distribute
+      entrypoint: contracts/exposure/agent-streams/template-quality-distribute.yaml
+      type: agent_stream

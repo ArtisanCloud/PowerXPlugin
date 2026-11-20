@@ -1,0 +1,102 @@
+package runtime_ops
+
+import (
+	"context"
+	"net/http"
+	"strings"
+	"time"
+
+	fwiamcontext "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/context"
+	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
+
+	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
+	"github.com/example.com/framework-ci-fixture/backend/internal/contracts"
+	"github.com/example.com/framework-ci-fixture/backend/internal/shared/app"
+	"github.com/gin-gonic/gin"
+)
+
+type wsBusGrantRequest struct {
+	Topics     []string `json:"topics"`
+	TenantUUID string   `json:"tenant_uuid"`
+	TraceID    string   `json:"trace_id"`
+}
+
+// WSBusGrantHandler provides a debug grant endpoint for standalone/host.
+func WSBusGrantHandler(deps *app.Deps) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if deps == nil {
+			contracts.ResponseServiceUnavailable(c, "ws bus is not configured", nil)
+			return
+		}
+		var req wsBusGrantRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			contracts.ResponseBadRequest(c, "invalid payload")
+			return
+		}
+		topics, result := fwwsbus.ExpandTopicsForRegister(req.Topics)
+		if !result.OK {
+			contracts.ResponseError(c, http.StatusBadRequest, result.ErrorCode, result.ErrorMessage)
+			return
+		}
+		var expiresAt time.Time
+		if identity, ok := fwiamcontext.DelegatedIdentityFromContext(c.Request.Context()); ok {
+			member := ""
+			if identity.MemberUUID != nil {
+				member = *identity.MemberUUID
+			}
+			for _, topic := range topics {
+				decision := frameworkrealtime.Decide(deps.RealtimeDescriptors, frameworkrealtime.ActionSubscribe, topic, frameworkrealtime.ProtocolWS, "message", frameworkrealtime.Scope{TenantUUID: identity.TenantUUID, MemberUUID: member})
+				if !decision.Allowed || (decision.RequiredPermission != "" && !identity.HasPermission(decision.RequiredPermission)) {
+					contracts.ResponseError(c, 403, frameworkrealtime.WSTopicForbidden, frameworkrealtime.WSTopicForbidden)
+					return
+				}
+			}
+			var err error
+			expiresAt, err = frameworkrealtime.BoundIdentityExpiry(identity, time.Minute, time.Now())
+			if err != nil {
+				contracts.ResponseError(c, 401, "IAM_CONTEXT_USER_SESSION_EXPIRED", "IAM_CONTEXT_USER_SESSION_EXPIRED")
+				return
+			}
+		}
+
+		tenantUUID, tenantMismatch := resolveGatewayTenantUUID(c, deps, req.TenantUUID)
+		if tenantMismatch {
+			contracts.ResponseError(c, http.StatusForbidden, contracts.ErrCodeTenantMismatch, "tenant mismatch")
+			return
+		}
+		traceID := strings.TrimSpace(req.TraceID)
+		if traceID == "" {
+			traceID = strings.TrimSpace(c.GetHeader("X-Request-ID"))
+		}
+
+		hostCfg, useHost := resolveWSBusHostClientConfig(deps)
+		if useHost {
+			outboundBearer := resolveGatewayBearerToken(c, deps)
+			logGatewayAuthSelection(c, deps, outboundBearer, tenantUUID)
+
+			hostClient, err := fwwsbus.NewHostClient(hostCfg)
+			if err != nil {
+				contracts.ResponseError(c, http.StatusBadGateway, contracts.ErrCodeInternalError, "host ws bus client init failed")
+				return
+			}
+			result = hostClient.RegisterTopics(context.Background(), topics, fwwsbus.PublishOptions{
+				TenantUUID:  tenantUUID,
+				TraceID:     traceID,
+				BearerToken: outboundBearer,
+			})
+			if !result.OK {
+				contracts.ResponseError(c, http.StatusBadRequest, result.ErrorCode, result.ErrorMessage)
+				return
+			}
+			response := gin.H{"ok": true, "topics": topics}
+			if !expiresAt.IsZero() {
+				response["expires_at"] = expiresAt.UTC().Format(time.RFC3339Nano)
+			}
+			contracts.ResponseSuccess(c, response)
+			return
+		}
+
+		// standalone: no-op grant, just return expanded topics
+		contracts.ResponseSuccess(c, gin.H{"ok": true, "topics": topics})
+	}
+}

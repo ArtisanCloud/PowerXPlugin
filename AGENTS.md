@@ -1,0 +1,99 @@
+# PowerXPlugin Development Guidelines
+
+Auto-generated from all feature plans. Last updated: 2026-10-13
+
+## Active Technologies
+- Go 1.24+, TypeScript 5.x (Nuxt 4.2) + Gin 框架、Nuxt 4.2、`@artisan-cloud/plugin-framework-admin` Layer、`@artisan-cloud/plugin-framework-client` (001-powerxplugin-foundation)
+- 暂不引入持久层（Skeleton/模板以内存或 mock 为主） (001-powerxplugin-foundation)
+- Go 1.24+, Node.js 18+, npm 9+, Bash (POSIX) + Go toolchain (`go test`, `go tool cover`), Playwright 1.48+, Nuxt CLI (`nuxi`), jq/standard UNIX utilities (002-testing-strategy)
+- N/A (documentation and scripts only) (002-testing-strategy)
+- Go 1.24 (PowerX Core/Dev API), TypeScript 5 + Node.js 18 (px-plugin CLI & tooling), Nuxt 4.2 (Admin) + Gin、`@artisan-cloud/plugin-framework-*`、px-plugin CLI runtime、S3/MinIO 对象存储、Redis/Kafka 链路、Playwright 1.48+ (004-publish-hub-spec)
+- Artefacts + integrity 文件放置于对象存储；Marketplace 复用既有 DB 持久化版本/审核记录，本阶段不新增数据库 (004-publish-hub-spec)
+- Go 1.24 (backend), TypeScript 5 / Nuxt 4.2 (web admin) + Gin, Gorm, `$fetch`/Nitro、Pinia、`@nuxt/ui`, PowerX framework middleware、`@artisan-cloud/plugin-framework-*` (005-plugin-auth)
+- 插件数据库（SQLite/PostgreSQL 由配置决定）中的业务表 + 新增 IAM 表（Local 模式）；Delegated 模式仅读写宿主 API (005-plugin-auth)
+- Go 1.24（后端），TypeScript 5 + Nuxt 4.2（前端），Node.js 20 + Gin、Gorm、Pinia、`@nuxt/ui`、PowerX 插件框架、px-plugin CLI (007-standalone-iam-rbac)
+- PostgreSQL（生产）/SQLite（本地），schema `powerx_plugin_base` 启用 IAM 表 (007-standalone-iam-rbac)
+- Go 1.24 + Gin/Gorm（插件侧既有）；framework runtime 组件（用于 TaskBus 适配，细节见 research） (008-framework-task-bus)
+- N/A（本 feature 目标是事件机制与迁移路径；consumer 落地结果时复用既有 DB） (008-framework-task-bus)
+- Python 3.11 + FastAPI, SQLAlchemy 2.0, Alembic (011-fastapi-gin-align)
+- PostgreSQL（schema: `powerx_plugin_base`） (011-fastapi-gin-align)
+- Go 1.24, TypeScript 5.x (Nuxt 4.2) + Gin/Gorm (backend), PowerXPlugin Framework, Nuxt UI (015-framework-websocket)
+- PostgreSQL/SQLite (schema: powerx_plugin_base) (015-framework-websocket)
+- TypeScript 5.x, React 18, Next.js 14.2.5, Go 1.24（联调基线） + Next App Router, Playwright（E2E）, 既有 Go-Gin 管理端 API 契约 (012-next-nuxt-align)
+- 前端本地会话存储（token/expires）+ 后端既有数据库（由 Gin 管理） (012-next-nuxt-align)
+- Go 1.24（backend runtime），TypeScript 5.x（文档/工具链侧验证） + framework runtime（taskbus/wsbus/common middleware）、Gin skeleton、`log/slog`、`logrus` (016-runtime-log-unification)
+- N/A（本特性不新增持久化模型） (016-runtime-log-unification)
+- Go 1.24（backend runtime），TypeScript 5.x（文档与联调脚本） + Gin skeleton、framework eventbridge/taskbus/wsbus 抽象、runtime ops 管理端点、logrus/slog 结构化日志 (017-async-runtime-scheduler-switch)
+- 复用现有插件数据库（PostgreSQL/SQLite），本特性不新增业务持久化模型 (017-async-runtime-scheduler-switch)
+- Go 1.24 + framework middleware/context/rbac；skeleton IAM local store；delegated auth proxy (018-framework-iam-unification)
+- PostgreSQL/SQLite（local 模式复用现有 IAM 表）；delegated 模式不新增插件侧组织写入 (018-framework-iam-unification)
+- Go 1.24, TypeScript 5.x (Nuxt 4.2) + framework IAM contracts/context/errors, skeleton IAM/auth service, RBAC, observability/audi (019-iam-federated-channel-login)
+- PostgreSQL/SQLite（复用 IAM 表并新增 external_identity/binding/challenge/risk_event） (019-iam-federated-channel-login)
+- Go 1.24（backend runtime/framework）, TypeScript 4.x（web-admin 验证） + framework runtime/common logging, slog/logrus adapter, skeleton logger bridge, observability hooks (020-framework-logger)
+- N/A（不新增业务持久化表；仅复用现有配置来源与日志后端） (020-framework-logger)
+- Go 1.24 + Gin middleware/context, existing skeleton customer auth, PowerX STS/delegated client patterns, framework runtime common logging/errors (023-framework-customer-auth)
+- Framework 不新增生产 customer 持久化；skeleton local/dev 可复用现有 customer 表；生产 membership/customer 数据由 PowerX Core 或平台身份源权威维护 (023-framework-customer-auth)
+- Go 1.24, TypeScript 5.x, Node.js 20, Nuxt 4.2 + Gin, GORM, Nuxt UI 3.3.x, Pinia, Framework Client/Admin Layer, Framework realtime/common logging 与现有 IAM/STS (025-framework-business-regression)
+- 插件 PostgreSQL schema powerx_plugin_base；隔离本地测试可使用 SQLite；三类回归记录表，Framework Store 接口与可选 GORM adapter (025-framework-business-regression)
+
+## Project Structure
+
+```text
+src/
+tests/
+```
+
+## Commands
+
+npm test && npm run lint
+
+## Code Style
+
+Go 1.24+, TypeScript 5.x (Nuxt 4.2): Follow standard conventions
+
+## Recent Changes
+- 025-framework-business-regression: Added Go 1.24, TypeScript 5.x, Node.js 20, Nuxt 4.2 + Gin, GORM, Nuxt UI 3.3.x, Pinia, Framework Client/Admin Layer, Framework realtime/common logging 与现有 IAM/STS
+- 023-framework-customer-auth: Added Go 1.24 + Gin middleware/context, existing skeleton customer auth, PowerX STS/delegated client patterns, framework runtime common logging/errors
+- 020-framework-logger: Added Go 1.24（backend runtime/framework）, TypeScript 4.x（web-admin 验证） + framework runtime/common logging, slog/logrus adapter, skeleton logger bridge, observability hooks
+
+## Manifest 迁移公告（2025-12-08）
+- 开发态唯一清单位于 `plugin.yaml`，所有脚本/文档示例应以生成项目根目录为基准。
+- 本地执行 `npm test`、`make validate`、`px-plugin capabilities *`、`make dist` 等命令时，请在项目根目录运行或显式传入 `--manifest ./plugin.yaml`。
+- `scripts/capabilities/run-from-package.mjs` 与 `validate-capabilities.mjs` 默认回退到 `./plugin.yaml`，CI 环节无需额外设定；若在独立插件仓库操作则保持原有路径。
+- QA/发布同学在具备 Dev API 凭证时，请使用迁移文档中的命令验证 `px-plugin capabilities submit/quota`，以覆盖新的 manifest 路径。
+
+<!-- MANUAL ADDITIONS START -->
+Always respond in Chinese-simplified
+
+默认在用户当前 Git 分支上进行调整。未经用户明确允许，不得新建、切换或拆分分支，也不得通过 git worktree 等方式另建工作分支。确需调整分支时，必须先说明原因、目标分支和影响，并等待用户明确同意后再执行。
+
+当用户提出问题、故障、疑问、现象描述或改造诉求时，默认先做分析并回复：问题可能在哪里、依据是什么、建议怎么解决、会影响哪些文件/链路、需要用户确认的执行边界。除非用户在同一条消息里明确要求“直接修改/执行/修复/按方案落地”，否则不要立刻修改代码、配置、文档、数据库或运行会改变状态的命令。
+
+在用户确认方案或明确下达执行指令后，才开始实施修改。实施前如果发现方案边界、风险或影响范围与先前分析不一致，必须先停下来说明差异并重新确认；不得为了推进任务而自行扩大改动范围。
+
+为配合已授权任务的联调，可以自行启动必要的临时服务，并记录启动命令、端口及父/子进程 PID。调试结束（包括失败或中断）后，必须关闭自己启动的服务及其子进程，并确认相关端口已释放，不能遗留后台进程。日常服务由用户自行启动；不得擅自停止或重启用户启动的进程。
+
+当出现新的策略、协议、接口形态或数据格式时，默认只实现和维护新方式；不要主动兼容废弃方式、旧协议或旧格式。只有在用户明确要求兼容时，才添加向后兼容逻辑，并在实现和说明中标注兼容边界。
+
+默认不添加通用 fallback 或静默降级，除非用户明确要求。前端实时更新如果设计为 WebSocket/SSE，不得偷偷增加轮询兜底；结构化字段不得用自由文本解析兜底；渠道、传输、鉴权、数据契约、构建运行时等边界同样不得静默降级。更合理的处理策略是明确失败、显示错误状态、记录日志、提供恢复动作，而不是隐藏式绕过问题。
+
+所有人类可读文本都必须走 i18n/locale，不得硬编码在业务代码、组件或测试断言里。覆盖范围包括前端按钮、提示、错误信息、空状态、确认弹窗、后端对用户可见回复、邮件模板、agent 对用户可见提示、业务角色显示名、角色别名/屏蔽词表，以及测试里依赖文案的断言。例外：协议常量、枚举值、JSON 字段名、路由、日志 key、状态码、能力名、数据库字段、i18n key 等机器语义可以保留在代码里。
+
+UI 默认不得直接把对象 UUID 作为用户可见显示文本，除非用户明确要求展示 UUID。列表、详情、表单、selector option、确认弹窗、提示文案等用户界面应优先显示对象名称或业务可读标识，例如显示租户名称而不是租户 UUID；UUID 仅作为内部 value、路由参数、请求字段、日志字段、调试诊断或明确的技术详情展示。
+
+业务对象表必须具备稳定的 `uuid` 字段。跨表、跨服务、API、事件、审计等所有对象引用统一使用对象 `uuid`，不得新增 numeric id 作为对外或跨边界引用。
+
+中间表可以没有自己的 `uuid`，但关联字段必须使用两端业务对象的 `uuid`。如果中间表演进为可审计、可引用或具备独立状态的业务对象，也必须补充自己的稳定 `uuid`。
+
+新增迁移、GORM 模型、Proto、OpenAPI、前端类型与测试必须按 UUID 规则设计和校验。修正旧 numeric id 引用时不做兼容兜底；缺少必要 UUID 必须明确失败，并提供迁移说明。
+
+页面设计必须具备产品思维，以用户目标、使用场景和实际操作路径为依据，不得只追求功能、字段和组件齐全而忽视用户体验。具体要求：
+
+- 信息呈现必须有清晰的层次与优先级，首屏优先展示核心信息、关键状态和主要操作，让用户能够快速理解当前情况与下一步动作。
+- 按用户的查看与操作逻辑组织内容，遵循“先概览、再详情、后深入”的渐进式呈现；次要信息、低频操作和复杂配置可通过明确的按钮进入弹层、抽屉或详情页继续查看，避免在同一页面一次性堆叠全部内容。
+- 对相对独立的主题或任务，可使用 TabView（标签页）分块组织；标签名称应体现业务含义，分组与层级应符合用户认知，避免过度拆分、重复入口和多层嵌套。
+- 保持主次操作、视觉层级与导航关系清晰，展开或切换内容时保留必要上下文；不得为了精简界面而隐藏完成主要任务所必需的信息、关键风险或错误提示。验收时应检查用户能否顺畅完成核心任务，而非仅检查功能是否全部出现。
+- 每次新建或修改页面，都必须同时检查文字与实际背景的对比度。页面正文、卡片标题、字段标签、说明、状态值、按钮及弹层文字应使用随当前主题切换的语义颜色；不得在深色背景上沿用浅色模式的深色文字，也不得依赖未校验的父级文字颜色。普通文字与背景的对比度至少为 4.5:1，大字号文字至少为 3:1；次要信息仍须清晰可读。
+- 页面样式验收必须实际渲染浅色、深色主题及桌面、窄屏布局，检查默认、悬停、选中、聚焦和禁用状态的文字可读性；同时覆盖应用手动主题与系统主题不一致的情况。不能只凭代码中的 `dark:` 类、构建通过或单一主题截图认定完成。
+
+<!-- MANUAL ADDITIONS END -->

@@ -1,0 +1,98 @@
+PLUGIN_FILE ?= plugin.yaml
+ifneq ($(wildcard docs/lifecycle/examples/manifest.yaml),)
+MANIFEST_FILE ?= docs/lifecycle/examples/manifest.yaml
+else ifneq ($(wildcard ../docs/standards/powerx-plugin/lifecycle/examples/manifest.yaml),)
+MANIFEST_FILE ?= ../docs/standards/powerx-plugin/lifecycle/examples/manifest.yaml
+else
+MANIFEST_FILE ?= docs/contracts/manifest.yaml
+endif
+ifneq ($(wildcard docs/lifecycle/contracts/manifest.schema.json),)
+MANIFEST_SCHEMA ?= docs/lifecycle/contracts/manifest.schema.json
+else ifneq ($(wildcard ../docs/standards/powerx-plugin/lifecycle/contracts/manifest.schema.json),)
+MANIFEST_SCHEMA ?= ../docs/standards/powerx-plugin/lifecycle/contracts/manifest.schema.json
+else
+MANIFEST_SCHEMA ?= ../specs/001-powerxplugin-foundation/contracts/manifest.schema.json
+endif
+
+ABS_PLUGIN_FILE := $(abspath $(PLUGIN_FILE))
+ABS_MANIFEST_FILE := $(abspath $(MANIFEST_FILE))
+ABS_MANIFEST_SCHEMA := $(abspath $(MANIFEST_SCHEMA))
+EVENT_FABRIC_FILE ?= config/event_fabric.yaml
+ABS_EVENT_FABRIC_FILE := $(abspath $(EVENT_FABRIC_FILE))
+MANIFESTCHECK_DIR := $(BACKEND_DIR)/cmd/manifestcheck
+BACKEND_GOCACHE ?= $(GO_BUILD_CACHE)
+
+.PHONY: plugin-yaml-sync
+plugin-yaml-sync: plugin-id-check ## 根据 contracts/capabilities 自动同步 plugin.d/capabilities.yaml 与 exposure.yaml
+	@echo "[manifest] syncing plugin catalogs from contracts/capabilities"
+	@if [ ! -d "$(MANIFESTCHECK_DIR)" ]; then \
+		echo "❌ 未找到 $(MANIFESTCHECK_DIR)，无法执行 plugin catalog 同步"; \
+		echo "   当前 BACKEND_DIR=$(BACKEND_DIR)"; \
+		exit 1; \
+	fi
+	@mkdir -p "$(BACKEND_GOCACHE)"
+	@cd $(BACKEND_DIR) && GOCACHE="$(BACKEND_GOCACHE)" go run ./cmd/manifestcheck \
+		--plugin "$(ABS_PLUGIN_FILE)" \
+		--sync-catalogs \
+		--sync-only
+
+.PHONY: verify-manifest
+verify-manifest:
+	@echo "[manifest] Validating $(PLUGIN_FILE) against $(MANIFEST_FILE)"
+	@if [ ! -d "$(MANIFESTCHECK_DIR)" ]; then \
+		echo "❌ 未找到 $(MANIFESTCHECK_DIR)，无法执行 manifest 校验"; \
+		echo "   当前 BACKEND_DIR=$(BACKEND_DIR)"; \
+		exit 1; \
+	fi
+	@mkdir -p "$(BACKEND_GOCACHE)"
+	@cd $(BACKEND_DIR) && GOCACHE="$(BACKEND_GOCACHE)" go run ./cmd/manifestcheck \
+		--plugin "$(ABS_PLUGIN_FILE)" \
+		--manifest "$(ABS_MANIFEST_FILE)" \
+		--schema "$(ABS_MANIFEST_SCHEMA)"
+
+.PHONY: check-capability
+check-capability:
+	@echo "[manifest] Running capability validation against $(PLUGIN_FILE)"
+	@if [ ! -d "$(MANIFESTCHECK_DIR)" ]; then \
+		echo "❌ 未找到 $(MANIFESTCHECK_DIR)，无法执行 capability 校验"; \
+		echo "   当前 BACKEND_DIR=$(BACKEND_DIR)"; \
+		exit 1; \
+	fi
+	@mkdir -p "$(BACKEND_GOCACHE)"
+	@cd $(BACKEND_DIR) && GOCACHE="$(BACKEND_GOCACHE)" go run ./cmd/manifestcheck \
+		--plugin "$(ABS_PLUGIN_FILE)" \
+		--manifest "$(ABS_MANIFEST_FILE)" \
+		--schema "$(ABS_MANIFEST_SCHEMA)" \
+		--capabilities-only
+
+.PHONY: plugin-yaml-check
+plugin-yaml-check: plugin-yaml-sync plugin-id-check ## 一条命令校验 plugin.yaml（ID/能力/事件）
+	@echo "[manifest] running one-shot plugin.yaml checks (id + capabilities + events)"
+	@if [ ! -d "$(MANIFESTCHECK_DIR)" ]; then \
+		echo "❌ 未找到 $(MANIFESTCHECK_DIR)，无法执行 plugin.yaml 校验"; \
+		echo "   当前 BACKEND_DIR=$(BACKEND_DIR)"; \
+		exit 1; \
+	fi
+	@if [ ! -f "$(EVENT_FABRIC_FILE)" ]; then \
+		echo "❌ 未找到 $(EVENT_FABRIC_FILE)，无法执行 events topic 对齐校验"; \
+		exit 1; \
+	fi
+	@mkdir -p "$(BACKEND_GOCACHE)"
+	@cd $(BACKEND_DIR) && GOCACHE="$(BACKEND_GOCACHE)" go run ./cmd/manifestcheck \
+		--plugin "$(ABS_PLUGIN_FILE)" \
+		--manifest "" \
+		--schema "$(ABS_MANIFEST_SCHEMA)" \
+		--capabilities-only \
+		--plugin-only \
+		--event-fabric "$(ABS_EVENT_FABRIC_FILE)"
+	@echo "✅ plugin.yaml checks passed"
+
+.PHONY: plugin-permission-declaration-check
+plugin-permission-declaration-check: ## 校验 PowerX plugin permissions[] 与 page/api protocol_bindings
+	@echo "[manifest] checking plugin permission declarations"
+	@node scripts/manifest/check-permission-declaration.mjs --manifest "$(PLUGIN_FILE)"
+
+PX_PLUGIN ?= px-plugin
+.PHONY: plugin-id-check
+plugin-id-check:
+	@"$(PX_PLUGIN)" plugin-id check --manifest "$(ABS_PLUGIN_FILE)"

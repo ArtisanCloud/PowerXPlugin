@@ -1,0 +1,304 @@
+package app
+
+import (
+	"context"
+	fwmanifest "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/cache"
+	Regression "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/regression"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/taskcenter"
+	"os"
+	"strings"
+
+	fwiamadapters "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/adapters"
+	fwiamcontracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
+	"github.com/example.com/framework-ci-fixture/backend/internal/capabilities"
+	"github.com/example.com/framework-ci-fixture/backend/internal/config"
+	"github.com/example.com/framework-ci-fixture/backend/internal/grpc/client"
+	"github.com/example.com/framework-ci-fixture/backend/internal/integrations/gateway"
+	"github.com/example.com/framework-ci-fixture/backend/internal/logger"
+	authx "github.com/example.com/framework-ci-fixture/backend/internal/middleware"
+	adminmetrics "github.com/example.com/framework-ci-fixture/backend/internal/observability/admin_console"
+	capmetrics "github.com/example.com/framework-ci-fixture/backend/internal/observability/capability"
+	opsmetrics "github.com/example.com/framework-ci-fixture/backend/internal/observability/operations"
+	localaisettings "github.com/example.com/framework-ci-fixture/backend/internal/services/ai_settings"
+	"github.com/example.com/framework-ci-fixture/backend/internal/services/authproxy"
+	iamservice "github.com/example.com/framework-ci-fixture/backend/internal/services/iam"
+	marketplacesvc "github.com/example.com/framework-ci-fixture/backend/internal/services/marketplace"
+	"github.com/example.com/framework-ci-fixture/backend/internal/services/runtimeexample"
+	"gorm.io/gorm"
+
+	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
+	fwagent "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/agent"
+	fwai "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/ai"
+	fwaisettings "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/aisettings"
+	fwcapability "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/capability"
+	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
+	contactfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/contactfw"
+	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
+	fweventfabric "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/eventfabric"
+	fwintegration "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/integration"
+	fwknowledge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/knowledge"
+	fwmedia "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/media"
+	fwmetadata "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/metadata"
+	fwnotifications "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/notifications"
+	fwpluginrelease "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/pluginrelease"
+	fwpluginruntime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/pluginruntime"
+	powerxagent "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/agent"
+	powerxai "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/ai"
+	powerxcapability "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/capability"
+	powerxknowledge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/knowledge"
+	powerxmedia "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/media"
+	powerxnotifications "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/notifications"
+	powerxskills "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/skills"
+	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
+	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
+	fwskills "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/skills"
+	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
+)
+
+type DelegatedAuthProxy interface {
+	Login(ctx context.Context, req iamservice.LoginRequest) (*iamservice.AuthTokens, error)
+	Refresh(ctx context.Context, refreshToken string) (*iamservice.AuthTokens, error)
+	Logout(ctx context.Context, refreshToken string) error
+	MeContext(ctx context.Context, accessToken string) (*authproxy.MeContext, error)
+	GetDirectoryTenant(ctx context.Context) (*authproxy.DirectoryTenant, error)
+	ListDirectoryMembers(ctx context.Context, page, pageSize int) (*authproxy.DirectoryMemberPage, error)
+	GetDirectoryMember(ctx context.Context, memberUUID string) (*authproxy.DirectoryMember, error)
+	BatchGetDirectoryMembers(ctx context.Context, memberUUIDs []string) ([]authproxy.DirectoryMember, error)
+	BatchResolveDirectoryMembers(ctx context.Context, memberUUIDs []string) (*authproxy.DirectoryMemberResolution, error)
+	BatchResolveDirectoryMembersByDisplayNames(ctx context.Context, displayNames []string) (*authproxy.DirectoryMemberDisplayNameResolution, error)
+	ListDirectoryDepartments(ctx context.Context) ([]authproxy.DirectoryDepartment, error)
+	ListDirectoryRoles(ctx context.Context) ([]authproxy.DirectoryRole, error)
+	ListDirectoryPermissions(ctx context.Context) ([]authproxy.DirectoryPermission, error)
+	CheckDirectoryAuthorization(ctx context.Context, request authproxy.DirectoryAuthorizationRequest) (*authproxy.AuthorizationDecision, error)
+}
+
+// Deps bundles shared infrastructure dependencies for handlers and services.
+type Deps struct {
+	NotificationPresentations      []fwmanifest.NotificationPresentation
+	Regression                     *Regression.Runner
+	KnowledgeProvider              fwknowledge.KnowledgeProvider
+	CacheRuntime                   *cache.Runtime
+	TaskCenterRuntime              *taskcenter.Runtime
+	DB                             *gorm.DB
+	Ctx                            context.Context
+	PowerXClient                   *client.PowerXServiceClient
+	CapabilityGateway              gatewayClient
+	Metadata                       *fwmetadata.Runtime
+	MetadataDebugLocalRuntime      *fwmetadata.Runtime
+	MetadataDebugDelegatedRuntime  *fwmetadata.Runtime
+	CustomerAdmin                  *customerfw.AdminClient
+	CustomerAccountSelector        *customerfw.AccountSelectorClient
+	CustomerRuntime                *customerfw.Runtime
+	CustomerIdentityDebugLocal     *customerfw.Runtime
+	CustomerIdentityDebugDelegated *customerfw.Runtime
+	ContactRuntime                 *contactfw.Runtime
+	// ContactDebug* are deliberately separate from ContactRuntime. They exist
+	// only for the Framework lab where an administrator explicitly selects a
+	// route per request; normal business traffic remains startup-mode bound.
+	ContactDebugLocalRuntime     *contactfw.Runtime
+	ContactDebugDelegatedRuntime *contactfw.Runtime
+	AISettings                   fwaisettings.Service
+	PowerXAISettings             *fwaisettings.Client
+	LocalAISettings              *localaisettings.LocalSettingsService
+	LocalAI                      *runtimeexample.LocalAI
+	AIInvocation                 *fwai.Runtime
+	AI                           *powerxai.Client
+	AgentLifecycle               *fwagent.Runtime
+	AgentRuntime                 *powerxagent.Client
+	CapabilityAccess             *fwcapability.Runtime
+	CapabilityRegistry           powerxcapability.Registry
+	IntegrationGateway           *fwintegration.Runtime
+	MediaCatalog                 *fwmedia.Runtime
+	Media                        powerxmedia.AssetReader
+	PluginRuntime                *fwpluginruntime.Runtime
+	PluginRelease                *fwpluginrelease.Runtime
+	KnowledgeQABridge            powerxknowledge.QABridge
+	KnowledgeDirectory           fwknowledge.DelegatedClient
+	NotificationDelivery         *fwnotifications.Runtime
+	Notifications                powerxnotifications.Publisher
+	LocalSkillInvoker            fwskills.Invoker
+	SkillInvocation              *fwskills.Runtime
+	Skills                       powerxskills.Invoker
+	Config                       *config.Config
+	CapabilitiesManager          capabilities.Manager
+	CapabilityMetrics            *capmetrics.Metrics
+	TaxProviderClient            *marketplacesvc.TaxProviderClient
+	MarketplaceBilling           marketplacesvc.BillingClient
+	LicenseAuthority             marketplacesvc.LicenseAuthority
+	LicenseCache                 marketplacesvc.LicenseCache
+	OperationsMetrics            *opsmetrics.Metrics
+	AdminConsoleMetrics          *adminmetrics.Metrics
+	EventEmitter                 fweventbridge.Emitter
+	ReliableEvents               *fweventfabric.Runtime
+	WSBusHub                     fwwsbus.LocalHub
+	RealtimeDescriptors          []frameworkrealtime.Descriptor
+	ProviderMode                 fwprovider.Mode
+	ProviderModeSource           string
+	IAMAdapterMode               iamservice.IAMAdapterMode
+	IAMAdapterModeSource         string
+	AuthProxy                    DelegatedAuthProxy
+	IAMDirectory                 iamservice.IAMDirectory
+	IAMRegistry                  *fwiamadapters.Registry
+	WSIdentityLifecycle          *frameworkrealtime.IdentityLifecycle
+	IAMDirectoryService          fwiamcontracts.DirectoryService
+	IAMAuthzService              fwiamcontracts.AuthzService
+	IAMContextService            fwiamcontracts.IdentityContextService
+	// LocalAuthorizationBaselines must be supplied by a plugin-owned authority.
+	LocalAuthorizationBaselines     fwiamcontracts.AuthorizationBaselineService
+	IAMAuthorizationBaselines       fwiamcontracts.AuthorizationBaselineService
+	IAMAuthorizationBaselineEnabled bool
+}
+
+type gatewayClient interface {
+	Enabled() bool
+	Invoke(ctx context.Context, params gateway.InvokeParams) (*gateway.InvokeResult, error)
+	ListPlatformCapabilityCatalog(ctx context.Context, opts gateway.ListPlatformCapabilityCatalogOptions) ([]gateway.PlatformCapabilityCatalogRecord, error)
+	ListKnowledgeSpaces(ctx context.Context, opts gateway.KnowledgeSpaceListOptions) ([]gateway.KnowledgeSpaceRuntimeRecord, error)
+	CreateKnowledgeSpace(ctx context.Context, params gateway.KnowledgeSpaceCreateParams) (*gateway.KnowledgeSpaceRecord, error)
+	RetireKnowledgeSpace(ctx context.Context, params gateway.KnowledgeSpaceRetireParams) (*gateway.KnowledgeSpaceRecord, error)
+	DeleteKnowledgeSpace(ctx context.Context, params gateway.KnowledgeSpaceDeleteParams) error
+	ResolveGatewayTenantUUID(ctx context.Context) (string, error)
+	ListAgents(ctx context.Context, env string) ([]gateway.AgentRecord, error)
+	GetAgent(ctx context.Context, agentUUID string) (*gateway.AgentRecord, error)
+	SyncPluginSkill(ctx context.Context, params gateway.PluginSkillSyncParams) (*gateway.PluginSkillSyncResult, error)
+	SyncPluginAgent(ctx context.Context, params gateway.PluginAgentSyncParams) (*gateway.PluginAgentSyncResult, error)
+	RegisterCatalog(ctx context.Context, catalog *capabilities.CatalogSnapshot, assets []capabilities.ProtocolAsset) error
+	Close() error
+}
+
+// RuntimeDefaults returns the configured runtime ops defaults (if any).
+func (d *Deps) RuntimeDefaults() *config.RuntimeOpsDefaults {
+	if d == nil || d.Config == nil {
+		return nil
+	}
+	return d.Config.RuntimeOps
+}
+
+// RuntimeLogger provides a structured logger enriched with runtime metadata.
+func (d *Deps) RuntimeLogger(ctx context.Context, component string, extra logger.Fields) *logger.Entry {
+	if extra == nil {
+		extra = logger.Fields{}
+	}
+	if _, ok := extra[runtimelogging.FieldSubscriber]; !ok {
+		extra[runtimelogging.FieldSubscriber] = component
+	}
+	if ctx == nil && d != nil {
+		ctx = d.Ctx
+	}
+
+	var tenantID string
+	if tid, ok := authx.TenantUUIDFromContext(ctx); ok && tid != "" {
+		tenantID = tid
+	}
+
+	traceID := ""
+	if ctx != nil {
+		if v := ctx.Value("request_id"); v != nil {
+			if s, ok := v.(string); ok {
+				traceID = s
+			}
+		}
+	}
+	baseFields := runtimelogging.Fields{
+		runtimelogging.FieldPluginID:   PluginID,
+		runtimelogging.FieldTenantUUID: tenantID,
+		runtimelogging.FieldTraceID:    traceID,
+		runtimelogging.FieldComponent:  component,
+		"request_id":                   traceID,
+	}
+	normalized := runtimelogging.NormalizeContextFields(baseFields, runtimelogging.Fields(extra))
+	if trimAny(normalized["biz_scene"]) == "" && strings.TrimSpace(component) != "" {
+		normalized["biz_scene"] = strings.TrimSpace(component)
+	}
+	if trimAny(normalized["biz_domain"]) == "" {
+		normalized["biz_domain"] = inferBizDomain(component)
+	}
+	labels := buildRuntimeLabels(component, normalized)
+	normalized["labels"] = labels
+	for k, v := range labels {
+		if _, exists := normalized[k]; !exists {
+			normalized[k] = v
+		}
+	}
+	extra = logger.Fields(normalized)
+
+	return logger.WithRuntimeFields(PluginID, tenantID, traceID, component, extra)
+}
+
+func buildRuntimeLabels(component string, fields runtimelogging.Fields) map[string]string {
+	labels := map[string]string{
+		"system":   firstNonEmpty(strings.TrimSpace(os.Getenv("POWERX_LOG_SYSTEM")), "powerx"),
+		"service":  firstNonEmpty(strings.TrimSpace(os.Getenv("POWERX_LOG_SERVICE")), "backend"),
+		"env":      firstNonEmpty(strings.TrimSpace(os.Getenv("POWERX_ENV")), strings.TrimSpace(os.Getenv("POWERX_SERVER_MODE")), "dev"),
+		"instance": firstNonEmpty(strings.TrimSpace(os.Getenv("HOSTNAME")), "local"),
+	}
+	if module := firstNonEmpty(trimAny(fields["module"]), strings.TrimSpace(component)); module != "" {
+		labels["module"] = module
+	}
+	return labels
+}
+
+func trimAny(v any) string {
+	if s, ok := v.(string); ok {
+		return strings.TrimSpace(s)
+	}
+	return ""
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if t := strings.TrimSpace(v); t != "" {
+			return t
+		}
+	}
+	return ""
+}
+
+func inferBizDomain(component string) string {
+	c := strings.ToLower(strings.TrimSpace(component))
+	switch {
+	case c == "":
+		return "backend"
+	case strings.Contains(c, "runtime") || strings.Contains(c, "mcp") || strings.Contains(c, "wsbus"):
+		return "runtime_ops"
+	case strings.Contains(c, "capability"):
+		return "capability"
+	case strings.Contains(c, "integration"):
+		return "integration"
+	case strings.Contains(c, "marketplace"):
+		return "marketplace"
+	case strings.Contains(c, "iam") || strings.Contains(c, "auth"):
+		return "iam"
+	case strings.Contains(c, "security") || strings.Contains(c, "consent") || strings.Contains(c, "toolgrant"):
+		return "security"
+	case strings.Contains(c, "operations") || strings.Contains(c, "incident") || strings.Contains(c, "sla"):
+		return "operations"
+	case strings.Contains(c, "agent"):
+		return "agent"
+	default:
+		return "backend"
+	}
+}
+
+func (d *Deps) LocalIAMEnabled() bool {
+	return d != nil && d.IAMAdapterMode == iamservice.IAMAdapterModeLocal && d.IAMDirectory != nil
+}
+
+func (d *Deps) DelegatedIAMEnabled() bool {
+	return d != nil && d.IAMAdapterMode == iamservice.IAMAdapterModeDelegated && d.AuthProxy != nil
+}
+
+func (d *Deps) LocalDirectory() iamservice.IAMDirectory {
+	if d.LocalIAMEnabled() {
+		return d.IAMDirectory
+	}
+	return nil
+}
+
+func (d *Deps) DelegatedProxy() DelegatedAuthProxy {
+	if d.DelegatedIAMEnabled() {
+		return d.AuthProxy
+	}
+	return nil
+}

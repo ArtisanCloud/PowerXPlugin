@@ -1,0 +1,92 @@
+package capability
+
+import (
+	"context"
+	"strings"
+	"time"
+
+	"github.com/example.com/framework-ci-fixture/backend/internal/logger"
+)
+
+const (
+	EventLifecyclePlanCreated = "capability.lifecycle.plan.created"
+	EventLifecyclePlanUpdated = "capability.lifecycle.plan.updated"
+)
+
+// Notifier 描述生命周期/审核事件的告警器接口。
+type Notifier interface {
+	Emit(ctx context.Context, evt Event)
+}
+
+// loggerNotifier 使用日志模拟多通道通知并带有简单的重试机制。
+type loggerNotifier struct {
+	maxRetries int
+	delay      time.Duration
+}
+
+// NewNotifier 返回具备重试能力的 Notifier。
+func NewNotifier(_ *logger.Entry) Notifier {
+	return &loggerNotifier{
+		maxRetries: 3,
+		delay:      200 * time.Millisecond,
+	}
+}
+
+func (n *loggerNotifier) Emit(ctx context.Context, evt Event) {
+	if n == nil {
+		return
+	}
+	channels := evt.Channels
+	if len(channels) == 0 {
+		n.dispatch(ctx, "", evt)
+		return
+	}
+	for _, channel := range channels {
+		n.dispatch(ctx, channel, evt)
+	}
+}
+
+func (n *loggerNotifier) dispatch(ctx context.Context, channel string, evt Event) {
+	for attempt := 1; attempt <= n.maxRetries; attempt++ {
+		if err := n.deliver(ctx, channel, evt); err != nil {
+			logger.WarnCtx(logger.WithLogFields(ctx, map[string]interface{}{
+				"module":     "capability",
+				"biz_scene":  "capability_lifecycle_notify",
+				"biz_domain": "capability",
+				"component":  "capability_notifier",
+				"event":      evt.Type,
+				"channel":    channel,
+				"attempt":    attempt,
+				"error":      err.Error(),
+				"metadata":   evt.Metadata,
+			}), "capability lifecycle notification failed, retrying")
+			time.Sleep(n.delay)
+			continue
+		}
+		break
+	}
+}
+
+func (n *loggerNotifier) deliver(ctx context.Context, channel string, evt Event) error {
+	fields := map[string]interface{}{
+		"module":        "capability",
+		"biz_scene":     "capability_lifecycle_notify",
+		"biz_domain":    "capability",
+		"component":     "capability_notifier",
+		"event":         evt.Type,
+		"capability_id": evt.CapabilityID,
+		"status":        evt.Status,
+		"channel":       strings.TrimSpace(channel),
+		"payload":       evt.Payload,
+	}
+	for k, v := range evt.Metadata {
+		fields[k] = v
+	}
+	if ctx != nil {
+		if reqID := ctx.Value("request_id"); reqID != nil {
+			fields["trace_id"] = reqID
+		}
+	}
+	logger.InfoCtx(logger.WithLogFields(ctx, fields), "capability lifecycle notification emitted")
+	return nil
+}

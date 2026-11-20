@@ -1,0 +1,240 @@
+package iam
+
+import (
+	"net/http"
+	"strings"
+
+	fwiamcontracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
+	"github.com/example.com/framework-ci-fixture/backend/internal/contracts"
+	authmw "github.com/example.com/framework-ci-fixture/backend/internal/middleware"
+	srviam "github.com/example.com/framework-ci-fixture/backend/internal/services/iam"
+	admincommon "github.com/example.com/framework-ci-fixture/backend/internal/transport/http/admin/common"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+)
+
+type MemberHandler struct {
+	service   *srviam.UserService
+	mode      srviam.IAMAdapterMode
+	directory fwiamcontracts.DirectoryService
+}
+
+func NewMemberHandler(svc *srviam.UserService, mode srviam.IAMAdapterMode, directories ...fwiamcontracts.DirectoryService) *MemberHandler {
+	var directory fwiamcontracts.DirectoryService
+	if len(directories) > 0 {
+		directory = directories[0]
+	}
+	return &MemberHandler{service: svc, mode: mode, directory: directory}
+}
+
+func (h *MemberHandler) List(c *gin.Context) {
+	var query MemberListQuery
+	if err := c.ShouldBindQuery(&query); err != nil {
+		contracts.ResponseBadRequest(c, "invalid query: "+err.Error())
+		return
+	}
+	query.TenantUUID = admincommon.ResolveTenantUUID(c)
+	if strings.TrimSpace(query.TenantUUID) == "" {
+		contracts.ResponseBadRequest(c, "tenant_uuid is required")
+		return
+	}
+	if h.mode == srviam.IAMAdapterModeDelegated {
+		if h.directory == nil {
+			contracts.ResponseServiceUnavailable(c, "IAM delegated directory provider is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "delegated"})
+			return
+		}
+		members, err := h.directory.ListMembers(c.Request.Context(), query.TenantUUID)
+		if err != nil {
+			respondIAMError(c, err)
+			return
+		}
+		contracts.ResponseSuccess(c, gin.H{
+			"items":     members,
+			"page":      resultPage(query.Page),
+			"page_size": resultPageSize(query.PageSize),
+		})
+		return
+	}
+	if h.service == nil {
+		contracts.ResponseServiceUnavailable(c, "IAM local member service is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "local"})
+		return
+	}
+	items, err := h.service.List(c.Request.Context(), srviam.UserFilter{
+		TenantUUID: query.TenantUUID,
+		Status:     query.Status,
+		Query:      query.Query,
+	})
+	if err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{
+		"items":     items,
+		"page":      resultPage(query.Page),
+		"page_size": resultPageSize(query.PageSize),
+	})
+}
+
+func (h *MemberHandler) Create(c *gin.Context) {
+	if h.mode == srviam.IAMAdapterModeDelegated {
+		contracts.ResponseError(c, http.StatusMethodNotAllowed, "IAM_DELEGATED_READ_ONLY", "member write operations are not allowed in delegated mode")
+		return
+	}
+	if h.service == nil {
+		contracts.ResponseServiceUnavailable(c, "IAM local member service is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "local"})
+		return
+	}
+	var req CreateMemberRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+		return
+	}
+	req.TenantUUID = admincommon.ResolveTenantUUID(c)
+	if strings.TrimSpace(req.TenantUUID) == "" {
+		contracts.ResponseBadRequest(c, "tenant_uuid is required")
+		return
+	}
+	tc, _ := authmw.GetTenantContext(c)
+	var actorID *uint64
+	if tc.UserID > 0 {
+		uid := uint64(tc.UserID)
+		actorID = &uid
+	}
+	if !validUUIDs(req.DepartmentUUIDs) || !validUUIDs(req.RoleUUIDs) {
+		contracts.ResponseBadRequest(c, "department_uuids and role_uuids must contain UUID values")
+		return
+	}
+	member, err := h.service.CreateByUUID(c.Request.Context(), srviam.CreateUserUUIDInput{
+		TenantUUID:      req.TenantUUID,
+		Email:           req.Email,
+		DisplayName:     req.DisplayName,
+		Username:        req.Username,
+		Phone:           req.Phone,
+		DepartmentUUIDs: req.DepartmentUUIDs,
+		Status:          req.Status,
+		RoleUUIDs:       req.RoleUUIDs,
+		ActorID:         actorID,
+	})
+	if err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, member)
+}
+
+func (h *MemberHandler) Update(c *gin.Context) {
+	if h.mode == srviam.IAMAdapterModeDelegated {
+		contracts.ResponseError(c, http.StatusMethodNotAllowed, "IAM_DELEGATED_READ_ONLY", "member write operations are not allowed in delegated mode")
+		return
+	}
+	if h.service == nil {
+		contracts.ResponseServiceUnavailable(c, "IAM local member service is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "local"})
+		return
+	}
+	memberUUID := strings.TrimSpace(c.Param("member_uuid"))
+	if _, err := uuid.Parse(memberUUID); err != nil {
+		contracts.ResponseBadRequest(c, "invalid member_uuid")
+		return
+	}
+	var req UpdateMemberRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+		return
+	}
+	tenantUUID := admincommon.ResolveTenantUUID(c)
+	if strings.TrimSpace(tenantUUID) == "" {
+		contracts.ResponseBadRequest(c, "tenant_uuid is required")
+		return
+	}
+	tc, _ := authmw.GetTenantContext(c)
+	var actorID *uint64
+	if tc.UserID > 0 {
+		uid := uint64(tc.UserID)
+		actorID = &uid
+	}
+	if !validUUIDs(req.DepartmentUUIDs) || !validUUIDs(req.RoleUUIDs) {
+		contracts.ResponseBadRequest(c, "department_uuids and role_uuids must contain UUID values")
+		return
+	}
+	member, err := h.service.UpdateByUUID(c.Request.Context(), memberUUID, srviam.UpdateUserUUIDInput{
+		TenantUUID:      tenantUUID,
+		DisplayName:     req.DisplayName,
+		Status:          req.Status,
+		DepartmentUUIDs: req.DepartmentUUIDs,
+		RoleUUIDs:       req.RoleUUIDs,
+		ReplaceRoles:    req.ReplaceRoles,
+		ActorID:         actorID,
+	})
+	if err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, member)
+}
+
+func (h *MemberHandler) BulkImport(c *gin.Context) {
+	if h.mode == srviam.IAMAdapterModeDelegated {
+		contracts.ResponseError(c, http.StatusMethodNotAllowed, "IAM_DELEGATED_READ_ONLY", "member write operations are not allowed in delegated mode")
+		return
+	}
+	if h.service == nil {
+		contracts.ResponseServiceUnavailable(c, "IAM local member service is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "local"})
+		return
+	}
+	var req BulkImportMembersRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+		return
+	}
+	req.TenantUUID = admincommon.ResolveTenantUUID(c)
+	if strings.TrimSpace(req.TenantUUID) == "" {
+		contracts.ResponseBadRequest(c, "tenant_uuid is required")
+		return
+	}
+	if len(req.Users) == 0 {
+		contracts.ResponseBadRequest(c, "users required")
+		return
+	}
+	for _, entry := range req.Users {
+		if !validUUIDs(entry.DepartmentUUIDs) || !validUUIDs(entry.RoleUUIDs) {
+			contracts.ResponseBadRequest(c, "department_uuids and role_uuids must contain UUID values")
+			return
+		}
+	}
+	result := &srviam.UserBulkImportResult{Created: []*srviam.UserView{}, Failed: []srviam.UserBulkImportError{}}
+	var err error
+	for idx, entry := range req.Users {
+		member, createErr := h.service.CreateByUUID(c.Request.Context(), srviam.CreateUserUUIDInput{TenantUUID: req.TenantUUID, Email: entry.Email, DisplayName: entry.DisplayName, Username: entry.Username, Phone: entry.Phone, DepartmentUUIDs: entry.DepartmentUUIDs, Status: entry.Status, RoleUUIDs: entry.RoleUUIDs})
+		if createErr != nil {
+			if err == nil {
+				err = createErr
+			}
+			result.Failed = append(result.Failed, srviam.UserBulkImportError{Index: idx, Email: entry.Email, Message: createErr.Error(), Err: createErr})
+			continue
+		}
+		result.Created = append(result.Created, member)
+	}
+	if result == nil {
+		result = &srviam.UserBulkImportResult{}
+	}
+	if err != nil && len(result.Failed) == len(req.Users) {
+		contracts.ResponseError(c, http.StatusBadRequest, contracts.ErrCodeInvalidRequest, err.Error())
+		return
+	}
+	contracts.ResponseSuccess(c, result)
+}
+
+func validUUIDs(values []string) bool {
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		parsed, err := uuid.Parse(strings.TrimSpace(value))
+		if err != nil || parsed.String() != strings.ToLower(strings.TrimSpace(value)) {
+			return false
+		}
+		if _, exists := seen[parsed.String()]; exists {
+			return false
+		}
+		seen[parsed.String()] = struct{}{}
+	}
+	return true
+}

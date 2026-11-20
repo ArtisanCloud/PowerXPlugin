@@ -1,0 +1,184 @@
+<template>
+  <section
+    class="space-y-4 rounded-xl border border-slate-200 bg-white p-5 text-gray-900 dark:border-slate-700 dark:bg-[#0f192a] dark:text-slate-100"
+  >
+    <header class="flex flex-wrap items-center justify-between gap-3">
+      <h2 class="font-semibold">{{ t('knowledgeSemantic.indexTitle') }}</h2>
+      <UButton color="neutral" variant="soft" :loading="loading" @click="load">
+        {{ t('common.refresh') }}
+      </UButton>
+    </header>
+    <UAlert v-if="error" color="error" :description="error" />
+    <UAlert
+      v-if="state && !state.indexed && !error"
+      color="info"
+      variant="soft"
+      :title="
+        t(
+          !state.configured
+            ? 'knowledgeSemantic.setup.configureTitle'
+            : !state.ready
+              ? 'knowledgeSemantic.setup.dependencyTitle'
+              : 'knowledgeSemantic.setup.indexTitle'
+        )
+      "
+      :description="
+        t(
+          !state.configured
+            ? 'knowledgeSemantic.setup.configureHint'
+            : !state.ready
+              ? 'knowledgeSemantic.setup.dependencyHint'
+              : 'knowledgeSemantic.setup.indexHint'
+        )
+      "
+    />
+    <div v-if="state" class="flex flex-wrap gap-3">
+      <UBadge :color="state.configured ? 'success' : 'neutral'">
+        {{
+          t(state.configured ? 'knowledgeSemantic.configured' : 'knowledgeSemantic.unconfigured')
+        }}
+      </UBadge>
+      <UBadge :color="state.ready ? 'success' : 'warning'">
+        {{ t(state.ready ? 'knowledgeSemantic.ready' : 'knowledgeSemantic.notReady') }}
+      </UBadge>
+      <UBadge :color="state.indexed ? 'success' : 'neutral'">
+        {{ t(state.indexed ? 'knowledgeSemantic.indexed' : 'knowledgeSemantic.notIndexed') }}
+      </UBadge>
+    </div>
+    <dl v-if="state?.generation" class="grid gap-3 text-sm sm:grid-cols-3">
+      <div>
+        <dt>{{ t('knowledgeSemantic.activeModel') }}</dt>
+        <dd>{{ state.generation.model_key }}</dd>
+      </div>
+      <div>
+        <dt>{{ t('knowledgeSemantic.dimensions') }}</dt>
+        <dd>{{ state.generation.dimensions }}</dd>
+      </div>
+      <div>
+        <dt>{{ t('knowledgeSemantic.environment') }}</dt>
+        <dd>{{ state.generation.env }}</dd>
+      </div>
+    </dl>
+    <p v-if="state?.pending_generation" class="text-sm text-amber-700 dark:text-amber-300">
+      {{
+        t('knowledgeSemantic.pendingModel', {
+          model: state.pending_generation.model_key,
+          dimensions: state.pending_generation.dimensions
+        })
+      }}
+    </p>
+    <div v-if="state?.index_counts?.length" class="flex flex-wrap gap-3 text-sm">
+      <p v-for="count in state.index_counts" :key="count.mode">
+        {{
+          t('knowledgeSemantic.indexCount', {
+            mode: t(`knowledgeSemantic.modes.${count.mode}`),
+            documents: count.documents,
+            chunks: count.chunks
+          })
+        }}
+      </p>
+    </div>
+    <p v-if="state?.reason_code" class="text-sm">
+      {{ t('knowledgeSemantic.setup.reason', { code: state.reason_code }) }}
+    </p>
+    <details v-if="workspace.configureSemantic">
+      <summary class="cursor-pointer text-sm font-medium">
+        {{ t('knowledgeSemantic.configure') }}
+      </summary>
+      <div class="mt-4 space-y-4">
+        <p class="text-sm text-gray-600 dark:text-slate-300">
+          {{ t('knowledgeSemantic.configureHint') }}
+        </p>
+        <UFormField :label="t('knowledgeSemantic.profileKey')">
+          <UInput v-model="modelKey" class="w-full" :disabled="loading" />
+        </UFormField>
+        <UButton :loading="loading" :disabled="!modelKey.trim()" @click="configure">
+          {{ t('knowledgeSemantic.configureAction') }}
+        </UButton>
+      </div>
+    </details>
+    <details v-if="state">
+      <summary class="cursor-pointer text-sm">
+        {{ t('knowledgeSemantic.versionDetails') }}
+      </summary>
+      <pre class="mt-3 max-h-72 overflow-auto whitespace-pre-wrap text-xs">{{
+        JSON.stringify(
+          {
+            generation: state.generation,
+            pending_generation: state.pending_generation,
+            limits: state.limits
+          },
+          null,
+          2
+        )
+      }}</pre>
+    </details>
+  </section>
+</template>
+<script setup lang="ts">
+import { formatKnowledgeRequestFailure } from '~/composables/knowledge/requestFailure'
+import { ref, watch } from 'vue'
+import type { SemanticCapabilities } from '~/composables/api/knowledgeSemanticTypes'
+import { useKnowledgeWorkspace } from '~/composables/api/useKnowledgeWorkspace'
+const props = defineProps<{
+  spaceUUID: string
+  initialState?: SemanticCapabilities
+}>()
+const emit = defineEmits<{
+  changed: [SemanticCapabilities | undefined]
+  failed: [string]
+}>()
+const workspace = useKnowledgeWorkspace()
+const { t } = useI18n()
+const state = ref<SemanticCapabilities>()
+const loading = ref(false)
+const error = ref('')
+const modelKey = ref('')
+function message(e: unknown) {
+  return formatKnowledgeRequestFailure(e, t)
+}
+async function load() {
+  if (!props.spaceUUID || !workspace.semanticCapabilities) return
+  loading.value = true
+  error.value = ''
+  state.value = undefined
+  emit('changed', undefined)
+  try {
+    state.value = await workspace.semanticCapabilities(props.spaceUUID)
+    modelKey.value = state.value.generation?.model_key || ''
+    emit('changed', state.value)
+  } catch (e) {
+    error.value = message(e)
+    emit('failed', error.value)
+  } finally {
+    loading.value = false
+  }
+}
+async function configure() {
+  if (!workspace.configureSemantic || !modelKey.value.trim()) return
+  loading.value = true
+  error.value = ''
+  try {
+    await workspace.configureSemantic(props.spaceUUID, {
+      embedding_profile_key: modelKey.value,
+      expected_configuration_generation: state.value?.generation?.configuration_generation
+    })
+    await load()
+  } catch (e) {
+    error.value = message(e)
+  } finally {
+    loading.value = false
+  }
+}
+watch(
+  () => props.spaceUUID,
+  () => {
+    if (props.initialState) {
+      state.value = props.initialState
+      modelKey.value = state.value.generation?.model_key || ''
+    } else void load()
+  },
+  { immediate: true }
+)
+defineExpose({ load })
+</script>

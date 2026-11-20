@@ -1,0 +1,548 @@
+package agent
+
+import (
+	"encoding/json"
+	"errors"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+
+	runtimeskills "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/skills"
+	"github.com/example.com/framework-ci-fixture/backend/internal/contracts"
+	capabilitycontract "github.com/example.com/framework-ci-fixture/backend/internal/contracts/capability"
+	dbm "github.com/example.com/framework-ci-fixture/backend/internal/entity/models/agent_registry"
+	authx "github.com/example.com/framework-ci-fixture/backend/internal/middleware"
+	"github.com/example.com/framework-ci-fixture/backend/internal/shared/app"
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+)
+
+type Handler struct {
+	deps *app.Deps
+}
+
+func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {
+	h := &Handler{deps: deps}
+	group := rg.Group("/plugin/agent")
+	group.GET("/agents", h.ListAgents)
+	group.GET("/agents/:agentUUID/effective-permissions", h.GetAgentEffectivePermissions)
+	group.POST("/sessions", h.Session)
+	group.GET("/sessions", h.Session)
+	group.GET("/sessions/:session_uuid", h.Session)
+	group.PATCH("/sessions/:session_uuid", h.Session)
+	group.DELETE("/sessions/:session_uuid", h.Session)
+	group.POST("/sessions/:session_uuid/archive", h.Session)
+	group.GET("/sessions/:session_uuid/messages", h.Session)
+	group.POST("/sessions/:session_uuid/messages", h.Session)
+	group.POST("/sessions/:session_uuid/invocations", h.Session)
+	group.GET("/sessions/:session_uuid/invocations/:invocation_uuid", h.Session)
+	group.POST("/sessions/:session_uuid/invocations/:invocation_uuid/cancel", h.Session)
+	group.GET("/sessions/:session_uuid/invocations/:invocation_uuid/events", h.Session)
+}
+
+type agentEffectivePermissionResponse struct {
+	Agent       agentPermissionAgentView    `json:"agent"`
+	User        agentPermissionUserView     `json:"user"`
+	CanUseAgent bool                        `json:"can_use_agent"`
+	Actions     []agentPermissionActionView `json:"actions"`
+}
+
+type agentPermissionAgentView struct {
+	PluginAgentID   string `json:"plugin_agent_id"`
+	PluginID        string `json:"plugin_id"`
+	PowerXAgentUUID string `json:"powerx_agent_uuid"`
+	AgentKey        string `json:"agent_key"`
+	Name            string `json:"name"`
+	SyncStatus      string `json:"sync_status"`
+}
+
+type agentPermissionUserView struct {
+	TenantUUID  string   `json:"tenant_uuid"`
+	UserID      int64    `json:"user_id"`
+	MemberID    int64    `json:"member_id"`
+	IsRoot      bool     `json:"is_root"`
+	Roles       []string `json:"roles"`
+	Permissions []string `json:"permissions"`
+}
+
+type agentPermissionActionView struct {
+	Action               string   `json:"action"`
+	SkillID              string   `json:"skill_id"`
+	CapabilityID         string   `json:"capability_id"`
+	DescriptorCapability string   `json:"descriptor_capability_id"`
+	RBACResource         string   `json:"rbac_resource"`
+	RBACActions          []string `json:"rbac_actions"`
+	RequiredPermissions  []string `json:"required_permissions"`
+	PermissionCandidates []string `json:"permission_candidates"`
+	Allowed              bool     `json:"allowed"`
+	DenyCode             string   `json:"deny_code,omitempty"`
+	UnavailableReason    string   `json:"unavailable_reason,omitempty"`
+}
+
+func (h *Handler) ListAgents(c *gin.Context) {
+	if h == nil || h.deps == nil || h.deps.CapabilityGateway == nil || !h.deps.CapabilityGateway.Enabled() {
+		contracts.ResponseError(c, http.StatusServiceUnavailable, "POWERX_AGENT_GATEWAY_UNAVAILABLE", "PowerX gateway client is not configured")
+		return
+	}
+
+	env := strings.TrimSpace(c.Query("env"))
+	agents, err := h.deps.CapabilityGateway.ListAgents(c.Request.Context(), env)
+	if err != nil {
+		contracts.ResponseError(c, http.StatusBadGateway, "POWERX_AGENT_LIST_FAILED", err.Error())
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{"items": agents})
+}
+
+func (h *Handler) GetAgentEffectivePermissions(c *gin.Context) {
+	if h == nil || h.deps == nil || h.deps.DB == nil {
+		contracts.ResponseError(c, http.StatusServiceUnavailable, "PLUGIN_AGENT_PERMISSION_STORE_UNAVAILABLE", "plugin database is not configured")
+		return
+	}
+	agentUUID := strings.TrimSpace(c.Param("agentUUID"))
+	if agentUUID == "" {
+		contracts.ResponseError(c, http.StatusBadRequest, "PLUGIN_AGENT_UUID_REQUIRED", "agent_uuid is required")
+		return
+	}
+	registryTenantUUID := h.registryTenantUUID(c)
+	if registryTenantUUID == "" {
+		contracts.ResponseError(c, http.StatusBadRequest, "PLUGIN_AGENT_PERMISSION_TENANT_REQUIRED", "registry tenant_uuid is required")
+		return
+	}
+	pluginID, err := registrationPluginID()
+	if err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_REGISTRATION_MODE_INVALID", err.Error())
+		return
+	}
+
+	var agent dbm.PluginAgent
+	err = h.deps.DB.WithContext(c.Request.Context()).
+		Where("tenant_uuid = ? AND plugin_id = ? AND powerx_agent_uuid = ?", registryTenantUUID, pluginID, agentUUID).
+		First(&agent).Error
+	if err != nil {
+		status := http.StatusInternalServerError
+		code := "PLUGIN_AGENT_PERMISSION_AGENT_LOOKUP_FAILED"
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			status = http.StatusNotFound
+			code = "PLUGIN_AGENT_NOT_FOUND"
+		}
+		contracts.ResponseError(c, status, code, err.Error())
+		return
+	}
+
+	catalog, err := loadCapabilityCatalog()
+	if err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_CAPABILITY_CATALOG_LOAD_FAILED", err.Error())
+		return
+	}
+	tc, hasTenantContext := authx.GetTenantContext(c)
+	actions, err := h.resolveAgentPermissionActions(c, &agent, catalog, tc, hasTenantContext)
+	if err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_AGENT_PERMISSION_RESOLVE_FAILED", err.Error())
+		return
+	}
+
+	contracts.ResponseSuccess(c, agentEffectivePermissionResponse{
+		Agent: agentPermissionAgentView{
+			PluginAgentID:   agent.PluginAgentID,
+			PluginID:        agent.PluginID,
+			PowerXAgentUUID: agent.PowerXAgentUUID,
+			AgentKey:        agent.AgentKey,
+			Name:            agent.Name,
+			SyncStatus:      agent.SyncStatus,
+		},
+		User: agentPermissionUserView{
+			TenantUUID:  tc.TenantUUID,
+			UserID:      tc.UserID,
+			MemberID:    tc.MemberID,
+			IsRoot:      tc.IsRoot,
+			Roles:       tc.Roles,
+			Permissions: tc.Permissions,
+		},
+		CanUseAgent: anyActionAllowed(actions),
+		Actions:     actions,
+	})
+}
+
+func parsePositiveInt(raw string, fallback int) int {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return fallback
+	}
+	n := 0
+	for _, r := range raw {
+		if r < '0' || r > '9' {
+			return fallback
+		}
+		n = n*10 + int(r-'0')
+	}
+	if n <= 0 {
+		return fallback
+	}
+	return n
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
+func (h *Handler) tenantUUID(c *gin.Context) string {
+	if h != nil && h.deps != nil && h.deps.Config != nil {
+		if h.deps.Config.Gateway != nil {
+			if isGatewayAPIKeyMode(h.deps.Config.Gateway.AuthScheme, h.deps.Config.Gateway.APIKey) {
+				return ""
+			}
+		}
+		if h.deps.Config.GRPCUpstream != nil {
+			if value := firstUsableTenantUUID(h.deps.Config.GRPCUpstream.TenantUUID); value != "" {
+				return value
+			}
+		}
+	}
+	if value := firstUsableTenantUUID(c.GetHeader("tenant_uuid")); value != "" {
+		return value
+	}
+	if value := firstUsableTenantUUID(c.GetHeader("X-Tenant-UUID")); value != "" {
+		return value
+	}
+	if value := firstUsableTenantUUID(c.Query("tenant_uuid")); value != "" {
+		return value
+	}
+	if tc, ok := authx.GetTenantContext(c); ok {
+		if tenantUUID := firstUsableTenantUUID(tc.TenantUUID); tenantUUID != "" {
+			return tenantUUID
+		}
+	}
+	if value, ok := authx.TenantUUIDFromContext(c.Request.Context()); ok {
+		if tenantUUID := firstUsableTenantUUID(value); tenantUUID != "" {
+			return tenantUUID
+		}
+	}
+	return ""
+}
+
+func (h *Handler) registryTenantUUID(c *gin.Context) string {
+	if h != nil && h.deps != nil && h.deps.CapabilityGateway != nil && h.deps.CapabilityGateway.Enabled() {
+		if value, err := h.deps.CapabilityGateway.ResolveGatewayTenantUUID(c.Request.Context()); err == nil {
+			if tenantUUID := firstUsableTenantUUID(value); tenantUUID != "" {
+				return tenantUUID
+			}
+		}
+	}
+	if h != nil && h.deps != nil && h.deps.Config != nil && h.deps.Config.GRPCUpstream != nil {
+		if value := firstUsableTenantUUID(h.deps.Config.GRPCUpstream.TenantUUID); value != "" {
+			return value
+		}
+	}
+	if value := firstUsableTenantUUID(c.GetHeader("tenant_uuid")); value != "" {
+		return value
+	}
+	if value := firstUsableTenantUUID(c.GetHeader("X-Tenant-UUID")); value != "" {
+		return value
+	}
+	if value := firstUsableTenantUUID(c.Query("tenant_uuid")); value != "" {
+		return value
+	}
+	if tc, ok := authx.GetTenantContext(c); ok {
+		if tenantUUID := firstUsableTenantUUID(tc.TenantUUID); tenantUUID != "" {
+			return tenantUUID
+		}
+	}
+	if value, ok := authx.TenantUUIDFromContext(c.Request.Context()); ok {
+		if tenantUUID := firstUsableTenantUUID(value); tenantUUID != "" {
+			return tenantUUID
+		}
+	}
+	return ""
+}
+
+func (h *Handler) originTenantUUID(c *gin.Context) string {
+	if value := strings.TrimSpace(c.Query("origin_tenant_uuid")); value != "" {
+		return value
+	}
+	if value := strings.TrimSpace(c.GetHeader("X-Origin-Tenant-UUID")); value != "" {
+		return value
+	}
+	if value := strings.TrimSpace(c.GetHeader("origin_tenant_uuid")); value != "" {
+		return value
+	}
+	if value := strings.TrimSpace(c.GetHeader("tenant_uuid")); value != "" {
+		return value
+	}
+	if value := strings.TrimSpace(c.GetHeader("X-Tenant-UUID")); value != "" {
+		return value
+	}
+	if tc, ok := authx.GetTenantContext(c); ok {
+		if value := strings.TrimSpace(tc.TenantUUID); value != "" {
+			return value
+		}
+	}
+	if value, ok := authx.TenantUUIDFromContext(c.Request.Context()); ok {
+		return strings.TrimSpace(value)
+	}
+	if h != nil && h.deps != nil && h.deps.Config != nil && h.deps.Config.GRPCUpstream != nil {
+		return strings.TrimSpace(h.deps.Config.GRPCUpstream.TenantUUID)
+	}
+	return ""
+}
+
+func (h *Handler) resolveAgentPermissionActions(
+	c *gin.Context,
+	agent *dbm.PluginAgent,
+	catalog *capabilitycontract.Catalog,
+	tc authx.TenantContext,
+	hasTenantContext bool,
+) ([]agentPermissionActionView, error) {
+	if h == nil || h.deps == nil || h.deps.DB == nil {
+		return nil, errors.New("plugin database is not configured")
+	}
+	if agent == nil {
+		return nil, errors.New("plugin agent is required")
+	}
+	skillIDs := stringListFromJSON(json.RawMessage(agent.PluginSkillIDs))
+	if len(skillIDs) == 0 {
+		skillIDs = stringListFromJSON(json.RawMessage(agent.PowerXSkillIDs))
+	}
+	if len(skillIDs) == 0 {
+		return []agentPermissionActionView{}, nil
+	}
+
+	var skills []dbm.PluginSkill
+	query := h.deps.DB.WithContext(c.Request.Context()).
+		Where("tenant_uuid = ? AND plugin_id = ?", agent.TenantUuid, agent.PluginID)
+	query = query.Where("plugin_skill_id IN ? OR powerx_skill_id IN ?", skillIDs, skillIDs)
+	if err := query.Find(&skills).Error; err != nil {
+		return nil, err
+	}
+	out := make([]agentPermissionActionView, 0)
+	for _, skill := range skills {
+		var executor runtimeskills.PluginSkillExecutor
+		if err := json.Unmarshal(skill.Executor, &executor); err != nil {
+			return nil, err
+		}
+		for action, capabilityID := range executor.ActionMap {
+			action = strings.TrimSpace(action)
+			capabilityID = strings.TrimSpace(capabilityID)
+			if action == "" || capabilityID == "" {
+				continue
+			}
+			out = append(out, buildActionPermissionView(skill.PluginSkillID, action, capabilityID, catalog, tc, hasTenantContext))
+		}
+	}
+	return out, nil
+}
+
+func buildActionPermissionView(
+	skillID string,
+	action string,
+	capabilityID string,
+	catalog *capabilitycontract.Catalog,
+	tc authx.TenantContext,
+	hasTenantContext bool,
+) agentPermissionActionView {
+	descriptorID := descriptorCapabilityID(capabilityID)
+	view := agentPermissionActionView{
+		Action:               action,
+		SkillID:              skillID,
+		CapabilityID:         capabilityID,
+		DescriptorCapability: descriptorID,
+		Allowed:              false,
+	}
+	record, ok := catalog.Get(descriptorID)
+	if !ok {
+		view.DenyCode = "capability_descriptor_missing"
+		view.UnavailableReason = "capability descriptor not found"
+		return view
+	}
+	resource := strings.TrimSpace(record.Descriptor.RBAC.Resource)
+	actions := normalizeStrings(record.Descriptor.RBAC.Actions)
+	view.RBACResource = resource
+	view.RBACActions = actions
+	view.RequiredPermissions = permissionNames(resource, actions)
+	view.PermissionCandidates = permissionCandidates(resource, actions)
+	if resource == "" || len(actions) == 0 {
+		view.DenyCode = "capability_rbac_missing"
+		view.UnavailableReason = "capability rbac resource/actions are required"
+		return view
+	}
+	if !hasTenantContext {
+		view.DenyCode = "tenant_context_missing"
+		return view
+	}
+	if tc.IsRoot || authx.IsSuperAdmin(tc.Roles, []string{"superadmin", "admin"}) {
+		view.Allowed = true
+		return view
+	}
+	for _, rbacAction := range actions {
+		if hasAnyPermissionCandidate(tc.Permissions, resource, rbacAction) {
+			view.Allowed = true
+			return view
+		}
+	}
+	view.DenyCode = "permission_denied"
+	return view
+}
+
+func registrationPluginID() (string, error) {
+	mode := strings.TrimSpace(strings.ToLower(os.Getenv("POWERX_PLUGIN_REGISTRATION_MODE")))
+	switch mode {
+	case "installed":
+		return app.PluginID, nil
+	case "local":
+		return app.PluginID + ".local", nil
+	default:
+		return "", errors.New("POWERX_PLUGIN_REGISTRATION_MODE must be one of installed or local")
+	}
+}
+
+func loadCapabilityCatalog() (*capabilitycontract.Catalog, error) {
+	if root := strings.TrimSpace(os.Getenv("POWERX_PLUGIN_CONTRACTS_DIR")); root != "" {
+		return capabilitycontract.LoadCatalog(filepath.Join(root, "capabilities"))
+	}
+	root, err := findRepoRootWith("contracts/capabilities")
+	if err != nil {
+		return nil, err
+	}
+	return capabilitycontract.LoadCatalog(filepath.Join(root, "contracts", "capabilities"))
+}
+
+func findRepoRootWith(relativePath string) (string, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	for {
+		candidate := filepath.Join(dir, filepath.FromSlash(relativePath))
+		if st, err := os.Stat(candidate); err == nil && st.IsDir() {
+			return dir, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return "", errors.New("contracts/capabilities directory not found")
+}
+
+func descriptorCapabilityID(capabilityID string) string {
+	capabilityID = strings.TrimSpace(capabilityID)
+	localPrefix := app.PluginID + ".local."
+	if strings.HasPrefix(capabilityID, localPrefix) {
+		return app.PluginID + "." + strings.TrimPrefix(capabilityID, localPrefix)
+	}
+	return capabilityID
+}
+
+func stringListFromJSON(raw json.RawMessage) []string {
+	if len(raw) == 0 {
+		return nil
+	}
+	var values []string
+	if err := json.Unmarshal(raw, &values); err == nil {
+		return normalizeStrings(values)
+	}
+	var anyValues []any
+	if err := json.Unmarshal(raw, &anyValues); err != nil {
+		return nil
+	}
+	out := make([]string, 0, len(anyValues))
+	for _, value := range anyValues {
+		out = append(out, strings.TrimSpace(strings.Trim(strings.ReplaceAll(strings.TrimSpace(toString(value)), "\x00", ""), `"`)))
+	}
+	return normalizeStrings(out)
+}
+
+func normalizeStrings(values []string) []string {
+	out := make([]string, 0, len(values))
+	seen := map[string]struct{}{}
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	return out
+}
+
+func toString(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return typed
+	case []byte:
+		return string(typed)
+	default:
+		raw, _ := json.Marshal(typed)
+		return string(raw)
+	}
+}
+
+func permissionNames(resource string, actions []string) []string {
+	out := make([]string, 0, len(actions))
+	resource = strings.TrimSpace(resource)
+	for _, action := range actions {
+		action = strings.TrimSpace(action)
+		if resource != "" && action != "" {
+			out = append(out, resource+":"+action)
+		}
+	}
+	return out
+}
+
+func permissionCandidates(resource string, actions []string) []string {
+	return normalizeStrings(permissionNames(resource, actions))
+}
+
+func hasAnyPermissionCandidate(userPerms []string, resource, action string) bool {
+	resource = strings.TrimSpace(resource)
+	action = strings.TrimSpace(action)
+	if resource == "" || action == "" {
+		return false
+	}
+	return authx.HasPerm(userPerms, authx.Permission{Resource: resource, Action: action})
+}
+
+func anyActionAllowed(actions []agentPermissionActionView) bool {
+	for _, action := range actions {
+		if action.Allowed {
+			return true
+		}
+	}
+	return false
+}
+
+func isGatewayAPIKeyMode(authScheme string, apiKey string) bool {
+	switch strings.ToLower(strings.TrimSpace(authScheme)) {
+	case "apikey", "api_key", "api-key":
+		return true
+	}
+	return strings.TrimSpace(apiKey) != ""
+}
+
+func isPlaceholderTenantUUID(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "00000000-0000-0000-0000-000000000000":
+		return true
+	default:
+		return false
+	}
+}
+
+func firstUsableTenantUUID(value string) string {
+	tenantUUID := strings.TrimSpace(value)
+	if tenantUUID == "" || isPlaceholderTenantUUID(tenantUUID) {
+		return ""
+	}
+	return tenantUUID
+}

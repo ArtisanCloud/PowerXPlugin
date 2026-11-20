@@ -1,0 +1,654 @@
+package public
+
+import (
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/example.com/framework-ci-fixture/backend/internal/contracts"
+	"github.com/example.com/framework-ci-fixture/backend/internal/logger"
+	authmetrics "github.com/example.com/framework-ci-fixture/backend/internal/observability/auth"
+	"github.com/example.com/framework-ci-fixture/backend/internal/shared/app"
+	middleware "github.com/example.com/framework-ci-fixture/backend/internal/transport/http/middleware"
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+
+	"github.com/example.com/framework-ci-fixture/backend/internal/services/authproxy"
+	iamservice "github.com/example.com/framework-ci-fixture/backend/internal/services/iam"
+)
+
+// authProxy captures the delegated client surface the handler needs.
+type authProxy interface {
+	Login(ctx context.Context, req iamservice.LoginRequest) (*iamservice.AuthTokens, error)
+	Refresh(ctx context.Context, refreshToken string) (*iamservice.AuthTokens, error)
+	Logout(ctx context.Context, refreshToken string) error
+	MeContext(ctx context.Context, accessToken string) (*authproxy.MeContext, error)
+}
+
+// AuthHandler exposes /api/v1/auth public endpoints.
+type AuthHandler struct {
+	mode      iamservice.IAMAdapterMode
+	proxy     authProxy
+	local     iamservice.IAMDirectory
+	tenantSvc *iamservice.TenantService
+}
+
+// NewAuthHandler builds a handler for the given IAM mode.
+func NewAuthHandler(deps *app.Deps) *AuthHandler {
+	if deps == nil {
+		return &AuthHandler{}
+	}
+	var tenantSvc *iamservice.TenantService
+	if deps.DB != nil {
+		tenantSvc = iamservice.NewTenantService(deps.DB, nil)
+	}
+	return &AuthHandler{mode: deps.IAMAdapterMode, proxy: deps.AuthProxy, local: deps.IAMDirectory, tenantSvc: tenantSvc}
+}
+
+// RegisterAuthRoutes wires /auth routes beneath the API prefix.
+func RegisterAuthRoutes(group *gin.RouterGroup, deps *app.Deps) {
+	if group == nil || deps == nil {
+		return
+	}
+	handler := NewAuthHandler(deps)
+	adminAuth := group.Group("/admin/user/auth")
+	adminAuth.Use(middleware.RequestTrace())
+	adminAuth.POST("/login", handler.Login)
+	adminAuth.POST("/refresh", handler.Refresh)
+	adminAuth.POST("/logout", handler.Logout)
+	adminAuth.GET("/me/context", handler.MeContext)
+	adminAuth.GET("/tenants/search", handler.SearchTenants)
+	adminAuth.GET("/tenants/resolve", handler.ResolveTenant)
+}
+
+// Login proxies login requests to PowerX Core.
+func (h *AuthHandler) Login(c *gin.Context) {
+	switch h.mode {
+	case iamservice.IAMAdapterModeDelegated:
+		if !h.ensureDelegated(c) {
+			return
+		}
+		h.handleDelegatedLogin(c)
+	case iamservice.IAMAdapterModeLocal:
+		h.handleLocalLogin(c)
+	default:
+		contracts.ResponseServiceUnavailable(c, "当前 IAM 模式未启用", nil)
+	}
+}
+
+// Refresh exchanges refresh_token for a new access token.
+func (h *AuthHandler) Refresh(c *gin.Context) {
+	switch h.mode {
+	case iamservice.IAMAdapterModeDelegated:
+		if !h.ensureDelegated(c) {
+			return
+		}
+		h.handleDelegatedRefresh(c)
+	case iamservice.IAMAdapterModeLocal:
+		h.handleLocalRefresh(c)
+	default:
+		contracts.ResponseServiceUnavailable(c, "当前 IAM 模式未启用", nil)
+	}
+}
+
+// Logout revokes the current refresh token upstream.
+func (h *AuthHandler) Logout(c *gin.Context) {
+	switch h.mode {
+	case iamservice.IAMAdapterModeDelegated:
+		if !h.ensureDelegated(c) {
+			return
+		}
+		h.handleDelegatedLogout(c)
+	case iamservice.IAMAdapterModeLocal:
+		h.handleLocalLogout(c)
+	default:
+		contracts.ResponseServiceUnavailable(c, "当前 IAM 模式未启用", nil)
+	}
+}
+
+// MeContext fetches the active user context from PowerX Core.
+func (h *AuthHandler) MeContext(c *gin.Context) {
+	switch h.mode {
+	case iamservice.IAMAdapterModeDelegated:
+		if !h.ensureDelegated(c) {
+			return
+		}
+		h.handleDelegatedMeContext(c)
+	case iamservice.IAMAdapterModeLocal:
+		h.handleLocalMeContext(c)
+	default:
+		contracts.ResponseServiceUnavailable(c, "当前 IAM 模式未启用", nil)
+	}
+}
+
+func (h *AuthHandler) ResolveTenant(c *gin.Context) {
+	if h == nil || h.tenantSvc == nil {
+		contracts.ResponseServiceUnavailable(c, "租户服务不可用", nil)
+		return
+	}
+	identifier := strings.TrimSpace(c.Query("identifier"))
+	if identifier == "" {
+		identifier = strings.TrimSpace(c.Query("tenant"))
+	}
+	if identifier == "" {
+		contracts.ResponseBadRequest(c, "identifier 必填")
+		return
+	}
+	tenant, err := h.tenantSvc.ResolveByIdentifier(c.Request.Context(), identifier)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			contracts.ResponseBadRequest(c, "组织不存在或未启用")
+			return
+		}
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{
+		"tenant_uuid": tenant.UUID,
+		"tenant_key":  tenant.Key,
+		"tenant_name": tenant.Name,
+		"status":      tenant.Status,
+	})
+}
+
+func (h *AuthHandler) SearchTenants(c *gin.Context) {
+	if h == nil || h.tenantSvc == nil {
+		contracts.ResponseServiceUnavailable(c, "租户服务不可用", nil)
+		return
+	}
+	query := strings.TrimSpace(c.Query("q"))
+	limit := 10
+	if v, err := strconv.Atoi(strings.TrimSpace(c.Query("limit"))); err == nil && v > 0 && v <= 50 {
+		limit = v
+	}
+	if query != "" && len([]rune(query)) < 2 {
+		contracts.ResponseSuccess(c, gin.H{"items": []gin.H{}})
+		return
+	}
+	result, err := h.tenantSvc.ListWithFilter(c.Request.Context(), iamservice.TenantListFilter{
+		Status:   "active",
+		Query:    query,
+		Page:     1,
+		PageSize: limit,
+	})
+	if err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	items := make([]gin.H, 0, len(result.Items))
+	for _, tenant := range result.Items {
+		items = append(items, gin.H{
+			"tenant_uuid": tenant.UUID,
+			"tenant_key":  tenant.Key,
+			"tenant_name": tenant.Name,
+			"status":      tenant.Status,
+		})
+	}
+	contracts.ResponseSuccess(c, gin.H{"items": items})
+}
+
+func (h *AuthHandler) ensureDelegated(c *gin.Context) bool {
+	if h.mode != iamservice.IAMAdapterModeDelegated {
+		contracts.ResponseServiceUnavailable(c, "当前路由仅支持 Delegated 模式", nil)
+		return false
+	}
+	if h.proxy == nil {
+		contracts.ResponseServiceUnavailable(c, "宿主认证未配置", nil)
+		return false
+	}
+	return true
+}
+
+func (h *AuthHandler) handleProxyErr(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, iamservice.ErrAuthUnavailable):
+		authmetrics.RecordDelegateError(app.PluginID, "unavailable")
+		contracts.ResponseServiceUnavailable(c, "宿主认证不可用，请稍后重试", nil)
+	case errors.Is(err, iamservice.ErrUnauthorized):
+		authmetrics.RecordDelegateError(app.PluginID, "unauthorized")
+		contracts.ResponseUnauthorized(c, "认证失败，请重新登录")
+	default:
+		var perr *authproxy.ProxyError
+		if errors.As(err, &perr) {
+			authmetrics.RecordDelegateError(app.PluginID, "proxy")
+			upstreamMethod := strings.TrimSpace(perr.UpstreamMethod)
+			upstreamPath := strings.TrimSpace(perr.UpstreamPath)
+			msg := perr.Message
+			if upstreamMethod != "" || upstreamPath != "" {
+				msg = fmt.Sprintf(
+					"delegated upstream request failed: %s %s returned %d (PowerX host IAM)",
+					upstreamMethod,
+					upstreamPath,
+					perr.Status,
+				)
+			}
+			contracts.ResponseErrorWithDetails(c, perr.Status, contracts.ErrCodeInternalError, msg, gin.H{
+				"upstream_method":  upstreamMethod,
+				"upstream_path":    upstreamPath,
+				"upstream_status":  perr.Status,
+				"upstream_message": perr.Message,
+			})
+		} else {
+			authmetrics.RecordDelegateError(app.PluginID, "other")
+			contracts.ResponseInternalError(c, err)
+		}
+	}
+}
+
+func (h *AuthHandler) handleLocalErr(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, iamservice.ErrUnauthorized):
+		contracts.ResponseUnauthorized(c, "认证失败，请重新登录")
+	case errors.Is(err, iamservice.ErrInvalidArguments):
+		contracts.ResponseBadRequest(c, "请求参数无效")
+	case errors.Is(err, iamservice.ErrAuthUnavailable):
+		contracts.ResponseServiceUnavailable(c, "本地认证暂不可用", nil)
+	default:
+		contracts.ResponseInternalError(c, err)
+	}
+}
+
+func (h *AuthHandler) handleDelegatedLogin(c *gin.Context) {
+	var req loginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+	tokens, err := h.proxy.Login(c.Request.Context(), iamservice.LoginRequest{
+		Tenant:     req.Tenant,
+		Identifier: req.Identifier,
+		Password:   req.Password,
+		Remember:   req.Remember,
+	})
+	if err != nil {
+		authmetrics.RecordLogin(app.PluginID, h.modeLabel(), "failure")
+		h.handleProxyErr(c, err)
+		return
+	}
+	authmetrics.RecordLogin(app.PluginID, h.modeLabel(), "success")
+	authmetrics.RecordPasswordLoginSuccess(app.PluginID, h.modeLabel())
+	contracts.ResponseSuccess(c, mapTokens(tokens))
+}
+
+func (h *AuthHandler) handleDelegatedRefresh(c *gin.Context) {
+	var req refreshRequest
+	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.RefreshToken) == "" {
+		contracts.ResponseBadRequest(c, "refresh_token 必填")
+		return
+	}
+	tokens, err := h.proxy.Refresh(c.Request.Context(), req.RefreshToken)
+	if err != nil {
+		authmetrics.RecordRefresh(app.PluginID, h.modeLabel(), "failure")
+		h.handleProxyErr(c, err)
+		return
+	}
+	authmetrics.RecordRefresh(app.PluginID, h.modeLabel(), "success")
+	contracts.ResponseSuccess(c, mapTokens(tokens))
+}
+
+func (h *AuthHandler) handleDelegatedLogout(c *gin.Context) {
+	var req refreshRequest
+	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.RefreshToken) == "" {
+		contracts.ResponseBadRequest(c, "refresh_token 必填")
+		return
+	}
+	if err := h.proxy.Logout(c.Request.Context(), req.RefreshToken); err != nil {
+		h.handleProxyErr(c, err)
+		return
+	}
+	authmetrics.RecordLogout(app.PluginID, h.modeLabel())
+	contracts.ResponseSuccess(c, gin.H{"ok": true})
+}
+
+func (h *AuthHandler) handleDelegatedMeContext(c *gin.Context) {
+	token := extractBearer(c.GetHeader("Authorization"))
+	if token == "" {
+		contracts.ResponseUnauthorized(c, "缺少 Authorization Bearer token")
+		return
+	}
+	ctxResp, err := h.proxy.MeContext(c.Request.Context(), token)
+	if err != nil {
+		h.handleProxyErr(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, mapDelegatedMeContext(ctxResp))
+}
+
+func mapDelegatedMeContext(ctx *authproxy.MeContext) gin.H {
+	if ctx == nil {
+		return gin.H{}
+	}
+	currentTenantUUID := strings.TrimSpace(ctx.CurrentTenantUUID)
+	memberAdmin := false
+	for _, member := range ctx.Members {
+		if strings.TrimSpace(member.TenantUUID) == currentTenantUUID && member.IsAdmin {
+			memberAdmin = true
+			break
+		}
+	}
+	permissionCodes := delegatedPermissionCodes(ctx)
+	manageByPermission := hasPermission(permissionCodes, "template.template:manage")
+	manageAllowed := ctx.IsRoot || memberAdmin || manageByPermission
+	capabilities := gin.H{
+		"templates": gin.H{
+			"can_create": manageAllowed,
+			"can_update": manageAllowed,
+			"can_delete": manageAllowed,
+		},
+	}
+	if ext, ok := ctx.Capabilities.(map[string]any); ok && len(ext) > 0 {
+		capabilities = mergeCapabilities(ext, capabilities)
+	}
+	return gin.H{
+		"is_root":             ctx.IsRoot,
+		"current_tenant_uuid": currentTenantUUID,
+		"current_tenant_id":   ctx.CurrentTenantID,
+		"current_member_id":   ctx.CurrentMemberID,
+		"current_member_uuid": strings.TrimSpace(ctx.CurrentMemberUUID),
+		"user":                ctx.User,
+		"members":             ctx.Members,
+		"roles":               ctx.Roles,
+		"permissions":         permissionCodes,
+		"permission_codes":    permissionCodes,
+		"policy_version":      ctx.PolicyVersion,
+		"perms_hash":          strings.TrimSpace(ctx.PermsHash),
+		"source":              strings.TrimSpace(ctx.Source),
+		"capabilities":        capabilities,
+	}
+}
+
+func delegatedPermissionCodes(ctx *authproxy.MeContext) []string {
+	if ctx == nil {
+		return nil
+	}
+	if len(ctx.PermissionCodes) > 0 {
+		return ctx.PermissionCodes
+	}
+	return ctx.Permissions
+}
+
+func (h *AuthHandler) handleLocalLogin(c *gin.Context) {
+	if h.local == nil {
+		contracts.ResponseServiceUnavailable(c, "本地 IAM 未初始化", nil)
+		return
+	}
+	var req loginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+	tokens, _, err := h.local.Login(c.Request.Context(), iamservice.LoginRequest{
+		Tenant:     req.Tenant,
+		Identifier: req.Identifier,
+		Password:   req.Password,
+		Remember:   req.Remember,
+	})
+	if err != nil {
+		authmetrics.RecordLogin(app.PluginID, h.modeLabel(), "failure")
+		h.handleLocalErr(c, err)
+		return
+	}
+	authmetrics.RecordLogin(app.PluginID, h.modeLabel(), "success")
+	authmetrics.RecordPasswordLoginSuccess(app.PluginID, h.modeLabel())
+	contracts.ResponseSuccess(c, mapTokens(tokens))
+}
+
+func (h *AuthHandler) handleLocalRefresh(c *gin.Context) {
+	if h.local == nil {
+		contracts.ResponseServiceUnavailable(c, "本地 IAM 未初始化", nil)
+		return
+	}
+	var req refreshRequest
+	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.RefreshToken) == "" {
+		contracts.ResponseBadRequest(c, "refresh_token 必填")
+		return
+	}
+	tokens, err := h.local.Refresh(c.Request.Context(), req.RefreshToken)
+	if err != nil {
+		authmetrics.RecordRefresh(app.PluginID, h.modeLabel(), "failure")
+		h.handleLocalErr(c, err)
+		return
+	}
+	authmetrics.RecordRefresh(app.PluginID, h.modeLabel(), "success")
+	contracts.ResponseSuccess(c, mapTokens(tokens))
+}
+
+func (h *AuthHandler) handleLocalLogout(c *gin.Context) {
+	if h.local == nil {
+		contracts.ResponseServiceUnavailable(c, "本地 IAM 未初始化", nil)
+		return
+	}
+	var req refreshRequest
+	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.RefreshToken) == "" {
+		contracts.ResponseBadRequest(c, "refresh_token 必填")
+		return
+	}
+	if err := h.local.Logout(c.Request.Context(), req.RefreshToken); err != nil {
+		h.handleLocalErr(c, err)
+		return
+	}
+	authmetrics.RecordLogout(app.PluginID, h.modeLabel())
+	contracts.ResponseSuccess(c, gin.H{"ok": true})
+}
+
+func (h *AuthHandler) handleLocalMeContext(c *gin.Context) {
+	if h.local == nil {
+		contracts.ResponseServiceUnavailable(c, "本地 IAM 未初始化", nil)
+		return
+	}
+	rawAuth := c.GetHeader("Authorization")
+	token := extractBearer(rawAuth)
+	if token == "" {
+		contracts.ResponseUnauthorized(c, "缺少 Authorization Bearer token")
+		return
+	}
+	decoder, ok := h.local.(interface {
+		UserContextFromToken(context.Context, string) (*iamservice.UserContext, error)
+	})
+	if !ok {
+		contracts.ResponseServiceUnavailable(c, "本地 IAM 不支持上下文解析", nil)
+		return
+	}
+	uc, err := decoder.UserContextFromToken(c.Request.Context(), token)
+	if err != nil {
+		claims := inspectJWTClaims(token)
+		logger.WarnWith(logger.WithComponent("auth.local.me_context"), c.Request.Context(), "local me/context token verify failed", logger.Fields{
+			"path": c.Request.URL.Path,
+			"iss":  claims["iss"],
+			"aud":  claims["aud"],
+			"tid":  claims["tid"],
+			"uid":  claims["uid"],
+		})
+		h.handleLocalErr(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, mapUserContext(uc))
+}
+
+func mapUserContext(uc *iamservice.UserContext) gin.H {
+	if uc == nil {
+		return gin.H{}
+	}
+	tenantUUID := strings.TrimSpace(uc.TenantUUID)
+	tenant := gin.H{
+		"uuid": tenantUUID,
+		"key":  uc.TenantKey,
+		"name": uc.TenantName,
+	}
+	if legacyRaw := strings.TrimSpace(uc.TenantUuid); legacyRaw != "" {
+		if legacyID, err := strconv.ParseUint(legacyRaw, 10, 64); err == nil && legacyID > 0 {
+			tenant["legacy_id"] = legacyID
+		}
+	}
+	resp := gin.H{
+		"tenant":              tenant,
+		"is_root":             uc.IsRoot,
+		"current_tenant_uuid": tenantUUID,
+		"current_tenant_id":   uc.TenantID,
+		"current_member_id":   uc.MemberID,
+		"current_member_uuid": strings.TrimSpace(uc.MemberUUID),
+		"user": gin.H{
+			"id":           uc.UserID,
+			"uuid":         strings.TrimSpace(uc.UserUUID),
+			"user_uuid":    strings.TrimSpace(uc.UserUUID),
+			"username":     uc.Username,
+			"email":        uc.Email,
+			"display_name": uc.DisplayName,
+			"is_root":      uc.IsRoot,
+		},
+		"roles":            uc.Roles,
+		"permissions":      uc.Permissions,
+		"permission_codes": uc.Permissions,
+		"policy_version":   uc.PolicyVersion,
+		"perms_hash":       strings.TrimSpace(uc.PermsHash),
+		"source":           strings.TrimSpace(uc.AuthzSource),
+		"capabilities": gin.H{
+			"templates": gin.H{
+				"can_create": uc.IsRoot || hasAdminRole(uc.Roles) || hasPermission(uc.Permissions, "template.template:manage"),
+				"can_update": uc.IsRoot || hasAdminRole(uc.Roles) || hasPermission(uc.Permissions, "template.template:manage"),
+				"can_delete": uc.IsRoot || hasAdminRole(uc.Roles) || hasPermission(uc.Permissions, "template.template:manage"),
+			},
+		},
+	}
+	members := make([]gin.H, 0, 1)
+	if tenantUUID != "" {
+		members = append(members, gin.H{
+			"tenant_uuid": tenantUUID,
+			"tenant_id":   uc.TenantID,
+			"tenant_name": uc.TenantName,
+			"member_id":   uc.MemberID,
+			"member_uuid": strings.TrimSpace(uc.MemberUUID),
+			"is_admin":    uc.IsRoot || hasAdminRole(uc.Roles),
+		})
+	}
+	resp["members"] = members
+	if strings.TrimSpace(uc.PluginID) != "" {
+		resp["plugin_id"] = uc.PluginID
+	}
+	return resp
+}
+
+func hasAdminRole(roles []string) bool {
+	for _, role := range roles {
+		switch strings.ToLower(strings.TrimSpace(role)) {
+		case "system.admin", "tenant.admin", "admin":
+			return true
+		}
+	}
+	return false
+}
+
+func hasPermission(permissions []string, target string) bool {
+	target = strings.ToLower(strings.TrimSpace(target))
+	if target == "" {
+		return false
+	}
+	for _, permission := range permissions {
+		if strings.ToLower(strings.TrimSpace(permission)) == target {
+			return true
+		}
+	}
+	return false
+}
+
+func mergeCapabilities(primary map[string]any, fallback map[string]any) gin.H {
+	merged := gin.H{}
+	for key, value := range fallback {
+		merged[key] = value
+	}
+	for key, value := range primary {
+		if strings.TrimSpace(key) == "" {
+			continue
+		}
+		merged[key] = value
+	}
+	return merged
+}
+
+func mapTokens(tokens *iamservice.AuthTokens) gin.H {
+	if tokens == nil {
+		return gin.H{}
+	}
+	expiresAt := tokens.ExpiresAt.UTC()
+	if expiresAt.IsZero() {
+		expiresAt = time.Now().Add(time.Duration(tokens.ExpiresIn) * time.Second)
+	}
+	return gin.H{
+		"token_type":          tokens.TokenType,
+		"access_token":        tokens.AccessToken,
+		"refresh_token":       tokens.RefreshToken,
+		"expires_in":          tokens.ExpiresIn,
+		"expires_at":          expiresAt.UnixMilli(),
+		"scope":               tokens.Scope,
+		"tenant_uuid":         strings.TrimSpace(tokens.TenantUUID),
+		"current_tenant_uuid": strings.TrimSpace(tokens.TenantUUID),
+		"policy_version":      tokens.PolicyVersion,
+		"perms_hash":          strings.TrimSpace(tokens.PermsHash),
+		"source":              strings.TrimSpace(tokens.AuthzSource),
+		"plugin_id":           tokens.PluginID,
+	}
+}
+
+func extractBearer(header string) string {
+	header = strings.TrimSpace(header)
+	if header == "" {
+		return ""
+	}
+	// Be tolerant to duplicated prefixes from frontend middleware (e.g. "Bearer Bearer <jwt>").
+	for strings.HasPrefix(strings.ToLower(header), "bearer ") {
+		header = strings.TrimSpace(header[len("Bearer "):])
+		if header == "" {
+			return ""
+		}
+	}
+	return header
+}
+
+func (h *AuthHandler) modeLabel() string {
+	if h == nil {
+		return ""
+	}
+	return string(h.mode)
+}
+
+func inspectJWTClaims(token string) map[string]any {
+	out := map[string]any{}
+	parts := strings.Split(strings.TrimSpace(token), ".")
+	if len(parts) < 2 {
+		return out
+	}
+	payload := parts[1]
+	if payload == "" {
+		return out
+	}
+	payload = strings.ReplaceAll(payload, "-", "+")
+	payload = strings.ReplaceAll(payload, "_", "/")
+	for len(payload)%4 != 0 {
+		payload += "="
+	}
+	raw, err := base64.StdEncoding.DecodeString(payload)
+	if err != nil {
+		return out
+	}
+	var claims map[string]any
+	if err := json.Unmarshal(raw, &claims); err != nil {
+		return out
+	}
+	return claims
+}
+
+type loginRequest struct {
+	Tenant     string `json:"tenant"`
+	Identifier string `json:"identifier" binding:"required"`
+	Password   string `json:"password" binding:"required"`
+	Remember   bool   `json:"remember"`
+}
+
+type refreshRequest struct {
+	RefreshToken string `json:"refresh_token"`
+}

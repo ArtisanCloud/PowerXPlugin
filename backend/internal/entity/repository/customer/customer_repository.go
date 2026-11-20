@@ -1,0 +1,299 @@
+package customer
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"time"
+
+	customerdomain "github.com/example.com/framework-ci-fixture/backend/internal/domain/customer"
+	customermodel "github.com/example.com/framework-ci-fixture/backend/internal/entity/models/customer"
+	"github.com/example.com/framework-ci-fixture/backend/internal/entity/repository"
+	"github.com/google/uuid"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
+)
+
+var (
+	ErrCustomerNotFound = errors.New("customer not found")
+	ErrCustomerExists   = errors.New("customer already exists")
+)
+
+type Repository struct {
+	*repository.BaseRepository[customermodel.CustomerAccount]
+}
+
+func NewRepository(db *gorm.DB) *Repository {
+	return &Repository{BaseRepository: repository.NewBaseRepository[customermodel.CustomerAccount](db)}
+}
+
+func (r *Repository) FindByEmailOrPhone(ctx context.Context, tenantUUID string, login string) (*customermodel.CustomerAccount, error) {
+	if r == nil || r.DB == nil {
+		return nil, errors.New("repository database is not initialized")
+	}
+	tenantUUID = strings.ToLower(strings.TrimSpace(tenantUUID))
+	login = strings.TrimSpace(login)
+	if tenantUUID == "" || login == "" {
+		return nil, ErrCustomerNotFound
+	}
+
+	var out customermodel.CustomerAccount
+	err := r.DB.WithContext(ctx).
+		Where("tenant_uuid = ? AND (email = ? OR phone = ?)", tenantUUID, login, login).
+		First(&out).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrCustomerNotFound
+		}
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (r *Repository) ListTenantUUIDsByEmailOrPhone(ctx context.Context, login string) ([]string, error) {
+	if r == nil || r.DB == nil {
+		return nil, errors.New("repository database is not initialized")
+	}
+	login = strings.TrimSpace(login)
+	if login == "" {
+		return nil, ErrCustomerNotFound
+	}
+
+	var out []string
+	err := r.DB.WithContext(ctx).
+		Model(&customermodel.CustomerAccount{}).
+		Select("DISTINCT tenant_uuid").
+		Where("(email = ? OR phone = ?)", login, login).
+		Where("status <> ?", string(customerdomain.CustomerStatusDeleted)).
+		Scan(&out).Error
+	if err != nil {
+		return nil, err
+	}
+	if len(out) == 0 {
+		return nil, ErrCustomerNotFound
+	}
+	return out, nil
+}
+
+func (r *Repository) FindByCustomerUUID(ctx context.Context, tenantUUID string, customerUUID string) (*customermodel.CustomerAccount, error) {
+	if r == nil || r.DB == nil {
+		return nil, errors.New("repository database is not initialized")
+	}
+	tenantUUID = strings.ToLower(strings.TrimSpace(tenantUUID))
+	customerUUID = strings.ToLower(strings.TrimSpace(customerUUID))
+	if tenantUUID == "" || customerUUID == "" {
+		return nil, ErrCustomerNotFound
+	}
+
+	var out customermodel.CustomerAccount
+	err := r.DB.WithContext(ctx).
+		Where("tenant_uuid = ? AND customer_uuid = ?", tenantUUID, customerUUID).
+		First(&out).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrCustomerNotFound
+		}
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (r *Repository) CreateCustomer(ctx context.Context, customer *customermodel.CustomerAccount) (*customermodel.CustomerAccount, error) {
+	if r == nil || r.DB == nil {
+		return nil, errors.New("repository database is not initialized")
+	}
+	if customer == nil {
+		return nil, errors.New("customer is required")
+	}
+	if customer.Type != "person" {
+		return nil, errors.New("password registration requires person customer type")
+	}
+	tenantUUID := strings.ToLower(strings.TrimSpace(customer.TenantUuid))
+	if tenantUUID == "" {
+		return nil, repository.ErrTenantUuidRequired
+	}
+
+	// Best-effort uniqueness check (email/phone).
+	email := strings.TrimSpace(customer.Email)
+	phone := strings.TrimSpace(customer.Phone)
+	if email != "" || phone != "" {
+		var count int64
+		q := r.DB.WithContext(ctx).Model(&customermodel.CustomerAccount{}).Where("tenant_uuid = ?", tenantUUID)
+		if email != "" && phone != "" {
+			q = q.Where("(email = ? OR phone = ?)", email, phone)
+		} else if email != "" {
+			q = q.Where("email = ?", email)
+		} else {
+			q = q.Where("phone = ?", phone)
+		}
+		if err := q.Count(&count).Error; err != nil {
+			return nil, err
+		}
+		if count > 0 {
+			return nil, ErrCustomerExists
+		}
+	}
+
+	if customer.CustomerUUID == "" {
+		customer.CustomerUUID = uuid.NewString()
+	}
+	if customer.PrimaryEmail == "" {
+		customer.PrimaryEmail = customer.Email
+	}
+	if customer.PrimaryPhone == "" {
+		customer.PrimaryPhone = customer.Phone
+	}
+	if customer.Metadata == nil {
+		customer.Metadata = datatypes.JSONMap{}
+	}
+
+	tx := r.DB.WithContext(ctx).Begin()
+	if tx.Error != nil {
+		return nil, tx.Error
+	}
+	defer func() {
+		if p := recover(); p != nil {
+			_ = tx.Rollback()
+			panic(p)
+		}
+	}()
+
+	if err := tx.Create(customer).Error; err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
+
+	identity := &customermodel.CustomerAuthIdentity{
+		CustomerUUID: customer.CustomerUUID,
+		Provider:     "password",
+		Email:        customer.Email,
+		Phone:        customer.Phone,
+		PasswordHash: customer.PasswordHash,
+		Status:       customer.Status,
+		Metadata:     datatypes.JSONMap{},
+	}
+	if customer.EmailVerified || customer.PhoneVerified {
+		now := time.Now()
+		identity.VerifiedAt = &now
+	}
+	if err := tx.Create(identity).Error; err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
+
+	membership := &customermodel.CustomerTenantMembership{
+		MembershipUUID: uuid.NewString(),
+		TenantUUID:     tenantUUID,
+		CustomerUUID:   customer.CustomerUUID,
+		Status:         customer.Status,
+		Roles:          datatypes.JSON([]byte("[]")),
+		Scopes:         datatypes.JSON([]byte("[]")),
+		Source:         "local_dev",
+		Metadata:       datatypes.JSONMap{},
+	}
+	if err := tx.Create(membership).Error; err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
+	contactName := strings.TrimSpace(customer.DisplayName)
+	if contactName == "" {
+		contactName = strings.TrimSpace(customer.GivenName + " " + customer.FamilyName)
+	}
+	if contactName == "" {
+		contactName = strings.TrimSpace(customer.Nickname)
+	}
+	if contactName == "" {
+		_ = tx.Rollback()
+		return nil, errors.New("person customer name is required for primary contact")
+	}
+	contact := &customermodel.Contact{ContactUUID: uuid.NewString(), TenantUUID: tenantUUID, CustomerUUID: customer.CustomerUUID, DisplayName: contactName, GivenName: customer.GivenName, FamilyName: customer.FamilyName, Email: customer.Email, Phone: customer.Phone, Status: "active", Roles: datatypes.JSON([]byte(`["primary"]`)), Tags: datatypes.JSON([]byte(`[]`)), Metadata: datatypes.JSON([]byte(`{"creation_intent":"explicit_create"}`))}
+	if err := tx.Create(contact).Error; err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
+	if err := tx.Model(membership).Update("primary_contact_uuid", contact.ContactUUID).Error; err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
+	if err := tx.Model(customer).Update("primary_contact_uuid", contact.ContactUUID).Error; err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
+	customer.PrimaryContactUUID = contact.ContactUUID
+
+	if err := tx.Commit().Error; err != nil {
+		return nil, err
+	}
+	return customer, nil
+}
+
+func (r *Repository) ResolveMembership(ctx context.Context, customerUUID string, tenantUUID string) (*customermodel.CustomerTenantMembership, error) {
+	if r == nil || r.DB == nil {
+		return nil, errors.New("repository database is not initialized")
+	}
+	customerUUID = strings.ToLower(strings.TrimSpace(customerUUID))
+	tenantUUID = strings.ToLower(strings.TrimSpace(tenantUUID))
+	if customerUUID == "" || tenantUUID == "" {
+		return nil, ErrCustomerNotFound
+	}
+	var out customermodel.CustomerTenantMembership
+	err := r.DB.WithContext(ctx).
+		Where("customer_uuid = ? AND tenant_uuid = ?", customerUUID, tenantUUID).
+		First(&out).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrCustomerNotFound
+		}
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (r *Repository) ListMemberships(ctx context.Context, customerUUID string) ([]customermodel.CustomerTenantMembership, error) {
+	if r == nil || r.DB == nil {
+		return nil, errors.New("repository database is not initialized")
+	}
+	customerUUID = strings.ToLower(strings.TrimSpace(customerUUID))
+	if customerUUID == "" {
+		return nil, ErrCustomerNotFound
+	}
+	var out []customermodel.CustomerTenantMembership
+	err := r.DB.WithContext(ctx).
+		Where("customer_uuid = ?", customerUUID).
+		Where("status <> ?", string(customerdomain.CustomerStatusDeleted)).
+		Find(&out).Error
+	if err != nil {
+		return nil, err
+	}
+	if len(out) == 0 {
+		return nil, ErrCustomerNotFound
+	}
+	return out, nil
+}
+
+func (r *Repository) UpdateStatus(ctx context.Context, tenantUUID string, customerUUID string, status string) error {
+	if r == nil || r.DB == nil {
+		return errors.New("repository database is not initialized")
+	}
+	tenantUUID = strings.ToLower(strings.TrimSpace(tenantUUID))
+	customerUUID = strings.ToLower(strings.TrimSpace(customerUUID))
+	status = strings.TrimSpace(status)
+	if tenantUUID == "" || customerUUID == "" {
+		return repository.ErrTenantUuidRequired
+	}
+	if status == "" {
+		return errors.New("status is required")
+	}
+
+	res := r.DB.WithContext(ctx).
+		Model(&customermodel.CustomerAccount{}).
+		Where("tenant_uuid = ? AND customer_uuid = ?", tenantUUID, customerUUID).
+		Update("status", status)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return ErrCustomerNotFound
+	}
+	return nil
+}

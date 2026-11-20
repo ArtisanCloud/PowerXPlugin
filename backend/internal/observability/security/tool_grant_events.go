@@ -1,0 +1,42 @@
+package security
+
+import (
+	"context"
+	"encoding/json"
+	"time"
+
+	pxlog "github.com/example.com/framework-ci-fixture/backend/internal/logger"
+)
+
+// EmitToolGrantEvent writes lifecycle events to structured log.
+func EmitToolGrantEvent(logger *pxlog.Entry, event string, tenantID string, metadata map[string]interface{}) {
+	if logger == nil {
+		return
+	}
+	payload := map[string]interface{}{
+		"event":       event,
+		"tenant_uuid": tenantID,
+		"timestamp":   time.Now().UTC().Format(time.RFC3339),
+	}
+	for k, v := range metadata {
+		payload[k] = v
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		pxlog.WarnCtx(pxlog.WithLogFields(context.Background(), map[string]interface{}{
+			"module":     "security",
+			"biz_scene":  "toolgrant_event",
+			"biz_domain": "security",
+			"component":  "observability.security.toolgrant_events",
+			"error":      err.Error(),
+		}), "failed to marshal toolgrant event metadata")
+		return
+	}
+	pxlog.InfoCtx(pxlog.WithLogFields(context.Background(), map[string]interface{}{
+		"module":          "security",
+		"biz_scene":       "toolgrant_event",
+		"biz_domain":      "security",
+		"component":       "observability.security.toolgrant_events",
+		"toolgrant_event": string(raw),
+	}), "toolgrant lifecycle event")
+}

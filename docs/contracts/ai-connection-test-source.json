@@ -1,0 +1,11 @@
+{
+  "source_repository": "ArtisanCloud/PowerX",
+  "source_commit": "97ae4d43e0d0e48516d8ffe46bbd7bc388aab0ad",
+  "source_worktree_uncommitted": true,
+  "snapshot_date": "2026-10-29",
+  "sha256": {
+    "ai-settings-connection-test.md": "a5669058c84a150a1d0eef12a95f6ea25a883dfd59d0c0ac7d527df5c24403bc",
+    "ai-connection-test.v1.openapi.yaml": "a34a629f64122d1bc606e7769f0de10716afadf42b2691355e29c517c5e59a3c",
+    "fixtures/ai-connection-test.v1.json": "6c1097684fef0d9bad5d775f59de38dcc3e262c3b4e1c96691b373832dbd76b7"
+  }
+}

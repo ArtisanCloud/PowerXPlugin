@@ -1,0 +1,210 @@
+package middleware
+
+import (
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"strings"
+
+	fwiamcontext "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/context"
+
+	authx "github.com/example.com/framework-ci-fixture/backend/internal/middleware"
+	authobs "github.com/example.com/framework-ci-fixture/backend/internal/observability/auth"
+	"github.com/example.com/framework-ci-fixture/backend/internal/shared/app"
+	"github.com/gin-gonic/gin"
+)
+
+// RBAC checks route permissions in both local and delegated modes. Delegated
+// mode first verifies the PowerX token source, then still uses the route table
+// and PowerX-issued permission snapshot for plugin-side secondary authz.
+func RBAC(cfg *authx.RBACConfig, _ authx.ABACClient, _ func(string, string) (bool, map[string]any)) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if cfg == nil || !cfg.Enabled || c.Request.Method == http.MethodOptions {
+			c.Next()
+			return
+		}
+		// 内部回调放行（仍建议结合网络/签名防护）
+		if strings.HasPrefix(c.Request.URL.Path, "/api/v1/internal/") || strings.HasPrefix(c.Request.URL.Path, "/api/v1/agent/") {
+			c.Next()
+			return
+		}
+		if isHealthEndpoint(c.Request.URL.Path) {
+			c.Next()
+			return
+		}
+
+		tc, ok := authx.GetTenantContext(c)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Role Authentication required"})
+			return
+		}
+
+		if cfg.DelegateToPowerX {
+			if allowPowerXDelegate(c, cfg) {
+				if err := validateDelegatedAuthzSnapshot(tc); err != nil {
+					c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+						"error":  "PowerX delegated authorization snapshot invalid",
+						"reason": err.Error(),
+					})
+					return
+				}
+			} else {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+					"error": "PowerX delegated authentication required",
+					"hint":  "请在宿主 PowerX 登录后再访问插件，或设置 POWERX_PROXY=0 运行 Standalone 模式",
+				})
+				return
+			}
+			identity, valid := fwiamcontext.DelegatedIdentityFromContext(c.Request.Context())
+			if !valid {
+				c.AbortWithStatusJSON(401, gin.H{"error": gin.H{"code": "IAM_CONTEXT_PROOF_REQUIRED"}})
+				return
+			}
+			// The proof carries Core's canonical business permission for this exact
+			// route, avoiding the legacy technical resource/action alias mapping.
+			if identity.IsRoot || (identity.SourceRequiredPermission != "" && identity.HasPermission(identity.SourceRequiredPermission)) {
+				c.Next()
+				return
+			}
+			c.AbortWithStatusJSON(403, gin.H{"error": gin.H{"code": "IAM_CONTEXT_REQUEST_FORBIDDEN"}})
+			return
+		}
+
+		if tc.IsRoot || (!cfg.DelegateToPowerX && authx.IsSuperAdmin(tc.Roles, cfg.SuperAdminRoles)) {
+			c.Next()
+			return
+		}
+
+		full := c.FullPath()
+		if full == "" {
+			full = c.Request.URL.Path
+		}
+		perm, has := authx.MatchRoute(c.Request.Method, full, cfg.RoutePermissions)
+		if has {
+			perm = cfg.NormalizePermission(perm)
+		} else if inferred, ok := authx.InferPermission(c.Request.Method, c.Request.URL.Path); ok {
+			perm = cfg.NormalizePermission(inferred)
+			has = true
+		}
+		passRBAC := (!has && !cfg.DefaultDeny) || (has && authx.HasPerm(tc.Permissions, perm))
+		if !passRBAC {
+			resource := perm.Resource
+			action := perm.Action
+			if strings.TrimSpace(resource) == "" {
+				resource = "unknown"
+			}
+			if strings.TrimSpace(action) == "" {
+				action = "unknown"
+			}
+			authobs.RecordRBACDenied(app.PluginID, resource, action)
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"error":             "Insufficient permissions",
+				"required_resource": perm.Resource,
+				"required_action":   perm.Action,
+			})
+			return
+		}
+
+		c.Next()
+	}
+}
+
+func allowPowerXDelegate(c *gin.Context, cfg *authx.RBACConfig) bool {
+	if cfg == nil {
+		return false
+	}
+	if _, ok := authx.GetTenantContext(c); !ok {
+		return false
+	}
+	raw, ok := authx.GetRawBearerToken(c)
+	if !ok || strings.TrimSpace(raw) == "" {
+		return false
+	}
+	claims, err := decodeJWTClaims(raw)
+	if err != nil {
+		return false
+	}
+
+	if cfg.PowerXIssuer != "" {
+		if iss, _ := claims["iss"].(string); iss != cfg.PowerXIssuer {
+			return false
+		}
+	}
+	if cfg.PowerXAudience != "" && !audienceMatches(claims["aud"], cfg.PowerXAudience) {
+		return false
+	}
+	return true
+}
+
+func validateDelegatedAuthzSnapshot(tc authx.TenantContext) error {
+	if strings.TrimSpace(tc.PolicyVersion) == "" {
+		return errors.New("policy_version missing")
+	}
+	if strings.TrimSpace(tc.PermsHash) == "" {
+		return errors.New("perms_hash missing")
+	}
+	source := strings.TrimSpace(tc.AuthzSource)
+	switch source {
+	case "core_identity_ticket":
+		return nil
+	case "":
+		return errors.New("source missing")
+	case "local_mock":
+		return errors.New("local_mock source is not valid for delegated mode")
+	default:
+		return errors.New("source invalid")
+	}
+}
+
+func decodeJWTClaims(raw string) (map[string]any, error) {
+	parts := strings.Split(raw, ".")
+	if len(parts) < 2 {
+		return nil, errInvalidToken
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return nil, err
+	}
+	var claims map[string]any
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return nil, err
+	}
+	return claims, nil
+}
+
+func audienceMatches(aud any, expected string) bool {
+	switch v := aud.(type) {
+	case string:
+		return v == expected
+	case []any:
+		for _, item := range v {
+			if s, ok := item.(string); ok && s == expected {
+				return true
+			}
+		}
+	case []string:
+		for _, s := range v {
+			if s == expected {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+var errInvalidToken = errors.New("invalid token")
+
+func isHealthEndpoint(path string) bool {
+	p := strings.ToLower(strings.TrimSpace(path))
+	if p == "" {
+		return false
+	}
+	if strings.HasPrefix(p, "/healthz") {
+		return true
+	}
+	if strings.HasPrefix(p, "/api/v1/admin/runtime/metrics") {
+		return true
+	}
+	return false
+}

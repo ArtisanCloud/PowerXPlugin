@@ -1,0 +1,15 @@
+{
+  "source_repository": "ArtisanCloud/PowerX",
+  "source_commit": "97ae4d43e0d0e48516d8ffe46bbd7bc388aab0ad",
+  "source_worktree_uncommitted": true,
+  "snapshot_date": "2026-10-30",
+  "sha256": {
+    "ai-online-model-catalog.md": "be84ec15626effb24a5bb8d1b752828b05494719c8a8746e3448282c08128efd",
+    "ai-settings-llm-catalog.v1.md": "5034b868a200b598002c17f038e3747cc2d5148eec79adfc77481de506b6d945"
+  },
+  "protocol_source": {
+    "path": "backend/internal/server/ai/modeldiscovery/client.go",
+    "sha256": "0fa1d8fd8f87c4ecdef6215865c42a2e04abf9acb41079b7e02585654d06a1a7",
+    "framework_adaptation": "runtime/ai/modeldiscovery; typed Framework errors, header trace preservation, strict model identifiers, no upstream error-text parsing"
+  }
+}

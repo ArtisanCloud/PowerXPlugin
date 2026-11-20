@@ -1,0 +1,20 @@
+# Example Framework Ci Fixture Plugin Web Admin
+
+该目录基于 Nuxt 4 与 `@artisan-cloud/plugin-framework-admin` Layer，默认启用 Starter 页面。
+
+```bash
+npm install
+npm run dev
+```
+
+若需要覆盖框架默认页面，可在 `app/pages` 或 `app/components` 下新增同路径文件。
+
+常用环境变量（`.env.local`）：
+
+- `POWERX_PROXY=0|1`
+- `NUXT_PUBLIC_API_BASE`
+- `NUXT_PUBLIC_API_PREFIX=/api/v1`
+- `NUXT_DEV_API_PROXY`
+- `NUXT_DEV_WS_PROXY`
+- `NUXT_PUBLIC_POWERX_CORE_BASE`
+- `NUXT_PUBLIC_POWERX_PROVIDER_MODE=local|delegated`

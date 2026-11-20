@@ -1,0 +1,13 @@
+# Next.js Stores Ruleset
+kind: ruleset
+id: next_stores
+version: 1.0.0
+summary: "Next.js 状态管理规范（占位）"
+checks:
+  - id: next-store-location
+    desc: Store/State 逻辑需集中放置（目录由项目约定）
+    assert:
+      type: text
+      target: web-admin/next
+      pattern:
+        - "store"

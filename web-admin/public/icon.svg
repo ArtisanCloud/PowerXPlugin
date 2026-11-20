@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="PowerX Base Plugin">
+  <defs>
+    <linearGradient id="bg" x1="18" y1="14" x2="110" y2="116" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2563eb"/>
+      <stop offset="0.55" stop-color="#0f766e"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="36" y1="28" x2="94" y2="100" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#dbeafe"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="url(#bg)"/>
+  <path fill="url(#mark)" d="M35 30h36c13.5 0 23 8.4 23 20.7 0 8.8-4.8 15.8-12.4 19.1L98 98H78.3L64.5 73.6H53.2V98H35V30Zm18.2 15.6v12.7h15.9c4.1 0 6.7-2.5 6.7-6.3 0-3.9-2.6-6.4-6.7-6.4H53.2Z"/>
+  <path fill="#67e8f9" d="M33 102 93 26h17l-60 76H33Z" opacity=".9"/>
+</svg>

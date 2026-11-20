@@ -1,0 +1,14 @@
+# Next.js API Client Ruleset
+kind: ruleset
+id: next_api_client
+version: 1.0.0
+summary: "Next.js API Client 规范（与 Nuxt 对齐）"
+checks:
+  - id: next-api-prefix
+    desc: API Base 需支持 /_p/<plugin-id>/api/v1 与直连 /api/v1
+    assert:
+      type: text
+      target: web-admin/next
+      pattern:
+        - "/api/v1"
+        - "/_p/"

@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   package:
-    uses: ArtisanCloud/PowerXPlugin/.github/workflows/reusable-plugin-ci.yml@d4ea4e439e71fcbb547e60ea14e5b1731faf1fac
+    uses: ArtisanCloud/PowerXPlugin/.github/workflows/reusable-plugin-ci.yml@10f67261d9d3f699a59ed7175ef3a793bdee7a31
     with:
       source_sha: ${{ github.sha }}
       plugin_version: '1.2.3'

@@ -1,0 +1,65 @@
+{
+  "id": "com.example.framework-ci-fixture.template.audit",
+  "version": "1.0.0",
+  "name": "模板巡检与修复",
+  "summary": "扫描模板库、提取首个命中项并自动修复。",
+  "nodes": [
+    {
+      "id": "collect-stale",
+      "kind": "plugin",
+      "use": "com.example.framework-ci-fixture.template.list",
+      "io": {
+        "in_map": {
+          "page": "{{var.filters.page}}",
+          "page_size": "{{var.filters.page_size}}",
+          "status": "{{var.filters.status}}",
+          "tags": "{{var.filters.tags}}"
+        },
+        "out_map": {
+          "total": "output.total",
+          "candidates": "output.items"
+        }
+      }
+    },
+    {
+      "id": "inspect-primary",
+      "kind": "plugin",
+      "use": "com.example.framework-ci-fixture.template.read",
+      "io": {
+        "in_map": {
+          "template_uuid": "{{task.collect-stale.output.candidates[0].uuid}}"
+        },
+        "out_map": {
+          "template_uuid": "output.uuid",
+          "current_content": "output.content"
+        }
+      }
+    },
+    {
+      "id": "update-primary",
+      "kind": "plugin",
+      "use": "com.example.framework-ci-fixture.template.update",
+      "io": {
+        "in_map": {
+          "template_uuid": "{{task.inspect-primary.output.template_uuid}}",
+          "body": "{{var.update_payload}}"
+        },
+        "out_map": {
+          "updated_id": "output.uuid"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "collect-stale",
+      "to": "inspect-primary",
+      "condition": "{{task.collect-stale.output.total > 0}}"
+    },
+    {
+      "from": "inspect-primary",
+      "to": "update-primary"
+    }
+  ],
+  "metadata": {}
+}

@@ -85,17 +85,21 @@ func validateDependencies(ctx context.Context, root string) error {
 }
 
 type treeWalk struct {
-	ctx         context.Context
-	root        string
-	destination string
-	hash        hash.Hash
-	bytes       int64
-	count       int
-	stack       map[string]bool
-	source      bool
+	ctx          context.Context
+	root         string
+	destination  string
+	skipRelative string
+	hash         hash.Hash
+	bytes        int64
+	count        int
+	stack        map[string]bool
+	source       bool
 }
 
 func (w *treeWalk) visit(rel string) error {
+	if rel == w.skipRelative && w.skipRelative != "" {
+		return nil
+	}
 	if strings.Contains(rel, "\\") {
 		return failure(SourceUnsafe, nil)
 	}

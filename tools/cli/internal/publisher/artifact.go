@@ -8,6 +8,7 @@ import (
 	"debug/elf"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/url"
 	"os"
@@ -16,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/powerx-plugin/cli/internal/datasetasset"
 	"gopkg.in/yaml.v3"
 )
 
@@ -53,6 +55,10 @@ func safePackagePath(root, rel string) (string, error) {
 }
 func copyPackageTree(ctx context.Context, root, rel, dest string) error {
 	w := treeWalk{ctx: ctx, root: root, destination: dest, stack: map[string]bool{}}
+	if rel == "contracts" {
+		// The dataset index controls which declarations enter the artifact.
+		w.skipRelative = filepath.FromSlash(datasetasset.Directory)
+	}
 	if err := w.visit(rel); err != nil {
 		return err
 	}
@@ -205,9 +211,6 @@ func decodeYAML(file string) (map[string]any, error) {
 	return result, nil
 }
 func freezePackage(ctx context.Context, snapshot, dist, stage string, p Plan, tools BuildTools) (int, error) {
-	if err := os.Mkdir(stage, 0700); err != nil {
-		return 0, failure(StorageFailure, err)
-	}
 	for _, rel := range []string{"plugin.yaml", "backend/bin", "web-admin/.output"} {
 		if err := copyPackageTree(ctx, dist, rel, stage); err != nil {
 			return 0, err
@@ -234,6 +237,13 @@ func freezePackage(ctx context.Context, snapshot, dist, stage string, p Plan, to
 	}
 	if err = rejectSecrets(doc); err != nil {
 		return 0, err
+	}
+	index, err := datasetasset.DecodeIndex(doc["data_lifecycle"])
+	if err != nil {
+		return 0, datasetAssetFailure(err)
+	}
+	if _, err = datasetasset.Copy(snapshot, stage, index); err != nil {
+		return 0, datasetAssetFailure(err)
 	}
 	runtime, ok := doc["runtime"].(map[string]any)
 	if !ok || runtime["kind"] != "process" {
@@ -391,6 +401,16 @@ func freezePackage(ctx context.Context, snapshot, dist, stage string, p Plan, to
 	})
 	return count, err
 }
+
+func datasetAssetFailure(err error) *Error {
+	buildErr := failure(ArtifactInvalid, err)
+	var invalid *datasetasset.InvalidDeclaration
+	if errors.As(err, &invalid) {
+		buildErr.Params = map[string]string{"reason": invalid.Code}
+	}
+	return buildErr
+}
+
 func checkReferences(root string, node any) error {
 	switch value := node.(type) {
 	case map[string]any:

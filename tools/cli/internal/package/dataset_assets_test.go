@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -26,8 +27,42 @@ func TestBuilderPackagesOnlyIndexedDatasetDeclarations(t *testing.T) {
 
 	result, err := NewBuilder().Build(context.Background(), datasetPackageOptions(root))
 	require.NoError(t, err)
+	require.Equal(t, map[string]string{name: declaration}, packagedDatasetDeclarations(t, result.PackagePath))
 
-	file, err := os.Open(result.PackagePath)
+	raw, err := os.ReadFile(result.MetadataPath)
+	require.NoError(t, err)
+	var metadata Metadata
+	require.NoError(t, json.Unmarshal(raw, &metadata))
+	require.Contains(t, metadata.Artifacts, Artifact{
+		Name: name, Path: "payload/" + name, Size: int64(len(declaration)), Hash: sum,
+	})
+}
+
+func TestBuilderIsolatesPackagesWithTheSameTimestamp(t *testing.T) {
+	const first = "contracts/storage-datasets/reports.json"
+	const second = "contracts/storage-datasets/other.json"
+	const declaration = "{}\n"
+	sum := fmt.Sprintf("%x", sha256.Sum256([]byte(declaration)))
+	root := datasetPackageFixture(t, "reports", sum)
+	writeFile(t, filepath.Join(root, first), declaration)
+	builder := NewBuilder(WithClock(func() time.Time { return time.Date(2026, 11, 22, 0, 0, 0, 0, time.UTC) }))
+	options := datasetPackageOptions(root)
+
+	a, err := builder.Build(context.Background(), options)
+	require.NoError(t, err)
+	writeFile(t, filepath.Join(root, second), declaration)
+	writeFile(t, filepath.Join(root, "plugin.yaml"), datasetPackageManifest("other", sum))
+	b, err := builder.Build(context.Background(), options)
+	require.NoError(t, err)
+
+	require.NotEqual(t, a.BuildDir, b.BuildDir)
+	require.Equal(t, map[string]string{first: declaration}, packagedDatasetDeclarations(t, a.PackagePath))
+	require.Equal(t, map[string]string{second: declaration}, packagedDatasetDeclarations(t, b.PackagePath))
+}
+
+func packagedDatasetDeclarations(t *testing.T, path string) map[string]string {
+	t.Helper()
+	file, err := os.Open(path)
 	require.NoError(t, err)
 	defer file.Close()
 	reader, err := gzip.NewReader(file)
@@ -47,15 +82,7 @@ func TestBuilderPackagesOnlyIndexedDatasetDeclarations(t *testing.T) {
 			declarations[header.Name] = string(raw)
 		}
 	}
-	require.Equal(t, map[string]string{name: declaration}, declarations)
-
-	raw, err := os.ReadFile(result.MetadataPath)
-	require.NoError(t, err)
-	var metadata Metadata
-	require.NoError(t, json.Unmarshal(raw, &metadata))
-	require.Contains(t, metadata.Artifacts, Artifact{
-		Name: name, Path: "payload/" + name, Size: int64(len(declaration)), Hash: sum,
-	})
+	return declarations
 }
 
 func TestBuilderRejectsInvalidIndexedDatasetDeclarations(t *testing.T) {
@@ -92,6 +119,9 @@ func TestBuilderRejectsInvalidIndexedDatasetDeclarations(t *testing.T) {
 			result, err := NewBuilder().Build(context.Background(), datasetPackageOptions(root))
 			require.ErrorContains(t, err, tc.code)
 			require.Nil(t, result)
+			entries, err := os.ReadDir(filepath.Join(root, ".px-plugin", "build"))
+			require.NoError(t, err)
+			require.Empty(t, entries)
 		})
 	}
 }
@@ -99,11 +129,14 @@ func TestBuilderRejectsInvalidIndexedDatasetDeclarations(t *testing.T) {
 func datasetPackageFixture(t *testing.T, key, sum string) string {
 	t.Helper()
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, "plugin.yaml"), fmt.Sprintf(
-		"id: com.example.demo\nversion: 0.1.0\ndata_lifecycle:\n  %q:\n    sha256: %q\n    observation_tables: [reports]\n", key, sum))
+	writeFile(t, filepath.Join(root, "plugin.yaml"), datasetPackageManifest(key, sum))
 	writeFile(t, filepath.Join(root, "docs/contracts/manifest.json"), "{}")
 	writeFile(t, filepath.Join(root, "docs/contracts/rbac.json"), "{}")
 	return root
+}
+
+func datasetPackageManifest(key, sum string) string {
+	return fmt.Sprintf("id: com.example.demo\nversion: 0.1.0\ndata_lifecycle:\n  %q:\n    sha256: %q\n    observation_tables: [reports]\n", key, sum)
 }
 
 func datasetPackageOptions(root string) *Options {

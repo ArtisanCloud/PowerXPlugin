@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/powerx-plugin/cli/internal/datasetasset"
 	"github.com/powerx-plugin/cli/internal/manifest"
 )
 
@@ -34,6 +35,8 @@ type Options struct {
 	Channel         string
 	VersionOverride string
 	CLIVersion      string
+
+	buildEnv []string
 }
 
 // Result captures the key artefacts emitted by the builder.
@@ -167,22 +170,12 @@ func (b *Builder) Build(ctx context.Context, userOpts *Options) (*Result, error)
 		version = opts.VersionOverride
 	}
 
-	// 确保 Nuxt 构建使用插件前缀，避免产物引用宿主根路径的 /assets/**
+	// Keep per-plugin defaults in the build subprocesses so other builds do
+	// not inherit their plugin identity from changes to the parent process.
 	for key, value := range map[string]string{"NUXT_APP_BASE_URL": fmt.Sprintf("/_p/%s/admin/", manifestFile.ID), "POWERX_PROXY": "1", "NUXT_PUBLIC_POWERX_PROXY": "1"} {
-		original, present := os.LookupEnv(key)
-		if original != "" {
-			continue
+		if os.Getenv(key) == "" {
+			opts.buildEnv = append(opts.buildEnv, key+"="+value)
 		}
-		if err := os.Setenv(key, value); err != nil {
-			return nil, err
-		}
-		defer func(key, original string, present bool) {
-			if present {
-				_ = os.Setenv(key, original)
-			} else {
-				_ = os.Unsetenv(key)
-			}
-		}(key, original, present)
 	}
 
 	if err := ensureFileExists(opts.ManifestPath, "manifest.json", "run 'npm run sync:manifest' first"); err != nil {
@@ -193,15 +186,24 @@ func (b *Builder) Build(ctx context.Context, userOpts *Options) (*Result, error)
 	}
 
 	now := b.clock().UTC()
-	buildID := now.Format("20060102T150405Z")
-	buildDir := filepath.Join(opts.OutputDir, buildID)
+	prefix := now.Format("20060102T150405Z-") + fmt.Sprintf("%09d-", now.Nanosecond())
+	buildDir, err := os.MkdirTemp(opts.OutputDir, prefix)
+	if err != nil {
+		return nil, fmt.Errorf("create build directory: %w", err)
+	}
+	complete := false
+	defer func() {
+		if !complete {
+			_ = os.RemoveAll(buildDir)
+		}
+	}()
 	payloadDir := filepath.Join(buildDir, "payload")
-	if err := os.MkdirAll(payloadDir, 0o755); err != nil {
+	if err := os.Mkdir(payloadDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create payload dir: %w", err)
 	}
 
 	result := &Result{
-		BuildID:        buildID,
+		BuildID:        filepath.Base(buildDir),
 		BuildDir:       buildDir,
 		PayloadDir:     payloadDir,
 		PluginYAMLPath: filepath.Join(payloadDir, "plugin.yaml"),
@@ -343,11 +345,13 @@ func (b *Builder) Build(ctx context.Context, userOpts *Options) (*Result, error)
 	if err != nil {
 		return nil, fmt.Errorf("validate packaged plugin.yaml: %w", err)
 	}
-	datasets, err := packageDatasetAssets(opts.EntryPath, result, packagedManifest.DataLifecycle)
+	datasets, err := datasetasset.Copy(opts.EntryPath, result.PayloadDir, packagedManifest.DataLifecycle)
 	if err != nil {
 		return nil, err
 	}
-	artifacts = append(artifacts, datasets...)
+	for _, file := range datasets {
+		artifacts = append(artifacts, Artifact{Name: file.Path, Path: "payload/" + file.Path, Size: file.Size, Hash: file.SHA256})
+	}
 
 	if hash, size, err := hashFile(result.ManifestPath); err == nil {
 		artifacts = append(artifacts, Artifact{
@@ -399,7 +403,9 @@ func (b *Builder) Build(ctx context.Context, userOpts *Options) (*Result, error)
 		return nil, fmt.Errorf("hash package.tar.gz: %w", err)
 	}
 
-	if err := WriteMetadata(result.MetadataPath, MetadataOptions{
+	// Publish the completion marker only after the archive and metadata are complete.
+	pendingMetadata := result.MetadataPath + ".tmp"
+	if err := WriteMetadata(pendingMetadata, MetadataOptions{
 		Version:    version,
 		Channel:    opts.Channel,
 		BuildTime:  now,
@@ -410,6 +416,10 @@ func (b *Builder) Build(ctx context.Context, userOpts *Options) (*Result, error)
 	}); err != nil {
 		return nil, fmt.Errorf("write metadata: %w", err)
 	}
+	if err := os.Rename(pendingMetadata, result.MetadataPath); err != nil {
+		return nil, fmt.Errorf("publish metadata: %w", err)
+	}
+	complete = true
 
 	result.Artifacts = artifacts
 	result.DistHash = distHash
@@ -668,16 +678,18 @@ func detectGitCommit(entry string) string {
 }
 
 func defaultFrontendBuild(ctx context.Context, opts *Options) error {
-	if err := ensureFrontendDeps(ctx, opts.FrontendDir); err != nil {
+	if err := ensureFrontendDeps(ctx, opts); err != nil {
 		return err
 	}
 	cmd := exec.CommandContext(ctx, "npm", "--prefix", opts.FrontendDir, "run", "build")
+	cmd.Env = append(cmd.Environ(), opts.buildEnv...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
 
-func ensureFrontendDeps(ctx context.Context, frontendDir string) error {
+func ensureFrontendDeps(ctx context.Context, opts *Options) error {
+	frontendDir := opts.FrontendDir
 	nuxiPath := filepath.Join(frontendDir, "node_modules", "nuxi", "bin", "nuxi.mjs")
 	if _, err := os.Stat(nuxiPath); err == nil {
 		return nil
@@ -690,6 +702,7 @@ func ensureFrontendDeps(ctx context.Context, frontendDir string) error {
 	}
 
 	cmd := exec.CommandContext(ctx, "npm", installArgs...)
+	cmd.Env = append(cmd.Environ(), opts.buildEnv...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
@@ -709,6 +722,7 @@ func defaultBackendBuild(ctx context.Context, opts *Options, outputPath string) 
 	args := []string{"build", "-o", outputPath, "./cmd/plugin"}
 	cmd := exec.CommandContext(ctx, "go", args...)
 	cmd.Dir = backendDir
+	cmd.Env = append(cmd.Environ(), opts.buildEnv...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
@@ -722,6 +736,7 @@ func buildBackendCommand(ctx context.Context, opts *Options, target, outputPath 
 	args := []string{"build", "-o", outputPath, target}
 	cmd := exec.CommandContext(ctx, "go", args...)
 	cmd.Dir = backendDir
+	cmd.Env = append(cmd.Environ(), opts.buildEnv...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()

@@ -407,7 +407,11 @@ func (e *Engine) executeBuild(ctx context.Context, b *Build, p Plan) error {
 	if err = e.saveBuild(b, true); err != nil {
 		return err
 	}
-	stage := filepath.Join(work, "staging")
+	stage, err := os.MkdirTemp(work, "staging-")
+	if err != nil {
+		return failure(StorageFailure, err)
+	}
+	defer os.RemoveAll(stage)
 	count, err := freezePackage(ctx, snapshot, filepath.Join(snapshot, ".publisher-out/dist", p.Version), stage, p, tools)
 	if err != nil {
 		return err

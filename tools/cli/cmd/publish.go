@@ -242,7 +242,9 @@ func findLatestBuildDir(entry string) (string, error) {
 	var dirs []string
 	for _, entry := range entries {
 		if entry.IsDir() {
-			dirs = append(dirs, entry.Name())
+			if info, err := os.Stat(filepath.Join(root, entry.Name(), "metadata.json")); err == nil && info.Mode().IsRegular() {
+				dirs = append(dirs, entry.Name())
+			}
 		}
 	}
 	if len(dirs) == 0 {

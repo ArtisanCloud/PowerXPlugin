@@ -20,10 +20,10 @@ import (
 const (
 	defaultVersion          = "0.1.0"
 	defaultGoVersion        = "1.24"
-	defaultFrameworkVersion = "v0.0.28"
+	defaultFrameworkVersion = "v0.0.29"
 	schemaDependency        = "github.com/santhosh-tekuri/jsonschema/v5 v5.3.0"
-	defaultAdminVersion     = "0.0.13"
-	defaultClientVersion    = "0.0.14"
+	defaultAdminVersion     = "0.0.14"
+	defaultClientVersion    = "0.0.15"
 )
 
 func runInit(args []string) error {

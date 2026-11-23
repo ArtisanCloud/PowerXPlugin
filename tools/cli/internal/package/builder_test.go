@@ -11,7 +11,7 @@ import (
 )
 
 func TestBuilderBuildSuccess(t *testing.T) {
-	t.Parallel()
+	isolateBuilderEnvironment(t)
 
 	tmp := t.TempDir()
 	writeFile(t, filepath.Join(tmp, "plugin.yaml"), `
@@ -109,7 +109,7 @@ backend:
 }
 
 func TestBuilderMissingManifest(t *testing.T) {
-	t.Parallel()
+	isolateBuilderEnvironment(t)
 	tmp := t.TempDir()
 	writeFile(t, filepath.Join(tmp, "plugin.yaml"), "id: com.example\nversion: 1.0.0\n")
 
@@ -128,7 +128,7 @@ func TestBuilderMissingManifest(t *testing.T) {
 }
 
 func TestBuilderMissingFrontendDist(t *testing.T) {
-	t.Parallel()
+	isolateBuilderEnvironment(t)
 	tmp := t.TempDir()
 	writeFile(t, filepath.Join(tmp, "plugin.yaml"), "id: com.example.demo\nversion: 1.0.0\n")
 	mkDir(t, filepath.Join(tmp, "docs", "contracts"))
@@ -150,6 +150,19 @@ func TestBuilderMissingFrontendDist(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "frontend build output not found") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// Builder configures process-wide environment for child builds, so these tests
+// must run serially and restore any inherited plugin identity settings.
+func isolateBuilderEnvironment(t *testing.T) {
+	t.Helper()
+	for _, key := range []string{
+		"POWERX_PLUGIN_ID", "POWERX_SECURITY_JWT_AUDIENCE", "NUXT_APP_BASE_URL",
+		"NUXT_PUBLIC_PLUGIN_ID", "NUXT_PUBLIC_POWERX_PLUGIN_ID",
+		"POWERX_PROXY", "NUXT_PUBLIC_POWERX_PROXY",
+	} {
+		t.Setenv(key, "")
 	}
 }
 

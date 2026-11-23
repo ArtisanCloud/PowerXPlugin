@@ -2,6 +2,7 @@ package publisher
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"os"
@@ -22,19 +23,22 @@ type Plugin struct {
 	SourceVersion string `json:"source_version"`
 }
 type Engine struct {
-	root         string
-	plugin       Plugin
-	state, plans *directory
-	builds, work *directory
-	mu           sync.Mutex
-	jobs         map[string]*buildJob
-	closing      bool
-	wg           sync.WaitGroup
-	host         Target
-	toolProbe    func() (BuildTools, error)
-	toolsOnce    sync.Once
-	tools        BuildTools
-	toolsErr     error
+	root           string
+	plugin         Plugin
+	state, plans   *directory
+	builds, work   *directory
+	mu             sync.Mutex
+	jobs           map[string]*buildJob
+	credentials    credentialStore
+	uploadJobs     map[string]context.CancelFunc
+	submissionJobs map[string]context.CancelFunc
+	closing        bool
+	wg             sync.WaitGroup
+	host           Target
+	toolProbe      func() (BuildTools, error)
+	toolsOnce      sync.Once
+	tools          BuildTools
+	toolsErr       error
 }
 
 func Open(entry string) (*Engine, error) {
@@ -81,7 +85,7 @@ func Open(entry string) (*Engine, error) {
 		state.close()
 		return nil, err
 	}
-	e := &Engine{root: root, plugin: plugin, state: state, plans: plans, builds: builds, work: work, jobs: map[string]*buildJob{}, host: nativeTarget(), toolProbe: probeTools}
+	e := &Engine{root: root, plugin: plugin, state: state, plans: plans, builds: builds, work: work, jobs: map[string]*buildJob{}, credentials: systemCredentials{}, uploadJobs: map[string]context.CancelFunc{}, submissionJobs: map[string]context.CancelFunc{}, host: nativeTarget(), toolProbe: probeTools}
 	if err = e.recoverBuilds(); err != nil {
 		e.Close()
 		return nil, err
@@ -91,6 +95,12 @@ func Open(entry string) (*Engine, error) {
 func (e *Engine) Close() error {
 	e.mu.Lock()
 	e.closing = true
+	for _, cancel := range e.submissionJobs {
+		cancel()
+	}
+	for _, cancel := range e.uploadJobs {
+		cancel()
+	}
 	for _, job := range e.jobs {
 		job.cancel()
 	}
@@ -107,6 +117,12 @@ func (e *Engine) Close() error {
 }
 func (e *Engine) cancelBuilds() {
 	e.mu.Lock()
+	for _, cancel := range e.submissionJobs {
+		cancel()
+	}
+	for _, cancel := range e.uploadJobs {
+		cancel()
+	}
 	for _, job := range e.jobs {
 		job.cancel()
 	}

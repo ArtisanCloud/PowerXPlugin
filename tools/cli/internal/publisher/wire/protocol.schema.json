@@ -1,0 +1,2142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:powerx:plugin-publisher:v1",
+  "title": "PowerX Plugin Publisher v1 P01 contract",
+  "description": "Versioned wire shapes and conformance definitions; no running HTTP service is implied. UTF-8 byte and cross-field constraints are also mandatory.",
+  "$defs": {
+    "UUID": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "OperationID": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "PluginID": {
+      "title": "PowerX Plugin ID v1",
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$",
+      "not": {
+        "pattern": "^com\\.powerx\\.plugin(?:\\.|$)|^com\\.powerx\\.plugins$|[^a-z0-9.-]"
+      },
+      "$comment": "PowerX-owned IDs use com.powerx.plugins.<name>. Third-party namespaces and single-segment IDs remain supported. No additional total-length limit. Reject legacy IDs without rewriting."
+    },
+    "Digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "UTC": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{3})?Z$"
+    },
+    "Version": {
+      "type": "string",
+      "minLength": 5,
+      "maxLength": 50,
+      "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+    },
+    "StableVersion": {
+      "type": "string",
+      "minLength": 5,
+      "maxLength": 50,
+      "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+    },
+    "Channel": {
+      "const": "stable"
+    },
+    "Target": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "os": {
+          "enum": [
+            "linux",
+            "darwin",
+            "windows"
+          ]
+        },
+        "arch": {
+          "enum": [
+            "amd64",
+            "arm64"
+          ]
+        }
+      },
+      "required": [
+        "os",
+        "arch"
+      ]
+    },
+    "UploadTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "os": {
+          "const": "linux"
+        },
+        "arch": {
+          "const": "amd64"
+        }
+      },
+      "required": [
+        "os",
+        "arch"
+      ]
+    },
+    "Scope": {
+      "enum": [
+        "plugins:read",
+        "packages:write",
+        "publications:read",
+        "publications:submit"
+      ]
+    },
+    "Scopes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Scope"
+      },
+      "minItems": 1,
+      "maxItems": 4,
+      "uniqueItems": true
+    },
+    "PluginIDs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/PluginID"
+      },
+      "minItems": 1,
+      "maxItems": 50,
+      "uniqueItems": true
+    },
+    "WebURL": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000,
+      "format": "uri",
+      "pattern": "^https?://"
+    },
+    "NullableUTC": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/UTC"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "Artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "$ref": "#/$defs/UUID"
+        },
+        "os": {
+          "enum": [
+            "linux",
+            "darwin",
+            "windows"
+          ]
+        },
+        "arch": {
+          "enum": [
+            "amd64",
+            "arm64"
+          ]
+        },
+        "sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483648
+        }
+      },
+      "required": [
+        "artifact_id",
+        "os",
+        "arch",
+        "sha256",
+        "size"
+      ]
+    },
+    "Artifacts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Artifact"
+      },
+      "minItems": 0,
+      "maxItems": 6
+    },
+    "PublicationMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10000
+        },
+        "license": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9.+-]{1,99}$"
+        },
+        "min_core": {
+          "$ref": "#/$defs/Version",
+          "maxLength": 20,
+          "type": "string"
+        },
+        "support_url": {
+          "$ref": "#/$defs/WebURL"
+        },
+        "icon_url": {
+          "anyOf": [
+            {
+              "const": ""
+            },
+            {
+              "$ref": "#/$defs/WebURL"
+            }
+          ]
+        },
+        "security_statement": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10000
+        },
+        "privacy_statement": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10000
+        }
+      },
+      "required": [
+        "description",
+        "license",
+        "min_core",
+        "support_url",
+        "security_statement",
+        "privacy_statement"
+      ]
+    },
+    "UploadFields": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "$ref": "#/$defs/StableVersion"
+        },
+        "channel": {
+          "$ref": "#/$defs/Channel"
+        },
+        "os": {
+          "const": "linux"
+        },
+        "arch": {
+          "const": "amd64"
+        },
+        "sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483648
+        },
+        "release_notes": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 10000
+        }
+      },
+      "required": [
+        "version",
+        "channel",
+        "os",
+        "arch",
+        "sha256",
+        "size",
+        "release_notes"
+      ]
+    },
+    "UploadRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "file": {
+          "type": "string",
+          "format": "binary"
+        },
+        "version": {
+          "$ref": "#/$defs/StableVersion"
+        },
+        "channel": {
+          "$ref": "#/$defs/Channel"
+        },
+        "os": {
+          "const": "linux"
+        },
+        "arch": {
+          "const": "amd64"
+        },
+        "sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483648
+        },
+        "release_notes": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 10000
+        }
+      },
+      "required": [
+        "file",
+        "version",
+        "channel",
+        "os",
+        "arch",
+        "sha256",
+        "size",
+        "release_notes"
+      ]
+    },
+    "UploadFingerprintInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "plugin_id": {
+          "$ref": "#/$defs/PluginID"
+        },
+        "version": {
+          "$ref": "#/$defs/StableVersion"
+        },
+        "channel": {
+          "$ref": "#/$defs/Channel"
+        },
+        "os": {
+          "const": "linux"
+        },
+        "arch": {
+          "const": "amd64"
+        },
+        "sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483648
+        },
+        "release_notes": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 10000
+        }
+      },
+      "required": [
+        "plugin_id",
+        "version",
+        "channel",
+        "os",
+        "arch",
+        "sha256",
+        "size",
+        "release_notes"
+      ]
+    },
+    "SubmitRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "metadata": {
+          "$ref": "#/$defs/PublicationMetadata"
+        },
+        "expected_artifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Artifact"
+          },
+          "minItems": 1,
+          "maxItems": 6
+        }
+      },
+      "required": [
+        "metadata",
+        "expected_artifacts"
+      ]
+    },
+    "SubmitFingerprintInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "plugin_id": {
+          "$ref": "#/$defs/PluginID"
+        },
+        "version_id": {
+          "$ref": "#/$defs/UUID"
+        },
+        "metadata": {
+          "$ref": "#/$defs/PublicationMetadata"
+        },
+        "expected_artifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Artifact"
+          },
+          "minItems": 1,
+          "maxItems": 6
+        }
+      },
+      "required": [
+        "plugin_id",
+        "version_id",
+        "metadata",
+        "expected_artifacts"
+      ]
+    },
+    "Plugin": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "plugin_id": {
+          "$ref": "#/$defs/PluginID"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 2000
+        },
+        "visibility": {
+          "enum": [
+            "draft",
+            "published"
+          ]
+        }
+      },
+      "required": [
+        "plugin_id",
+        "name",
+        "summary",
+        "visibility"
+      ]
+    },
+    "MarketVersion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version_id": {
+          "$ref": "#/$defs/UUID"
+        },
+        "plugin_id": {
+          "$ref": "#/$defs/PluginID"
+        },
+        "version": {
+          "$ref": "#/$defs/Version"
+        },
+        "channel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20
+        },
+        "availability_status": {
+          "enum": [
+            "draft",
+            "submitted",
+            "rejected",
+            "approved",
+            "published",
+            "deleting"
+          ]
+        },
+        "release_notes": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 10000
+        },
+        "min_core": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 20
+        },
+        "created_at": {
+          "$ref": "#/$defs/UTC"
+        },
+        "published_at": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UTC"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "artifacts": {
+          "$ref": "#/$defs/Artifacts"
+        },
+        "market_version_url": {
+          "$ref": "#/$defs/WebURL"
+        }
+      },
+      "required": [
+        "version_id",
+        "plugin_id",
+        "version",
+        "channel",
+        "availability_status",
+        "release_notes",
+        "min_core",
+        "created_at",
+        "published_at",
+        "artifacts",
+        "market_version_url"
+      ]
+    },
+    "UploadReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "operation_id": {
+          "$ref": "#/$defs/OperationID"
+        },
+        "plugin_id": {
+          "$ref": "#/$defs/PluginID"
+        },
+        "version_id": {
+          "$ref": "#/$defs/UUID"
+        },
+        "version": {
+          "$ref": "#/$defs/StableVersion"
+        },
+        "artifact": {
+          "$ref": "#/$defs/Artifact"
+        },
+        "market_version_url": {
+          "$ref": "#/$defs/WebURL"
+        }
+      },
+      "required": [
+        "operation_id",
+        "plugin_id",
+        "version_id",
+        "version",
+        "artifact",
+        "market_version_url"
+      ]
+    },
+    "SubmissionReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "operation_id": {
+          "$ref": "#/$defs/OperationID"
+        },
+        "publication_id": {
+          "$ref": "#/$defs/UUID"
+        },
+        "version_id": {
+          "$ref": "#/$defs/UUID"
+        },
+        "status": {
+          "const": "submitted"
+        },
+        "submitted_at": {
+          "$ref": "#/$defs/UTC"
+        },
+        "market_publication_url": {
+          "$ref": "#/$defs/WebURL"
+        }
+      },
+      "required": [
+        "operation_id",
+        "publication_id",
+        "version_id",
+        "status",
+        "submitted_at",
+        "market_publication_url"
+      ]
+    },
+    "Error": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "enum": [
+            400,
+            401,
+            403,
+            404,
+            408,
+            409,
+            413,
+            415,
+            429,
+            500,
+            503
+          ]
+        },
+        "error": {
+          "enum": [
+            "invalid_input",
+            "package_plugin_id_mismatch",
+            "package_version_mismatch",
+            "package_target_mismatch",
+            "package_digest_mismatch",
+            "package_invalid",
+            "publisher_scope_unsupported",
+            "publisher_unauthorized",
+            "publisher_forbidden",
+            "not_found",
+            "request_timeout",
+            "artifact_conflict",
+            "version_locked",
+            "idempotency_conflict",
+            "artifact_set_changed",
+            "artifact_changed",
+            "publication_state",
+            "license_blocked",
+            "security_blocked",
+            "channel_mismatch",
+            "version_not_newer",
+            "feature_unavailable",
+            "publisher_token_limit",
+            "package_too_large",
+            "package_budget_exceeded",
+            "unsupported_media_type",
+            "rate_limited",
+            "internal_error",
+            "storage_unavailable",
+            "publication_options_unavailable",
+            "publisher_unavailable",
+            "request_too_large"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "field_errors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "pattern": "^[a-zA-Z0-9_.\\[\\]-]+$"
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80,
+                "pattern": "^[a-z][a-z0-9_]*$"
+              }
+            },
+            "required": [
+              "field",
+              "reason"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 20
+        },
+        "operation_id": {
+          "$ref": "#/$defs/OperationID"
+        }
+      },
+      "required": [
+        "code",
+        "error",
+        "message",
+        "retryable"
+      ]
+    },
+    "OperationProcessing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "operation_id": {
+          "$ref": "#/$defs/OperationID"
+        },
+        "type": {
+          "enum": [
+            "package-upload",
+            "publication-submit"
+          ]
+        },
+        "plugin_id": {
+          "$ref": "#/$defs/PluginID"
+        },
+        "request_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "created_at": {
+          "$ref": "#/$defs/UTC"
+        },
+        "updated_at": {
+          "$ref": "#/$defs/UTC"
+        },
+        "status": {
+          "const": "processing"
+        },
+        "retain_until": {
+          "type": "null"
+        },
+        "retry_after_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 300
+        }
+      },
+      "required": [
+        "operation_id",
+        "type",
+        "plugin_id",
+        "request_sha256",
+        "created_at",
+        "updated_at",
+        "status",
+        "retain_until",
+        "retry_after_seconds"
+      ]
+    },
+    "OperationSucceeded": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "operation_id": {
+          "$ref": "#/$defs/OperationID"
+        },
+        "type": {
+          "enum": [
+            "package-upload",
+            "publication-submit"
+          ]
+        },
+        "plugin_id": {
+          "$ref": "#/$defs/PluginID"
+        },
+        "request_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "created_at": {
+          "$ref": "#/$defs/UTC"
+        },
+        "updated_at": {
+          "$ref": "#/$defs/UTC"
+        },
+        "status": {
+          "const": "succeeded"
+        },
+        "retain_until": {
+          "$ref": "#/$defs/UTC"
+        },
+        "result": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/UploadReceipt"
+            },
+            {
+              "$ref": "#/$defs/SubmissionReceipt"
+            }
+          ]
+        }
+      },
+      "required": [
+        "operation_id",
+        "type",
+        "plugin_id",
+        "request_sha256",
+        "created_at",
+        "updated_at",
+        "status",
+        "retain_until",
+        "result"
+      ]
+    },
+    "OperationFailed": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "operation_id": {
+          "$ref": "#/$defs/OperationID"
+        },
+        "type": {
+          "enum": [
+            "package-upload",
+            "publication-submit"
+          ]
+        },
+        "plugin_id": {
+          "$ref": "#/$defs/PluginID"
+        },
+        "request_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "created_at": {
+          "$ref": "#/$defs/UTC"
+        },
+        "updated_at": {
+          "$ref": "#/$defs/UTC"
+        },
+        "status": {
+          "const": "failed"
+        },
+        "retain_until": {
+          "$ref": "#/$defs/UTC"
+        },
+        "error": {
+          "$ref": "#/$defs/Error"
+        }
+      },
+      "required": [
+        "operation_id",
+        "type",
+        "plugin_id",
+        "request_sha256",
+        "created_at",
+        "updated_at",
+        "status",
+        "retain_until",
+        "error"
+      ]
+    },
+    "Operation": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/OperationProcessing"
+        },
+        {
+          "$ref": "#/$defs/OperationSucceeded"
+        },
+        {
+          "$ref": "#/$defs/OperationFailed"
+        }
+      ]
+    },
+    "CreateTokenRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "plugin_ids": {
+          "$ref": "#/$defs/PluginIDs"
+        },
+        "scopes": {
+          "$ref": "#/$defs/Scopes"
+        },
+        "ttl_seconds": {
+          "type": "integer",
+          "minimum": 300,
+          "maximum": 2592000
+        }
+      },
+      "required": [
+        "name",
+        "plugin_ids",
+        "scopes"
+      ]
+    },
+    "PublishToken": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "token_id": {
+          "$ref": "#/$defs/UUID"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "plugin_ids": {
+          "$ref": "#/$defs/PluginIDs"
+        },
+        "scopes": {
+          "$ref": "#/$defs/Scopes"
+        },
+        "created_at": {
+          "$ref": "#/$defs/UTC"
+        },
+        "expires_at": {
+          "$ref": "#/$defs/UTC"
+        },
+        "last_used_at": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UTC"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "revoked_at": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UTC"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "enum": [
+            "active",
+            "expired",
+            "revoked"
+          ]
+        }
+      },
+      "required": [
+        "token_id",
+        "name",
+        "plugin_ids",
+        "scopes",
+        "created_at",
+        "expires_at",
+        "last_used_at",
+        "revoked_at",
+        "status"
+      ]
+    },
+    "CreatedToken": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "token": {
+          "type": "string",
+          "pattern": "^pxpub_[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$"
+        },
+        "credential": {
+          "$ref": "#/$defs/PublishToken"
+        }
+      },
+      "required": [
+        "token",
+        "credential"
+      ]
+    },
+    "RevokeTokenRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 1000
+        }
+      },
+      "required": [
+        "reason"
+      ]
+    },
+    "Me": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "user": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "user_id": {
+              "$ref": "#/$defs/UUID"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          },
+          "required": [
+            "user_id",
+            "name"
+          ]
+        },
+        "developer": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "developer_id": {
+              "$ref": "#/$defs/UUID"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          },
+          "required": [
+            "developer_id",
+            "name"
+          ]
+        },
+        "credential": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "token_id": {
+              "$ref": "#/$defs/UUID"
+            },
+            "plugin_ids": {
+              "$ref": "#/$defs/PluginIDs"
+            },
+            "scopes": {
+              "$ref": "#/$defs/Scopes"
+            },
+            "expires_at": {
+              "$ref": "#/$defs/UTC"
+            }
+          },
+          "required": [
+            "token_id",
+            "plugin_ids",
+            "scopes",
+            "expires_at"
+          ]
+        },
+        "server_time": {
+          "$ref": "#/$defs/UTC"
+        }
+      },
+      "required": [
+        "user",
+        "developer",
+        "credential",
+        "server_time"
+      ]
+    },
+    "Discovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "service": {
+          "const": "powerx-marketplace"
+        },
+        "protocol": {
+          "const": "powerx.plugin-publisher/v1"
+        },
+        "contract_version": {
+          "const": "1.0.0-rc.2"
+        },
+        "features": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "package-upload",
+              "idempotent-writes",
+              "publication-submit"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 3,
+          "uniqueItems": true
+        },
+        "package_formats": {
+          "const": [
+            "zip"
+          ]
+        },
+        "channels": {
+          "const": [
+            "stable"
+          ]
+        },
+        "targets": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "items": {
+            "$ref": "#/$defs/UploadTarget"
+          }
+        },
+        "supported_scopes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Scope"
+          },
+          "minItems": 2,
+          "maxItems": 4,
+          "uniqueItems": true
+        },
+        "console_base_url": {
+          "$ref": "#/$defs/WebURL"
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "max_package_bytes": {
+              "const": 2147483648
+            },
+            "max_multipart_overhead_bytes": {
+              "const": 1048576
+            },
+            "max_request_bytes": {
+              "const": 2148532224
+            },
+            "max_multipart_parts": {
+              "const": 8
+            },
+            "max_part_header_bytes": {
+              "const": 8192
+            },
+            "max_json_bytes": {
+              "const": 65536
+            },
+            "max_manifest_bytes": {
+              "const": 262144
+            },
+            "max_uncompressed_bytes": {
+              "const": 8589934592
+            },
+            "max_archive_entries": {
+              "const": 50000
+            },
+            "max_archive_path_bytes": {
+              "const": 1024
+            },
+            "max_compression_ratio": {
+              "const": 200
+            },
+            "max_release_notes_bytes": {
+              "const": 10000
+            },
+            "max_metadata_text_bytes": {
+              "const": 10000
+            },
+            "max_url_bytes": {
+              "const": 2000
+            },
+            "max_expected_artifacts": {
+              "const": 6
+            },
+            "max_response_bytes": {
+              "const": 8388608
+            },
+            "max_json_depth": {
+              "const": 64
+            },
+            "max_name_bytes": {
+              "const": 200
+            },
+            "max_summary_bytes": {
+              "const": 2000
+            },
+            "max_reason_bytes": {
+              "const": 1000
+            },
+            "max_review_reason_bytes": {
+              "const": 4000
+            },
+            "max_version_chars": {
+              "const": 50
+            },
+            "max_core_version_chars": {
+              "const": 20
+            },
+            "min_metadata_text_scalars": {
+              "const": 10
+            }
+          },
+          "required": [
+            "max_package_bytes",
+            "max_multipart_overhead_bytes",
+            "max_request_bytes",
+            "max_multipart_parts",
+            "max_part_header_bytes",
+            "max_json_bytes",
+            "max_manifest_bytes",
+            "max_uncompressed_bytes",
+            "max_archive_entries",
+            "max_archive_path_bytes",
+            "max_compression_ratio",
+            "max_release_notes_bytes",
+            "max_metadata_text_bytes",
+            "max_url_bytes",
+            "max_expected_artifacts",
+            "max_response_bytes",
+            "max_json_depth",
+            "max_name_bytes",
+            "max_summary_bytes",
+            "max_reason_bytes",
+            "max_review_reason_bytes",
+            "max_version_chars",
+            "max_core_version_chars",
+            "min_metadata_text_scalars"
+          ]
+        },
+        "token_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "default_ttl_seconds": {
+              "const": 604800
+            },
+            "min_ttl_seconds": {
+              "const": 300
+            },
+            "max_ttl_seconds": {
+              "const": 2592000
+            },
+            "max_plugin_ids": {
+              "const": 50
+            },
+            "max_active_per_user": {
+              "const": 20
+            }
+          },
+          "required": [
+            "default_ttl_seconds",
+            "min_ttl_seconds",
+            "max_ttl_seconds",
+            "max_plugin_ids",
+            "max_active_per_user"
+          ]
+        },
+        "timeouts": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "connect_seconds": {
+              "const": 10
+            },
+            "response_header_seconds": {
+              "const": 30
+            },
+            "read_request_seconds": {
+              "const": 30
+            },
+            "json_write_seconds": {
+              "const": 60
+            },
+            "upload_idle_seconds": {
+              "const": 60
+            },
+            "upload_total_seconds": {
+              "const": 1800
+            },
+            "upload_client_seconds": {
+              "const": 1860
+            },
+            "upload_response_header_seconds": {
+              "const": 1800
+            }
+          },
+          "required": [
+            "connect_seconds",
+            "response_header_seconds",
+            "read_request_seconds",
+            "json_write_seconds",
+            "upload_idle_seconds",
+            "upload_total_seconds",
+            "upload_client_seconds",
+            "upload_response_header_seconds"
+          ]
+        },
+        "recovery": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "idempotency_retention_seconds": {
+              "const": 604800
+            },
+            "lease_seconds": {
+              "const": 60
+            },
+            "lease_renew_seconds": {
+              "const": 15
+            },
+            "processing_retry_after_seconds": {
+              "const": 2
+            },
+            "max_attempts": {
+              "const": 3
+            },
+            "backoff_base_seconds": {
+              "const": 1
+            },
+            "backoff_cap_seconds": {
+              "const": 30
+            },
+            "max_retry_after_seconds": {
+              "const": 300
+            },
+            "max_recovery_elapsed_seconds": {
+              "const": 7200
+            },
+            "operation_poll_seconds": {
+              "const": 2
+            },
+            "max_operation_poll_seconds": {
+              "const": 120
+            }
+          },
+          "required": [
+            "idempotency_retention_seconds",
+            "lease_seconds",
+            "lease_renew_seconds",
+            "processing_retry_after_seconds",
+            "max_attempts",
+            "backoff_base_seconds",
+            "backoff_cap_seconds",
+            "max_retry_after_seconds",
+            "max_recovery_elapsed_seconds",
+            "operation_poll_seconds",
+            "max_operation_poll_seconds"
+          ]
+        },
+        "pagination": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "default_size": {
+              "const": 20
+            },
+            "max_size": {
+              "const": 100
+            }
+          },
+          "required": [
+            "default_size",
+            "max_size"
+          ]
+        },
+        "server_time": {
+          "$ref": "#/$defs/UTC"
+        }
+      },
+      "required": [
+        "service",
+        "protocol",
+        "contract_version",
+        "features",
+        "package_formats",
+        "channels",
+        "targets",
+        "supported_scopes",
+        "console_base_url",
+        "limits",
+        "token_policy",
+        "timeouts",
+        "recovery",
+        "pagination",
+        "server_time"
+      ]
+    },
+    "PublicationOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "versions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 20,
+            "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+          },
+          "minItems": 1,
+          "maxItems": 1000,
+          "uniqueItems": true
+        },
+        "licenses": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9.+-]{1,99}$"
+          },
+          "minItems": 1,
+          "maxItems": 1000,
+          "uniqueItems": true
+        },
+        "source": {
+          "$ref": "#/$defs/WebURL"
+        },
+        "version_source": {
+          "enum": [
+            "verified_snapshot",
+            "official_releases"
+          ]
+        }
+      },
+      "required": [
+        "versions",
+        "licenses",
+        "source",
+        "version_source"
+      ]
+    },
+    "Publication": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "publication_id": {
+          "$ref": "#/$defs/UUID"
+        },
+        "plugin_id": {
+          "$ref": "#/$defs/PluginID"
+        },
+        "version_id": {
+          "$ref": "#/$defs/UUID"
+        },
+        "version": {
+          "$ref": "#/$defs/Version"
+        },
+        "status": {
+          "enum": [
+            "submitted",
+            "rejected",
+            "approved",
+            "published"
+          ]
+        },
+        "metadata": {
+          "$ref": "#/$defs/PublicationMetadata"
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Artifact"
+          },
+          "minItems": 1,
+          "maxItems": 6
+        },
+        "submitted_at": {
+          "$ref": "#/$defs/UTC"
+        },
+        "reviewed_at": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UTC"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "review_reason": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 4000
+        },
+        "published_at": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UTC"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "publish_reason": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 4000
+        },
+        "market_publication_url": {
+          "$ref": "#/$defs/WebURL"
+        }
+      },
+      "required": [
+        "publication_id",
+        "plugin_id",
+        "version_id",
+        "version",
+        "status",
+        "metadata",
+        "artifacts",
+        "submitted_at",
+        "reviewed_at",
+        "review_reason",
+        "published_at",
+        "publish_reason",
+        "market_publication_url"
+      ]
+    },
+    "VersionsPage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MarketVersion"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "page": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "required": [
+        "items",
+        "total",
+        "page",
+        "size"
+      ]
+    },
+    "TokensPage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PublishToken"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "page": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "required": [
+        "items",
+        "total",
+        "page",
+        "size"
+      ]
+    },
+    "PublicationsPage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Publication"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "page": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "required": [
+        "items",
+        "total",
+        "page",
+        "size"
+      ]
+    },
+    "DiscoveryResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "const": 0
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "data": {
+          "$ref": "#/$defs/Discovery"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "data"
+      ]
+    },
+    "MeResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "const": 0
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "data": {
+          "$ref": "#/$defs/Me"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "data"
+      ]
+    },
+    "PluginResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "const": 0
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "data": {
+          "$ref": "#/$defs/Plugin"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "data"
+      ]
+    },
+    "MarketVersionResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "const": 0
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "data": {
+          "$ref": "#/$defs/MarketVersion"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "data"
+      ]
+    },
+    "UploadReceiptResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "const": 0
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "data": {
+          "$ref": "#/$defs/UploadReceipt"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "data"
+      ]
+    },
+    "SubmissionReceiptResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "const": 0
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "data": {
+          "$ref": "#/$defs/SubmissionReceipt"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "data"
+      ]
+    },
+    "OperationResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "const": 0
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "data": {
+          "$ref": "#/$defs/Operation"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "data"
+      ]
+    },
+    "OperationProcessingResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "const": 0
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "data": {
+          "$ref": "#/$defs/OperationProcessing"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "data"
+      ]
+    },
+    "CreatedTokenResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "const": 0
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "data": {
+          "$ref": "#/$defs/CreatedToken"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "data"
+      ]
+    },
+    "PublishTokenResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "const": 0
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "data": {
+          "$ref": "#/$defs/PublishToken"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "data"
+      ]
+    },
+    "VersionsPageResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "const": 0
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "data": {
+          "$ref": "#/$defs/VersionsPage"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "data"
+      ]
+    },
+    "TokensPageResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "const": 0
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "data": {
+          "$ref": "#/$defs/TokensPage"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "data"
+      ]
+    },
+    "PublicationsPageResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "const": 0
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "data": {
+          "$ref": "#/$defs/PublicationsPage"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "data"
+      ]
+    },
+    "PublicationOptionsResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "const": 0
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "data": {
+          "$ref": "#/$defs/PublicationOptions"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "data"
+      ]
+    },
+    "RecoveryContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "credential_status": {
+          "enum": [
+            "active",
+            "expired",
+            "revoked"
+          ]
+        },
+        "identity_matches": {
+          "type": "boolean"
+        },
+        "plugin_allowed": {
+          "type": "boolean"
+        },
+        "scope_allowed": {
+          "type": "boolean"
+        },
+        "request_matches": {
+          "type": "boolean"
+        },
+        "operation_status": {
+          "enum": [
+            "unknown",
+            "not_found",
+            "processing",
+            "succeeded",
+            "failed_retryable",
+            "failed_permanent"
+          ]
+        },
+        "retention_expired": {
+          "type": "boolean"
+        },
+        "feature_available": {
+          "type": "boolean"
+        },
+        "attempts": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "elapsed_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "poll_elapsed_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "retry_after_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "credential_status",
+        "identity_matches",
+        "plugin_allowed",
+        "scope_allowed",
+        "request_matches",
+        "operation_status",
+        "retention_expired",
+        "feature_available",
+        "attempts",
+        "elapsed_seconds",
+        "poll_elapsed_seconds",
+        "retry_after_seconds"
+      ]
+    },
+    "Error400": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/Error"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "code": {
+              "const": 400
+            }
+          }
+        }
+      ]
+    },
+    "Error401": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/Error"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "code": {
+              "const": 401
+            }
+          }
+        }
+      ]
+    },
+    "Error403": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/Error"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "code": {
+              "const": 403
+            }
+          }
+        }
+      ]
+    },
+    "Error404": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/Error"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "code": {
+              "const": 404
+            }
+          }
+        }
+      ]
+    },
+    "Error408": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/Error"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "code": {
+              "const": 408
+            }
+          }
+        }
+      ]
+    },
+    "Error409": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/Error"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "code": {
+              "const": 409
+            }
+          }
+        }
+      ]
+    },
+    "Error413": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/Error"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "code": {
+              "const": 413
+            }
+          }
+        }
+      ]
+    },
+    "Error415": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/Error"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "code": {
+              "const": 415
+            }
+          }
+        }
+      ]
+    },
+    "Error429": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/Error"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "code": {
+              "const": 429
+            }
+          }
+        }
+      ]
+    },
+    "Error500": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/Error"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "code": {
+              "const": 500
+            }
+          }
+        }
+      ]
+    },
+    "Error503": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/Error"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "code": {
+              "const": 503
+            }
+          }
+        }
+      ]
+    }
+  }
+}

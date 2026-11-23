@@ -1,0 +1,351 @@
+{
+  "date": "2026-11-11",
+  "timezone": "Asia/Shanghai",
+  "stage": "Framework P07 alignment and client corrections",
+  "status": "client_and_documents_corrected_real_joint_acceptance_waiting_for_environment",
+  "branch": "025-framework-business-regression",
+  "source_commit": "5683e4293d89b276ee3669448ceefd9de06a75a7",
+  "source_sha256": "../../../artifacts/plugin-publisher-p07-alignment-20261111/source-sha256.json",
+  "contract": {
+    "version": "1.0.0-rc.2",
+    "bundle_sha256": "89141c00e0b99b6a803312119e4cbcb3e64224bf458e234e35fc5ffbdeacd8fa",
+    "files": 24,
+    "modified": false
+  },
+  "changes": {
+    "paired_docs_version": "0.8",
+    "market_p07": "implemented routes and M2 scopes; default off; new Publication UUID on rejected resubmission; confirmed from current source and delivery",
+    "client": [
+      "private durable intent and completion records for every upload/submission HTTP request",
+      "task-bound request pagination in local API, CLI and on-demand technical details",
+      "only canonical server request UUID forwarded in fixed error diagnostics",
+      "Publication/Version UUID in technical details and trusted exact receipt link",
+      "approved is awaiting publication; published only from current market application status",
+      "reject reuse of a known old Publication UUID by a new submission task"
+    ],
+    "market_functional_source_or_selected_config_changed": false,
+    "market_files_changed": [
+      "docs/marketplace/plugin-developer-publishing-center-plan.md",
+      "docs/marketplace/plugin-publisher-implementation.md"
+    ],
+    "framework_files": "request_trace.go, request_trace_test.go, credentials_system_test.go; market/errors/upload/submission/local route/CLI integration; publisher frontend; local OpenAPI; docs and targeted CI"
+  },
+  "validation": {
+    "go_race": {
+      "passed": 201,
+      "skipped": [
+        "TestPublisherSystemCredentialLifecycle",
+        "TestMarketExternalFixture"
+      ],
+      "failed": 0,
+      "command": "go test -race -json ./tools/cli/internal/publisher ./tools/cli/cmd"
+    },
+    "system_keyring": {
+      "opt_in_test": "TestPublisherSystemCredentialLifecycle",
+      "result": "passed actual macOS security write/read/delete",
+      "secret_origin": "process-generated synthetic token, new UUID account",
+      "existing_items_enumerated_or_changed": false,
+      "created_item_deleted": true,
+      "real_market_credential_binding": false
+    },
+    "frontend": {
+      "passed": 48,
+      "failed": 0
+    },
+    "portable_node": {
+      "passed": 216,
+      "failed": 0
+    },
+    "portable_go_race_vet": "passed",
+    "publisher_cli_go_vet": "passed",
+    "local_openapi": "zero lint errors",
+    "portable_openapi": "12 paths, 32 referenced definitions; unchanged rc.2",
+    "templates": "sync-templates --check passed",
+    "generated_cli_consumer": "GOWORK=off no replace, packaged Framework snapshot; generated plugin and actual CLI review preview passed",
+    "typecheck": "publisher module only; strict vue-tsc against independent Nuxt/UI/i18n dependencies passed",
+    "consumer": {
+      "cli_version": "px-plugin version dev (commit 5683e42-dirty)",
+      "cli_sha256": "9ee49dae84203cb0ebccd06b2e40b64f9a1da50787f889953b7c1eb7e529af51",
+      "sdk_tarballs": [
+        {
+          "name": "@artisan-cloud/plugin-framework-client",
+          "version": "0.0.15",
+          "sha256": "423d02223ec0b6a41b725e3c88ca96d4f0892c0502968cfac7a0ff6c1e208e6f",
+          "filename": "423d02223ec0b6a4-artisan-cloud-plugin-framework-client-0.0.15.tgz"
+        },
+        {
+          "name": "@artisan-cloud/plugin-framework-admin",
+          "version": "0.0.14",
+          "sha256": "9af0d9ee3428b473858f521c8dd9a90d97fed16852099473b922f54bf4bf8900",
+          "filename": "9af0d9ee3428b473-artisan-cloud-plugin-framework-admin-0.0.14.tgz"
+        }
+      ],
+      "publisher_files": 14,
+      "independent_dev_and_production_exact_source_bytes": true,
+      "workspace_symlink": false,
+      "generated_manifest_sha256": "d8ef21245060e573e3d0ac99a18a1f0c3ef77765920ad1af0566cef6be5496cf",
+      "production_development_markers": [],
+      "formal_registry_release": false
+    },
+    "browser": {
+      "renders": 8,
+      "viewports": [
+        1440,
+        390
+      ],
+      "manual_and_system_themes": [
+        "light",
+        "dark"
+      ],
+      "minimum_contrast": 6.922767067725606,
+      "page_errors": [],
+      "focus_warnings": [],
+      "checks": [
+        "real_local_executor_without_bound_market_keeps_submission_disabled",
+        "publication_uuid_and_trusted_exact_application_link",
+        "request_history_paginates_and_keeps_lost_response_distinct",
+        "eight_theme_viewport_renders_with_hover_focus_selected_disabled_states",
+        "published_state_requires_current_market_application_status",
+        "fixed_permission_error_shows_validated_market_request_uuid"
+      ],
+      "actual_boundary": "real generated plugin, SDK tarball, Go local session/info, local no-market guard",
+      "controlled_boundary": "actual local Go session/info; explicit controlled task/market/request DTO fixtures; zero real Market upload/submission/admin mutations"
+    },
+    "production": {
+      "routes": [
+        {
+          "path": "/__powerx/publisher",
+          "status": 200,
+          "content_type": "text/html;charset=utf-8",
+          "matched_routes": [],
+          "workspaces": 0
+        },
+        {
+          "path": "/__powerx/publisher-api/submissions",
+          "status": 200,
+          "content_type": "text/html;charset=utf-8",
+          "matched_routes": [],
+          "workspaces": 0
+        },
+        {
+          "path": "/__powerx/publisher-api/submissions/00000000-0000-4000-8000-000000000001/requests",
+          "status": 200,
+          "content_type": "text/html;charset=utf-8",
+          "matched_routes": [],
+          "workspaces": 0
+        }
+      ],
+      "router_unmatched": true,
+      "api_and_core_isolated_at": "http://127.0.0.1:9",
+      "publisher_bootstrap_provided": false
+    },
+    "git_diff_check": "passed",
+    "documents": {
+      "paired_canonical_equal": 2,
+      "relative_links_checked": 134,
+      "broken_links": 0
+    },
+    "locale_leaf_keys": 317
+  },
+  "real_joint_acceptance": {
+    "market_upload_requests": 0,
+    "market_submission_requests": 0,
+    "market_admin_review_or_publish_requests": 0,
+    "result": "not_executed",
+    "reason": "approved isolated API root, console, test plugin and authorization entry not handed over",
+    "pending_text_question_sent": true,
+    "linux_package": {
+      "actual_zip_available": false,
+      "actual_zip_sha256": null,
+      "reason": "Darwin/arm64 host; Docker daemon unavailable; temporary Linux/amd64 or CI execution still required"
+    },
+    "real_keyring_bind_and_rotate": "waiting for approved market credentials via private stdin",
+    "record": "../../marketplace/plugin-publisher-framework-m2-joint-record.md"
+  },
+  "cleanup": {
+    "records": [
+      {
+        "pid": 72310,
+        "pgid": 72310,
+        "command": [
+          "<temporary-consumer>/px-plugin",
+          "publisher",
+          "serve",
+          "--entry",
+          "<temporary-consumer>/consumer",
+          "--origin",
+          "http://localhost:53705"
+        ],
+        "ports": [
+          53706
+        ]
+      },
+      {
+        "pid": 72316,
+        "pgid": 72316,
+        "command": [
+          "/Users/michaelhu/.nvm/versions/node/v22.23.2/bin/node",
+          "node_modules/nuxi/bin/nuxi.mjs",
+          "dev",
+          "--host",
+          "localhost",
+          "--port",
+          "53705"
+        ],
+        "cwd": "<temporary-consumer>/consumer/web-admin",
+        "ports": [
+          53705
+        ]
+      },
+      {
+        "pid": 77942,
+        "pgid": 77942,
+        "command": [
+          "<temporary-consumer>/px-plugin",
+          "publisher",
+          "serve",
+          "--entry",
+          "<temporary-consumer>/consumer",
+          "--origin",
+          "http://localhost:53705"
+        ],
+        "ports": [
+          55182
+        ]
+      },
+      {
+        "pid": 77993,
+        "pgid": 77993,
+        "command": [
+          "/Users/michaelhu/.nvm/versions/node/v22.23.2/bin/node",
+          "node_modules/nuxi/bin/nuxi.mjs",
+          "dev",
+          "--host",
+          "localhost",
+          "--port",
+          "53705"
+        ],
+        "cwd": "<temporary-consumer>/consumer/web-admin",
+        "ports": [
+          53705
+        ]
+      },
+      {
+        "pid": 86151,
+        "pgid": 86151,
+        "command": [
+          "/Users/michaelhu/.nvm/versions/node/v22.23.2/bin/node",
+          ".output/server/index.mjs"
+        ],
+        "cwd": "<temporary-consumer>/production",
+        "ports": [
+          57114
+        ]
+      },
+      {
+        "pid": 7359,
+        "pgid": 7359,
+        "command": [
+          "<temporary-consumer>/px-plugin",
+          "publisher",
+          "serve",
+          "--entry",
+          "<temporary-consumer>/consumer",
+          "--origin",
+          "http://localhost:53705"
+        ],
+        "ports": [
+          61218
+        ]
+      },
+      {
+        "pid": 7397,
+        "pgid": 7397,
+        "command": [
+          "/Users/michaelhu/.nvm/versions/node/v22.23.2/bin/node",
+          "node_modules/nuxi/bin/nuxi.mjs",
+          "dev",
+          "--host",
+          "localhost",
+          "--port",
+          "53705"
+        ],
+        "cwd": "<temporary-consumer>/consumer/web-admin",
+        "ports": [
+          53705
+        ]
+      }
+    ],
+    "observed_children": [
+      {
+        "pid": 7359,
+        "ppid": 1,
+        "pgid": 7359,
+        "stat": "Ss",
+        "command": "<temporary-consumer>/px-plugin publisher serve --entry <temporary-consumer>/consumer --origin http://localhost:53705"
+      },
+      {
+        "pid": 7397,
+        "ppid": 1,
+        "pgid": 7397,
+        "stat": "Ss",
+        "command": "/Users/michaelhu/.nvm/versions/node/v22.23.2/bin/node node_modules/nuxi/bin/nuxi.mjs dev --host localhost --port 53705"
+      },
+      {
+        "pid": 9494,
+        "ppid": 7397,
+        "pgid": 7397,
+        "stat": "S",
+        "command": "/Users/michaelhu/.nvm/versions/node/v22.23.2/bin/node --enable-source-maps /private<temporary-consumer>/consumer/web-admin/node_modules/nuxi/dist/dev/index.mjs --host localhost --port 53705"
+      },
+      {
+        "pid": 9495,
+        "ppid": 7397,
+        "pgid": 7397,
+        "stat": "S",
+        "command": "/Users/michaelhu/.nvm/versions/node/v22.23.2/bin/node --enable-source-maps /private<temporary-consumer>/consumer/web-admin/node_modules/nuxi/dist/dev/index.mjs --host localhost --port 53705"
+      },
+      {
+        "pid": 14067,
+        "ppid": 7397,
+        "pgid": 7397,
+        "stat": "S",
+        "command": "/private<temporary-consumer>/consumer/web-admin/node_modules/@esbuild/darwin-arm64/bin/esbuild --service=0.27.2 --ping"
+      },
+      {
+        "pid": 86151,
+        "ppid": 1,
+        "pgid": 86151,
+        "stat": "Ss",
+        "command": "/Users/michaelhu/.nvm/versions/node/v22.23.2/bin/node .output/server/index.mjs"
+      }
+    ],
+    "terminated_groups": [
+      7359,
+      7397,
+      86151
+    ],
+    "forced_groups": [],
+    "remaining_owned_processes": 0,
+    "checked_ports": [
+      53705,
+      53706,
+      55182,
+      57114,
+      61218
+    ],
+    "all_ports_released": true,
+    "bootstrap_removed_by_executor": true,
+    "synthetic_keyring_item_deleted": true,
+    "no_user_owned_process_stopped": true,
+    "temporary_consumer_removed": true
+  },
+  "history": "prior F08/M1 evidence unchanged; synthetic and controlled checks do not become real joint acceptance",
+  "publication_or_remote_changes": {
+    "registry_release": false,
+    "commit_push_branch_switch": false,
+    "daily_service_restart": false,
+    "daily_db_migration": false,
+    "remote_ci": false
+  }
+}

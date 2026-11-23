@@ -40,7 +40,7 @@ func TestBuildHTTPSharedEngineAndStrictRequest(t *testing.T) {
 	if bad.StatusCode != http.StatusBadRequest {
 		t.Fatal("arbitrary_command_accepted")
 	}
-	b := decodeData[Build](t, request(t, server.Info().Endpoint, http.MethodPost, "/v1/builds", session.Token, `{"release_plan_id":"`+p.ReleasePlanID+`"}`), http.StatusAccepted)
+	b := decodeData[Build](t, request(t, server.Info().Endpoint, http.MethodPost, "/v1/builds", session.Token, `{"release_plan_id":"`+p.ReleasePlanID+`","executor":"native"}`), http.StatusAccepted)
 	if b.Stage != "queued" {
 		t.Fatal("request_not_asynchronous")
 	}
@@ -71,7 +71,7 @@ func TestBuildServerShutdownCancelsOwnedChildProcesses(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "Makefile"), []byte("dist:\n\tsleep 30 & wait\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	b := decodeData[Build](t, request(t, server.Info().Endpoint, http.MethodPost, "/v1/builds", session.Token, `{"release_plan_id":"`+p.ReleasePlanID+`"}`), http.StatusAccepted)
+	b := decodeData[Build](t, request(t, server.Info().Endpoint, http.MethodPost, "/v1/builds", session.Token, `{"release_plan_id":"`+p.ReleasePlanID+`","executor":"native"}`), http.StatusAccepted)
 	deadline := time.Now().Add(10 * time.Second)
 	pid := 0
 	for time.Now().Before(deadline) {

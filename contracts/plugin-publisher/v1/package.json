@@ -1,0 +1,17 @@
+{
+  "name": "powerx-plugin-publisher-contract-v1",
+  "version": "1.0.0-rc.2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test conformance.test.mjs",
+    "check:openapi": "node check-openapi.mjs"
+  },
+  "engines": { "node": ">=22" },
+  "devDependencies": {
+    "@redocly/openapi-core": "1.34.5",
+    "ajv": "8.17.1",
+    "ajv-formats": "3.0.1",
+    "yaml": "2.8.1"
+  }
+}

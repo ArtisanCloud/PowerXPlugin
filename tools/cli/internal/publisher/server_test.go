@@ -105,7 +105,7 @@ func TestLocalServiceHandshakePlansAndExplicitCapabilities(t *testing.T) {
 		t.Fatal("bootstrap_replayed")
 	}
 	capabilities := decodeData[LocalInfo](t, request(t, info.Endpoint, http.MethodGet, "/v1/info", session.Token, ""), http.StatusOK)
-	if capabilities.Protocol != Protocol || len(capabilities.Features) != 2 || capabilities.Features[0] != "release-plans" || capabilities.BuildTargets == nil || len(capabilities.BuildTargets) != 0 {
+	if capabilities.Protocol != Protocol || len(capabilities.Features) != 10 || capabilities.Features[0] != "release-plans" || capabilities.Features[9] != directBuildFeature || capabilities.BuildTargets == nil {
 		t.Fatalf("capabilities=%+v", capabilities)
 	}
 	data, _ := json.Marshal(input())

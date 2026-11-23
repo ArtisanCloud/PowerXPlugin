@@ -1,0 +1,199 @@
+{
+  "vectors": [
+    {
+      "name": "Unicode and HTML are preserved",
+      "type": "package-upload",
+      "input": {
+        "plugin_id": "com.example.promo",
+        "version": "1.2.0",
+        "channel": "stable",
+        "os": "linux",
+        "arch": "amd64",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "size": 12345678,
+        "release_notes": "修复上传恢复；保留 <tag> & 原文。 第二行\n"
+      },
+      "canonical": "{\"arch\":\"amd64\",\"channel\":\"stable\",\"os\":\"linux\",\"plugin_id\":\"com.example.promo\",\"protocol\":\"powerx.plugin-publisher/v1\",\"release_notes\":\"修复上传恢复；保留 <tag> & 原文。 第二行\\n\",\"sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"size\":12345678,\"type\":\"package-upload\",\"version\":\"1.2.0\"}",
+      "sha256": "77161ca5f62520514fc2a1eecf3e68f193e27a8ccb988523f16efd0a1e47af07"
+    },
+    {
+      "name": "different input property order",
+      "type": "package-upload",
+      "input": {
+        "release_notes": "修复上传恢复；保留 <tag> & 原文。 第二行\n",
+        "size": 12345678,
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "arch": "amd64",
+        "os": "linux",
+        "channel": "stable",
+        "version": "1.2.0",
+        "plugin_id": "com.example.promo"
+      },
+      "canonical": "{\"arch\":\"amd64\",\"channel\":\"stable\",\"os\":\"linux\",\"plugin_id\":\"com.example.promo\",\"protocol\":\"powerx.plugin-publisher/v1\",\"release_notes\":\"修复上传恢复；保留 <tag> & 原文。 第二行\\n\",\"sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"size\":12345678,\"type\":\"package-upload\",\"version\":\"1.2.0\"}",
+      "sha256": "77161ca5f62520514fc2a1eecf3e68f193e27a8ccb988523f16efd0a1e47af07"
+    },
+    {
+      "name": "changed notes change request identity",
+      "type": "package-upload",
+      "input": {
+        "plugin_id": "com.example.promo",
+        "version": "1.2.0",
+        "channel": "stable",
+        "os": "linux",
+        "arch": "amd64",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "size": 12345678,
+        "release_notes": "Changed notes"
+      },
+      "canonical": "{\"arch\":\"amd64\",\"channel\":\"stable\",\"os\":\"linux\",\"plugin_id\":\"com.example.promo\",\"protocol\":\"powerx.plugin-publisher/v1\",\"release_notes\":\"Changed notes\",\"sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"size\":12345678,\"type\":\"package-upload\",\"version\":\"1.2.0\"}",
+      "sha256": "89349b576bbacbc18d769028ab3f01dcbe263d38eccdac76c57093ec22eaabce"
+    },
+    {
+      "name": "third-party namespace",
+      "type": "package-upload",
+      "input": {
+        "plugin_id": "org.acme.weather-v2",
+        "version": "1.2.0",
+        "channel": "stable",
+        "os": "linux",
+        "arch": "amd64",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "size": 12345678,
+        "release_notes": "修复上传恢复；保留 <tag> & 原文。 第二行\n"
+      },
+      "canonical": "{\"arch\":\"amd64\",\"channel\":\"stable\",\"os\":\"linux\",\"plugin_id\":\"org.acme.weather-v2\",\"protocol\":\"powerx.plugin-publisher/v1\",\"release_notes\":\"修复上传恢复；保留 <tag> & 原文。 第二行\\n\",\"sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"size\":12345678,\"type\":\"package-upload\",\"version\":\"1.2.0\"}",
+      "sha256": "50e99e981ad8b3848a396ea29c1ae1e012e46de3fa2783e41539aaef3e1a1177"
+    },
+    {
+      "name": "unordered future artifact set",
+      "type": "publication-submit",
+      "input": {
+        "plugin_id": "com.example.promo",
+        "version_id": "00000000-0000-4000-8000-000000000003",
+        "metadata": {
+          "description": " \t这是插件的完整功能说明文本。\r\n",
+          "license": "MIT",
+          "min_core": "1.0.0",
+          "support_url": "https://support.example/help",
+          "security_statement": "这是安全权限和资源使用的说明。",
+          "privacy_statement": "这是个人数据处理和隐私的说明。"
+        },
+        "expected_artifacts": [
+          {
+            "artifact_id": "00000000-0000-4000-8000-000000000005",
+            "os": "linux",
+            "arch": "arm64",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "size": 8765432
+          },
+          {
+            "artifact_id": "00000000-0000-4000-8000-000000000004",
+            "os": "linux",
+            "arch": "amd64",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size": 12345678
+          }
+        ]
+      },
+      "canonical": "{\"expected_artifacts\":[{\"arch\":\"amd64\",\"artifact_id\":\"00000000-0000-4000-8000-000000000004\",\"os\":\"linux\",\"sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"size\":12345678},{\"arch\":\"arm64\",\"artifact_id\":\"00000000-0000-4000-8000-000000000005\",\"os\":\"linux\",\"sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"size\":8765432}],\"metadata\":{\"description\":\"这是插件的完整功能说明文本。\",\"icon_url\":\"\",\"license\":\"MIT\",\"min_core\":\"1.0.0\",\"privacy_statement\":\"这是个人数据处理和隐私的说明。\",\"security_statement\":\"这是安全权限和资源使用的说明。\",\"support_url\":\"https://support.example/help\"},\"plugin_id\":\"com.example.promo\",\"protocol\":\"powerx.plugin-publisher/v1\",\"type\":\"publication-submit\",\"version_id\":\"00000000-0000-4000-8000-000000000003\"}",
+      "sha256": "43723c7e5aa3e64d732302cbd71284a6c8db23507577fea057c0bc2843d6547d"
+    },
+    {
+      "name": "optional empty icon and reordered set",
+      "type": "publication-submit",
+      "input": {
+        "plugin_id": "com.example.promo",
+        "version_id": "00000000-0000-4000-8000-000000000003",
+        "metadata": {
+          "description": "这是插件的完整功能说明文本。",
+          "license": "MIT",
+          "min_core": "1.0.0",
+          "support_url": "https://support.example/help",
+          "security_statement": "这是安全权限和资源使用的说明。",
+          "privacy_statement": "这是个人数据处理和隐私的说明。",
+          "icon_url": ""
+        },
+        "expected_artifacts": [
+          {
+            "artifact_id": "00000000-0000-4000-8000-000000000004",
+            "os": "linux",
+            "arch": "amd64",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size": 12345678
+          },
+          {
+            "artifact_id": "00000000-0000-4000-8000-000000000005",
+            "os": "linux",
+            "arch": "arm64",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "size": 8765432
+          }
+        ]
+      },
+      "canonical": "{\"expected_artifacts\":[{\"arch\":\"amd64\",\"artifact_id\":\"00000000-0000-4000-8000-000000000004\",\"os\":\"linux\",\"sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"size\":12345678},{\"arch\":\"arm64\",\"artifact_id\":\"00000000-0000-4000-8000-000000000005\",\"os\":\"linux\",\"sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"size\":8765432}],\"metadata\":{\"description\":\"这是插件的完整功能说明文本。\",\"icon_url\":\"\",\"license\":\"MIT\",\"min_core\":\"1.0.0\",\"privacy_statement\":\"这是个人数据处理和隐私的说明。\",\"security_statement\":\"这是安全权限和资源使用的说明。\",\"support_url\":\"https://support.example/help\"},\"plugin_id\":\"com.example.promo\",\"protocol\":\"powerx.plugin-publisher/v1\",\"type\":\"publication-submit\",\"version_id\":\"00000000-0000-4000-8000-000000000003\"}",
+      "sha256": "43723c7e5aa3e64d732302cbd71284a6c8db23507577fea057c0bc2843d6547d"
+    },
+    {
+      "name": "different Artifact UUID changes identity",
+      "type": "publication-submit",
+      "input": {
+        "plugin_id": "com.example.promo",
+        "version_id": "00000000-0000-4000-8000-000000000003",
+        "metadata": {
+          "description": "这是插件的完整功能说明文本。",
+          "license": "MIT",
+          "min_core": "1.0.0",
+          "support_url": "https://support.example/help",
+          "security_statement": "这是安全权限和资源使用的说明。",
+          "privacy_statement": "这是个人数据处理和隐私的说明。",
+          "icon_url": ""
+        },
+        "expected_artifacts": [
+          {
+            "artifact_id": "00000000-0000-4000-8000-000000000009",
+            "os": "linux",
+            "arch": "amd64",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size": 12345678
+          },
+          {
+            "artifact_id": "00000000-0000-4000-8000-000000000005",
+            "os": "linux",
+            "arch": "arm64",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "size": 8765432
+          }
+        ]
+      },
+      "canonical": "{\"expected_artifacts\":[{\"arch\":\"amd64\",\"artifact_id\":\"00000000-0000-4000-8000-000000000009\",\"os\":\"linux\",\"sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"size\":12345678},{\"arch\":\"arm64\",\"artifact_id\":\"00000000-0000-4000-8000-000000000005\",\"os\":\"linux\",\"sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"size\":8765432}],\"metadata\":{\"description\":\"这是插件的完整功能说明文本。\",\"icon_url\":\"\",\"license\":\"MIT\",\"min_core\":\"1.0.0\",\"privacy_statement\":\"这是个人数据处理和隐私的说明。\",\"security_statement\":\"这是安全权限和资源使用的说明。\",\"support_url\":\"https://support.example/help\"},\"plugin_id\":\"com.example.promo\",\"protocol\":\"powerx.plugin-publisher/v1\",\"type\":\"publication-submit\",\"version_id\":\"00000000-0000-4000-8000-000000000003\"}",
+      "sha256": "e5ad983c67cd75ca906899c96b4fe8b9450e2427c606d149d7d5418c29e5c58c"
+    },
+    {
+      "name": "NBSP is not ASCII trim",
+      "type": "publication-submit",
+      "input": {
+        "plugin_id": "com.example.promo",
+        "version_id": "00000000-0000-4000-8000-000000000003",
+        "metadata": {
+          "description": " 这是插件的完整功能说明文本。",
+          "license": "MIT",
+          "min_core": "1.0.0",
+          "support_url": "https://support.example/help",
+          "security_statement": "这是安全权限和资源使用的说明。",
+          "privacy_statement": "这是个人数据处理和隐私的说明。"
+        },
+        "expected_artifacts": [
+          {
+            "artifact_id": "00000000-0000-4000-8000-000000000004",
+            "os": "linux",
+            "arch": "amd64",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size": 12345678
+          }
+        ]
+      },
+      "canonical": "{\"expected_artifacts\":[{\"arch\":\"amd64\",\"artifact_id\":\"00000000-0000-4000-8000-000000000004\",\"os\":\"linux\",\"sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"size\":12345678}],\"metadata\":{\"description\":\" 这是插件的完整功能说明文本。\",\"icon_url\":\"\",\"license\":\"MIT\",\"min_core\":\"1.0.0\",\"privacy_statement\":\"这是个人数据处理和隐私的说明。\",\"security_statement\":\"这是安全权限和资源使用的说明。\",\"support_url\":\"https://support.example/help\"},\"plugin_id\":\"com.example.promo\",\"protocol\":\"powerx.plugin-publisher/v1\",\"type\":\"publication-submit\",\"version_id\":\"00000000-0000-4000-8000-000000000003\"}",
+      "sha256": "fe08b47194cc07e58d1b3653bb8191a278d39081aa3a9132709ba3e90a7270ba"
+    }
+  ]
+}

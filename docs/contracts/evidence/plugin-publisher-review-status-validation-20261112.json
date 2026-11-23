@@ -1,0 +1,171 @@
+{
+  "date": "2026-11-12",
+  "task": "Framework submission artifact collection status synchronization",
+  "result": "passed_real_market_page_regression",
+  "protocol_version": "1.0.0-rc.2",
+  "branch": "025-framework-business-regression",
+  "source_commit": "5683e4293d89b276ee3669448ceefd9de06a75a7",
+  "implementation": {
+    "cause": "preparation.version.availability_status retained rejected while refreshed task.current_publication had approved/published",
+    "status_source": "latest task by created_at within the prepared market connection, plugin and version; confirmed current_publication",
+    "unresolved_state": "explicit unconfirmed; no reuse of stale rejected/approved observation",
+    "no_task_source": "market version observation from preparation",
+    "historical_metadata_artifacts_receipt_mutated": false,
+    "completed_task_polling_added": false,
+    "changed_source_hashes": {
+      "framework/frontend/nuxt/framework-admin/publisher/review-workspace.ts": "a6924b60d61b685328c870dc68e601bc21d7a166485798052a147bb123009b40",
+      "framework/frontend/nuxt/framework-admin/publisher/runtime/ReviewPanel.vue": "005021f6de4190a28969c58d2f0b362d46a678aebac3e99df0000f8177a804eb",
+      "framework/frontend/nuxt/framework-admin/publisher/locales/en.json": "8f3ea0fdd09b157563b2bb7191d4b2f4833c2eb759dfd886c475292276a3ce6b",
+      "framework/frontend/nuxt/framework-admin/publisher/locales/zh.json": "673326655fdfe95f010ddd624b5aab66fc7388bffcbbd639ceb05d1b80559060",
+      "skeleton/web-admin/nuxt/tests/unit/publisher-review.spec.ts": "8ec1cac8764b9f8234fa802c725a2862678d8982c6ed0827e92f21d38f0867e0"
+    },
+    "go_or_market_functional_sources_changed": false,
+    "unrelated_worktree_changes_preserved": true
+  },
+  "environment": {
+    "market": "actual isolated PostgreSQL, MinIO, Gin Publisher/Identity/Catalog and production Nuxt; actual review admin UI with isolated root user",
+    "framework": "CLI-generated independent plugin; local SDK tarball install; actual Go executor, system keychain and Nuxt developer page",
+    "business_response_fixtures_or_interception": false,
+    "package": {
+      "controlled_preuploaded_zip": true,
+      "sha256": "743cdbae1308c23f78136030769a0a41570651b27bd6f7d5cb59b68c87ba742c",
+      "size": 4415873,
+      "framework_native_build_or_upload": false
+    },
+    "consumer_provenance": "../../../artifacts/plugin-publisher-review-status-20261112/consumer-provenance.json",
+    "current_state": "closed_and_cleaned"
+  },
+  "tests": {
+    "unit": {
+      "files": 6,
+      "tests": 54,
+      "new_cases": 6,
+      "result": "passed",
+      "command": "node skeleton/web-admin/nuxt/node_modules/vitest/vitest.mjs run --root skeleton/web-admin/nuxt tests/unit/publisher-proxy.spec.ts tests/unit/publisher-workspace.spec.ts tests/unit/publisher-page.spec.ts tests/unit/publisher-market.spec.ts tests/unit/publisher-review.spec.ts tests/unit/publisher-request-trace.spec.ts"
+    },
+    "strict_typecheck": {
+      "result": "passed",
+      "typescript": "5.9.3",
+      "vue_tsc": "3.3.14",
+      "scope": "all publisher TS and Vue files; actual Nuxt imports and generated i18n augmentation; strict true",
+      "config": "../../../artifacts/plugin-publisher-review-status-20261112/typecheck-config.json"
+    },
+    "template_sync": {
+      "command": "node scripts/sync-templates.mjs --check",
+      "result": "passed"
+    }
+  },
+  "real_status_cases": [
+    {
+      "status": "submitted",
+      "submission_id": "6bacb7f1-3841-4132-9b8b-21f46279f9c2",
+      "operation_id": "68e025c1-f191-4324-959a-00be7957b285",
+      "publication_id": "e03e5c49-2c4f-4657-9a64-89186358994d",
+      "attempts": 1,
+      "screenshots": [
+        "submitted-desktop-light.png",
+        "submitted-narrow-dark.png"
+      ]
+    },
+    {
+      "status": "rejected",
+      "submission_id": "da845dc3-9431-4b65-af17-6827ceea6ae7",
+      "operation_id": "28a68d7e-b57c-4050-bb41-178b734fe969",
+      "publication_id": "4bdb8dd5-b8ee-48c1-bbe1-c83dce7a3ebb",
+      "attempts": 1,
+      "screenshots": [
+        "rejected-desktop-light.png",
+        "rejected-narrow-dark.png"
+      ]
+    },
+    {
+      "status": "approved",
+      "submission_id": "6bacb7f1-3841-4132-9b8b-21f46279f9c2",
+      "operation_id": "68e025c1-f191-4324-959a-00be7957b285",
+      "publication_id": "e03e5c49-2c4f-4657-9a64-89186358994d",
+      "attempts": 1,
+      "screenshots": [
+        "approved-desktop-light.png",
+        "approved-narrow-dark.png"
+      ]
+    },
+    {
+      "status": "published",
+      "submission_id": "6bacb7f1-3841-4132-9b8b-21f46279f9c2",
+      "operation_id": "68e025c1-f191-4324-959a-00be7957b285",
+      "publication_id": "e03e5c49-2c4f-4657-9a64-89186358994d",
+      "attempts": 1,
+      "screenshots": [
+        "published-desktop-light.png",
+        "published-narrow-dark.png",
+        "published-desktop-dark.png",
+        "published-narrow-light.png"
+      ]
+    }
+  ],
+  "actual_revision_preparation_status": "rejected",
+  "immutable_history": {
+    "selected_old_application_id": "4bdb8dd5-b8ee-48c1-bbe1-c83dce7a3ebb",
+    "current_collection_status": "published",
+    "old_application_status": "rejected",
+    "metadata_unchanged": true,
+    "expected_artifacts_unchanged": true,
+    "receipt_unchanged": true,
+    "retained_across_task_tabs": true
+  },
+  "two_tasks_each_post_attempts": [
+    1,
+    1
+  ],
+  "approval_catalogue_http_status": 404,
+  "explicit_publication_catalogue_http_status": 200,
+  "visual": {
+    "screenshots": 10,
+    "view_checks": 30,
+    "widths": [
+      1440,
+      390
+    ],
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "manual_theme_opposite_system": true,
+    "states": [
+      "default",
+      "selected",
+      "hover",
+      "focus",
+      "disabled"
+    ],
+    "minimum_contrast": 5.91,
+    "horizontal_overflow": false,
+    "five_navigation_tabs_visible": true,
+    "page_errors": [],
+    "focus_warnings": [],
+    "screenshot_index": "../../../artifacts/plugin-publisher-review-status-20261112/README.md"
+  },
+  "privacy": {
+    "checked_mutable_files": 1139,
+    "credential_literal_matches": 0,
+    "credential_revoked": true,
+    "system_connection_disconnected": true
+  },
+  "cleanup": {
+    "complete": true,
+    "ports_released": 8,
+    "schema_bucket_removed": true,
+    "lab_root_removed": true,
+    "framework_root_removed": true,
+    "system_keychain_find_exit_codes": [
+      44
+    ],
+    "record": "../../../artifacts/plugin-publisher-review-status-20261112/cleanup.json"
+  },
+  "remaining_acceptance": [
+    "complete native Linux/amd64 generated plugin build and start",
+    "Framework actual build/upload",
+    "public package download and PowerX install/enable",
+    "registry release, remote CI and production deployment"
+  ]
+}

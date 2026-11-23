@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -34,12 +35,14 @@ type BuildTools struct {
 	Node     string `json:"node"`
 	NodeOS   string `json:"node_os"`
 	NodeArch string `json:"node_arch"`
+	CLI      string `json:"cli_sha256,omitempty"`
 }
 type BuildSource struct {
-	SHA256 string `json:"sha256"`
-	Commit string `json:"commit,omitempty"`
-	Dirty  *bool  `json:"dirty"`
-	VCS    string `json:"vcs"`
+	SHA256           string            `json:"sha256"`
+	Commit           string            `json:"commit,omitempty"`
+	Dirty            *bool             `json:"dirty"`
+	VCS              string            `json:"vcs"`
+	DependencySHA256 map[string]string `json:"dependency_sha256,omitempty"`
 }
 type Artifact struct {
 	Path      string `json:"path"`
@@ -56,21 +59,23 @@ type BuildProcess struct {
 	ExitedAt         *time.Time `json:"exited_at,omitempty"`
 }
 type Build struct {
-	Schema        string        `json:"schema"`
-	BuildID       string        `json:"build_id"`
-	ReleasePlanID string        `json:"release_plan_id"`
-	PluginID      string        `json:"plugin_id"`
-	Version       string        `json:"version"`
-	Target        Target        `json:"target"`
-	Stage         string        `json:"stage"`
-	Source        *BuildSource  `json:"source,omitempty"`
-	Tools         *BuildTools   `json:"tools,omitempty"`
-	Artifact      *Artifact     `json:"artifact,omitempty"`
-	Error         *Error        `json:"error,omitempty"`
-	PID           int           `json:"pid,omitempty"`
-	Process       *BuildProcess `json:"process,omitempty"`
-	CreatedAt     time.Time     `json:"created_at"`
-	UpdatedAt     time.Time     `json:"updated_at"`
+	Schema         string        `json:"schema"`
+	BuildID        string        `json:"build_id"`
+	ReleasePlanID  string        `json:"release_plan_id"`
+	PluginID       string        `json:"plugin_id"`
+	Version        string        `json:"version"`
+	Target         Target        `json:"target"`
+	Stage          string        `json:"stage"`
+	Executor       string        `json:"executor,omitempty"`
+	ContainerImage string        `json:"container_image,omitempty"`
+	Source         *BuildSource  `json:"source,omitempty"`
+	Tools          *BuildTools   `json:"tools,omitempty"`
+	Artifact       *Artifact     `json:"artifact,omitempty"`
+	Error          *Error        `json:"error,omitempty"`
+	PID            int           `json:"pid,omitempty"`
+	Process        *BuildProcess `json:"process,omitempty"`
+	CreatedAt      time.Time     `json:"created_at"`
+	UpdatedAt      time.Time     `json:"updated_at"`
 }
 type BuildPage struct {
 	Items []Build `json:"items"`
@@ -86,12 +91,36 @@ type buildJob struct {
 }
 
 func nativeTarget() Target { return Target{OS: runtime.GOOS, Arch: runtime.GOARCH} }
-func (e *Engine) BuildTargets() []Target {
-	if e.host == (Target{OS: "linux", Arch: "amd64"}) {
-		tools, err := e.availableTools()
-		if err == nil && tools.NodeOS == "linux" && tools.NodeArch == "x64" {
-			return []Target{e.host}
+
+func (e *Engine) nativeBuildTools() (BuildTools, error) {
+	tools, err := e.availableTools()
+	if err != nil {
+		return BuildTools{}, err
+	}
+	switch e.host {
+	case Target{OS: "linux", Arch: "amd64"}:
+		if tools.NodeOS == "linux" && tools.NodeArch == "x64" {
+			return tools, nil
 		}
+	case Target{OS: "darwin", Arch: "arm64"}:
+		if tools.NodeOS == "darwin" && tools.NodeArch == "arm64" {
+			for _, name := range []string{"make", "npm", "rg", "strings"} {
+				if _, err := exec.LookPath(name); err != nil {
+					return BuildTools{}, failure(BuildPlatform, err)
+				}
+			}
+			return tools, nil
+		}
+	}
+	return BuildTools{}, failure(BuildPlatform, nil)
+}
+
+func (e *Engine) BuildTargets() []Target {
+	if _, err := e.nativeBuildTools(); err == nil {
+		return []Target{{OS: "linux", Arch: "amd64"}}
+	}
+	if _, err := exec.LookPath("docker"); err == nil {
+		return []Target{{OS: "linux", Arch: "amd64"}}
 	}
 	return []Target{}
 }
@@ -135,7 +164,14 @@ func (e *Engine) GetBuild(id string) (Build, error) {
 	if b.Source != nil && (!validSHA(b.Source.SHA256) || b.Source.VCS != "git" && b.Source.VCS != "filesystem") {
 		return Build{}, failure(InvalidRecord, nil)
 	}
-	if b.Process != nil && (b.Process.ParentPID < 1 || b.Process.LeaderPID < 1 || b.Process.GroupID != b.Process.LeaderPID || b.Process.WorkingDirectory != "work/"+id+"/source") {
+	if b.Executor != "" && b.Executor != "native" && b.Executor != "container" {
+		return Build{}, failure(InvalidRecord, nil)
+	}
+	workingDirectory := "work/" + id + "/source"
+	if b.Executor == "container" {
+		workingDirectory = "work/" + id + "/run"
+	}
+	if b.Process != nil && (b.Process.ParentPID < 1 || b.Process.LeaderPID < 1 || b.Process.GroupID != b.Process.LeaderPID || b.Process.WorkingDirectory != workingDirectory) {
 		return Build{}, failure(InvalidRecord, nil)
 	}
 	if !active(b.Stage) && b.Stage != "ready" && b.Error == nil {
@@ -224,12 +260,20 @@ func (e *Engine) recoverBuilds() error {
 	return nil
 }
 func (e *Engine) StartBuild(ctx context.Context, planID string) (Build, error) {
+	return e.StartBuildWithExecutor(ctx, planID, "native")
+}
+func (e *Engine) StartBuildWithExecutor(ctx context.Context, planID, executor string) (Build, error) {
 	p, err := e.Get(planID)
 	if err != nil {
 		return Build{}, err
 	}
-	if e.host != p.Target {
-		return Build{}, failure(BuildPlatform, nil)
+	if executor != "native" && executor != "container" {
+		return Build{}, invalid("executor")
+	}
+	if executor == "native" {
+		if _, err := e.nativeBuildTools(); err != nil {
+			return Build{}, err
+		}
 	}
 	if !safeMakePath(e.root) || !e.work.current() {
 		return Build{}, failure(SourceUnsafe, nil)
@@ -246,7 +290,7 @@ func (e *Engine) StartBuild(ctx context.Context, planID string) (Build, error) {
 		}
 		return Build{}, err
 	}
-	b := Build{Schema: BuildSchema, BuildID: uuid.NewString(), ReleasePlanID: p.ReleasePlanID, PluginID: p.PluginID, Version: p.Version, Target: p.Target, Stage: "queued", CreatedAt: time.Now().UTC()}
+	b := Build{Schema: BuildSchema, BuildID: uuid.NewString(), ReleasePlanID: p.ReleasePlanID, PluginID: p.PluginID, Version: p.Version, Target: p.Target, Executor: executor, Stage: "queued", CreatedAt: time.Now().UTC()}
 	if err = e.saveBuild(&b, false); err != nil {
 		release()
 		return Build{}, err
@@ -316,6 +360,9 @@ func (e *Engine) CancelBuild(id string) (Build, error) {
 	return e.WaitBuild(id)
 }
 func (e *Engine) VerifyArtifact(id string) (Artifact, error) {
+	return e.verifyArtifact(context.Background(), id)
+}
+func (e *Engine) verifyArtifact(ctx context.Context, id string) (Artifact, error) {
 	b, err := e.GetBuild(id)
 	if err != nil {
 		return Artifact{}, err
@@ -333,25 +380,35 @@ func (e *Engine) VerifyArtifact(id string) (Artifact, error) {
 		return Artifact{}, err
 	}
 	defer f.Close()
+	info, err := f.Stat()
+	if err != nil || info.Size() != b.Artifact.Size {
+		return Artifact{}, failure(ArtifactChanged, err)
+	}
+	if info.Size() > MaxPackageBytes {
+		return Artifact{}, failure(TooLarge, nil)
+	}
 	h := sha256.New()
-	size, err := io.Copy(h, f)
+	size, err := io.Copy(h, &contextReader{ctx: ctx, reader: io.LimitReader(f, MaxPackageBytes+1)})
 	sha := hex.EncodeToString(h.Sum(nil))
 	if err != nil || size != b.Artifact.Size || sha != b.Artifact.SHA256 {
 		return Artifact{}, failure(ArtifactChanged, err)
 	}
+	if err = validatePackageZIP(ctx, f, size, Plan{PluginID: b.PluginID, CreatePlan: CreatePlan{Version: b.Version, Target: b.Target}}); err != nil {
+		return Artifact{}, err
+	}
 	return *b.Artifact, nil
 }
 func (e *Engine) executeBuild(ctx context.Context, b *Build, p Plan) error {
+	if b.Executor == "container" {
+		return e.executeContainerBuild(ctx, b, p)
+	}
 	b.Stage = "prechecking"
 	if err := e.saveBuild(b, true); err != nil {
 		return err
 	}
-	tools, err := e.availableTools()
+	tools, err := e.nativeBuildTools()
 	if err != nil {
 		return err
-	}
-	if tools.NodeOS != "linux" || tools.NodeArch != "x64" {
-		return failure(BuildPlatform, nil)
 	}
 	b.Tools = &tools
 	current, err := readPlugin(e.root)
@@ -364,6 +421,9 @@ func (e *Engine) executeBuild(ctx context.Context, b *Build, p Plan) error {
 	work := filepath.Join(e.work.path, b.BuildID)
 	if err = os.Mkdir(work, 0700); err != nil {
 		return failure(StorageFailure, err)
+	}
+	if e.host.OS == "darwin" {
+		return e.executeDarwinBuild(ctx, b, p, tools, work)
 	}
 	snapshot := filepath.Join(work, "source")
 	source, err := snapshotSource(ctx, e.root, snapshot)
@@ -382,18 +442,8 @@ func (e *Engine) executeBuild(ctx context.Context, b *Build, p Plan) error {
 	if err != nil {
 		return err
 	}
-	args := []string{"dist", "VERSION=" + p.Version, "PLATFORM=linux", "TARGET_ARCH=amd64", "BUILD_DIR=" + filepath.Join(snapshot, ".publisher-out/bin"), "DIST_ROOT=" + filepath.Join(snapshot, ".publisher-out/dist"), "DIST_DIR=" + filepath.Join(snapshot, ".publisher-out/dist", p.Version)}
-	err = runBuildCommand(ctx, snapshot, args, log, func(pid int) error {
-		b.PID = pid
-		b.Process = &BuildProcess{ParentPID: os.Getpid(), LeaderPID: pid, GroupID: pid, WorkingDirectory: "work/" + b.BuildID + "/source", StartedAt: time.Now().UTC()}
-		return e.saveBuild(b, true)
-	})
-	if b.Process != nil {
-		now := time.Now().UTC()
-		b.Process.ExitedAt = &now
-	}
+	err = e.runNativeBuildProcess(ctx, b, snapshot, "make", makeDistArgs(snapshot, p), log)
 	closeErr := log.Close()
-	b.PID = 0
 	if err != nil {
 		return err
 	}
@@ -403,8 +453,31 @@ func (e *Engine) executeBuild(ctx context.Context, b *Build, p Plan) error {
 	if err = unchangedSource(ctx, e.root, snapshot, source); err != nil {
 		return err
 	}
+	return e.finishBuild(ctx, b, p, tools, snapshot, work)
+}
+
+func makeDistArgs(snapshot string, p Plan) []string {
+	dist := filepath.Join(snapshot, ".publisher-out/dist")
+	return []string{"dist", "VERSION=" + p.Version, "PLATFORM=linux", "TARGET_ARCH=amd64",
+		"BUILD_DIR=" + filepath.Join(snapshot, ".publisher-out/bin"), "DIST_ROOT=" + dist, "DIST_DIR=" + filepath.Join(dist, p.Version)}
+}
+
+func (e *Engine) runNativeBuildProcess(ctx context.Context, b *Build, snapshot, program string, args []string, log io.Writer) error {
+	err := runOwnedCommand(ctx, program, snapshot, args, nil, log, func(pid int) error {
+		b.PID = pid
+		b.Process = &BuildProcess{ParentPID: os.Getpid(), LeaderPID: pid, GroupID: pid, WorkingDirectory: "work/" + b.BuildID + "/source", StartedAt: time.Now().UTC()}
+		return e.saveBuild(b, true)
+	})
+	if b.Process != nil {
+		now := time.Now().UTC()
+		b.Process.ExitedAt = &now
+	}
+	b.PID = 0
+	return err
+}
+func (e *Engine) finishBuild(ctx context.Context, b *Build, p Plan, tools BuildTools, snapshot, work string) error {
 	b.Stage = "packing"
-	if err = e.saveBuild(b, true); err != nil {
+	if err := e.saveBuild(b, true); err != nil {
 		return err
 	}
 	stage, err := os.MkdirTemp(work, "staging-")
@@ -421,14 +494,14 @@ func (e *Engine) executeBuild(ctx context.Context, b *Build, p Plan) error {
 		return err
 	}
 	artifact := filepath.Join(work, "artifact.zip")
-	if err = packZIP(ctx, stage, artifact, p.Version); err != nil {
+	if err = packZIP(ctx, stage, artifact, p); err != nil {
 		return err
 	}
 	size, sha, err := digestFile(artifact)
 	if err != nil {
 		return err
 	}
-	if size > 2<<30 {
+	if size > MaxPackageBytes {
 		return failure(TooLarge, nil)
 	}
 	if err = os.Chmod(artifact, 0400); err != nil {

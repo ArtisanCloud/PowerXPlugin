@@ -25,6 +25,7 @@ import (
 const BootstrapTTL = 5 * time.Minute
 const SessionTTL = time.Hour
 const SessionFile = ".px-plugin/publisher/tool-session.json"
+const directBuildFeature = "direct-build-apple-silicon"
 
 type ServerOptions struct{ Listen, Origin string }
 type ServerInfo struct {
@@ -44,19 +45,21 @@ type Session struct {
 	ExpiresAt time.Time `json:"expires_at"`
 }
 type LocalInfo struct {
-	Protocol     string   `json:"protocol"`
-	Plugin       Plugin   `json:"plugin"`
-	Features     []string `json:"features"`
-	BuildTargets []Target `json:"build_targets"`
+	Protocol         string           `json:"protocol"`
+	Plugin           Plugin           `json:"plugin"`
+	Features         []string         `json:"features"`
+	BuildTargets     []Target         `json:"build_targets"`
+	BuildEnvironment BuildEnvironment `json:"build_environment"`
 }
 
 type Server struct {
-	info   ServerInfo
-	engine *Engine
-	http   *http.Server
-	cancel context.CancelFunc
-	done   chan struct{}
-	err    error
+	info    ServerInfo
+	engine  *Engine
+	handler *localHandler
+	http    *http.Server
+	cancel  context.CancelFunc
+	done    chan struct{}
+	err     error
 }
 
 type localHandler struct {
@@ -106,8 +109,8 @@ func secret() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(value[:]), nil
 }
 
-// Start binds only loopback and serves local plan management. No build, shell,
-// upload, or business-runtime routes are registered by this service.
+// Start binds only loopback and serves the fixed local publisher API.
+// Arbitrary shell and business-runtime routes are absent.
 func Start(ctx context.Context, engine *Engine, opts ServerOptions) (*Server, error) {
 	if err := validateEndpoint(opts.Listen, opts.Origin); err != nil {
 		return nil, err
@@ -140,7 +143,7 @@ func Start(ctx context.Context, engine *Engine, opts ServerOptions) (*Server, er
 	}
 	handler := &localHandler{engine: engine, host: listener.Addr().String(), origin: opts.Origin, bootstrapHash: sha256.Sum256([]byte(token)), bootstrapExpires: info.BootstrapExpiresAt, now: time.Now}
 	serveCtx, cancel := context.WithCancel(ctx)
-	srv := &Server{info: info, engine: engine, cancel: cancel, done: make(chan struct{})}
+	srv := &Server{info: info, engine: engine, handler: handler, cancel: cancel, done: make(chan struct{})}
 	srv.http = &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 16 << 10}
 	served := make(chan error, 1)
 	go func() { served <- srv.http.Serve(listener) }()
@@ -178,9 +181,34 @@ func Start(ctx context.Context, engine *Engine, opts ServerOptions) (*Server, er
 	}()
 	return srv, nil
 }
-func (s *Server) Info() ServerInfo { return s.info }
-func (s *Server) Wait() error      { <-s.done; return s.err }
-func (s *Server) Close() error     { s.cancel(); return s.Wait() }
+func (s *Server) Info() ServerInfo { s.handler.mu.Lock(); defer s.handler.mu.Unlock(); return s.info }
+
+// RenewBootstrap is invoked only by the managed parent's private OS signal;
+// it has no public HTTP route and does not cancel jobs or change operation IDs.
+func (s *Server) RenewBootstrap() error {
+	token, err := secret()
+	if err != nil {
+		return err
+	}
+	s.handler.mu.Lock()
+	defer s.handler.mu.Unlock()
+	info := s.info
+	info.BootstrapExpiresAt = s.handler.now().UTC().Add(BootstrapTTL)
+	raw, err := json.Marshal(Bootstrap{ServerInfo: info, BootstrapToken: token})
+	if err != nil {
+		return failure(StorageFailure, err)
+	}
+	if err = s.engine.state.write("tool-session.json", append(raw, '\n'), true); err != nil {
+		return err
+	}
+	s.info.BootstrapExpiresAt = info.BootstrapExpiresAt
+	s.handler.bootstrapHash = sha256.Sum256([]byte(token))
+	s.handler.bootstrapExpires = info.BootstrapExpiresAt
+	s.handler.consumed = false
+	return nil
+}
+func (s *Server) Wait() error  { <-s.done; return s.err }
+func (s *Server) Close() error { s.cancel(); return s.Wait() }
 func (s *Server) removeOwnedBootstrap() error {
 	data, err := s.engine.state.read("tool-session.json", MaxRequestBytes)
 	if err != nil {
@@ -207,7 +235,7 @@ func (h *localHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeError(w, failure(Forbidden, nil))
 		return
 	}
-	if r.URL.RawQuery != "" && r.URL.Path != "/v1/plans" && r.URL.Path != "/v1/builds" {
+	if r.URL.RawQuery != "" && r.URL.Path != "/v1/plans" && r.URL.Path != "/v1/builds" && !(r.Method == http.MethodGet && (strings.HasPrefix(r.URL.Path, "/v1/uploads/") || strings.HasPrefix(r.URL.Path, "/v1/submissions/")) && strings.HasSuffix(r.URL.Path, "/requests")) && !(strings.HasPrefix(r.URL.Path, "/v1/markets/") && (strings.HasSuffix(r.URL.Path, "/versions") || strings.HasSuffix(r.URL.Path, "/publications"))) {
 		writeError(w, invalid("query"))
 		return
 	}
@@ -246,7 +274,24 @@ func (h *localHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			writeError(w, failure(Method, nil))
 			return
 		}
-		writeData(w, http.StatusOK, LocalInfo{Protocol: Protocol, Plugin: h.engine.Plugin(), Features: []string{"release-plans", "local-builds"}, BuildTargets: h.engine.BuildTargets()})
+		writeData(w, http.StatusOK, LocalInfo{Protocol: Protocol, Plugin: h.engine.Plugin(), Features: []string{"release-plans", "local-builds", "market-connections", "package-upload", "operation-recovery", "publication-submit", "managed-executor", "container-build", "credential-bind", directBuildFeature}, BuildTargets: h.engine.BuildTargets(), BuildEnvironment: h.engine.BuildEnvironment()})
+	case r.URL.Path == "/v1/build-environment/start":
+		if r.Method != http.MethodPost || r.ContentLength != 0 || r.URL.RawQuery != "" {
+			writeError(w, invalid("body"))
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+		value, err := h.engine.StartBuildEnvironment(ctx)
+		if err != nil {
+			writeError(w, AsError(err))
+			return
+		}
+		writeData(w, http.StatusOK, value)
+	case r.URL.Path == "/v1/submissions" || strings.HasPrefix(r.URL.Path, "/v1/submissions/"):
+		h.serveSubmission(w, r)
+	case r.URL.Path == "/v1/markets" || strings.HasPrefix(r.URL.Path, "/v1/markets/") || r.URL.Path == "/v1/uploads" || strings.HasPrefix(r.URL.Path, "/v1/uploads/"):
+		h.serveMarket(w, r)
 	case r.URL.Path == "/v1/builds" || strings.HasPrefix(r.URL.Path, "/v1/builds/"):
 		h.serveBuild(w, r)
 	case r.URL.Path == "/v1/plans" && r.Method == http.MethodPost:
@@ -366,7 +411,7 @@ func writeError(w http.ResponseWriter, err *Error) {
 		status = http.StatusForbidden
 	case NotFound:
 		status = http.StatusNotFound
-	case Conflict, WorkspaceChanged, BuildBusy, SourceChanged, ArtifactChanged:
+	case Conflict, WorkspaceChanged, BuildBusy, SourceChanged, ArtifactChanged, SubmissionChanged, SubmissionState:
 		status = http.StatusConflict
 	case TooLarge:
 		status = http.StatusRequestEntityTooLarge
@@ -376,6 +421,8 @@ func writeError(w http.ResponseWriter, err *Error) {
 		status = http.StatusMethodNotAllowed
 	case ArtifactInvalid, SourceUnsafe, NativeUnsupported:
 		status = http.StatusUnprocessableEntity
+	case SubmissionCapability:
+		status = http.StatusServiceUnavailable
 	case Unsupported, BuildPlatform:
 		status = http.StatusNotImplemented
 	}
@@ -403,13 +450,14 @@ func (h *localHandler) serveBuild(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			var input struct {
-				PlanID string `json:"release_plan_id"`
+				PlanID   string `json:"release_plan_id"`
+				Executor string `json:"executor"`
 			}
 			if decodeStrict(data, &input) != nil {
 				writeError(w, invalid("body"))
 				return
 			}
-			b, err := h.engine.StartBuild(context.Background(), input.PlanID)
+			b, err := h.engine.StartBuildWithExecutor(context.Background(), input.PlanID, input.Executor)
 			if err != nil {
 				writeError(w, AsError(err))
 				return

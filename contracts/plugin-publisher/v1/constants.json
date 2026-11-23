@@ -1,0 +1,84 @@
+{
+  "protocol": "powerx.plugin-publisher/v1",
+  "contract_version": "1.0.0-rc.2",
+  "runtime_status": "partial_foundation",
+  "fingerprint_domain": "powerx.plugin-publisher/v1/request\n",
+  "token": {
+    "default_ttl_seconds": 604800,
+    "min_ttl_seconds": 300,
+    "max_ttl_seconds": 2592000,
+    "max_plugin_ids": 50,
+    "max_active_per_user": 20,
+    "secret_prefix": "pxpub_",
+    "random_bytes": 32,
+    "m1_scopes": [
+      "plugins:read",
+      "packages:write"
+    ]
+  },
+  "limits": {
+    "max_package_bytes": 2147483648,
+    "max_multipart_overhead_bytes": 1048576,
+    "max_request_bytes": 2148532224,
+    "max_multipart_parts": 8,
+    "max_part_header_bytes": 8192,
+    "max_json_bytes": 65536,
+    "max_manifest_bytes": 262144,
+    "max_uncompressed_bytes": 8589934592,
+    "max_archive_entries": 50000,
+    "max_archive_path_bytes": 1024,
+    "max_compression_ratio": 200,
+    "max_release_notes_bytes": 10000,
+    "max_metadata_text_bytes": 10000,
+    "max_url_bytes": 2000,
+    "max_expected_artifacts": 6,
+    "max_response_bytes": 8388608,
+    "max_json_depth": 64,
+    "max_name_bytes": 200,
+    "max_summary_bytes": 2000,
+    "max_reason_bytes": 1000,
+    "max_review_reason_bytes": 4000,
+    "max_version_chars": 50,
+    "max_core_version_chars": 20,
+    "min_metadata_text_scalars": 10
+  },
+  "timeouts": {
+    "connect_seconds": 10,
+    "response_header_seconds": 30,
+    "read_request_seconds": 30,
+    "json_write_seconds": 60,
+    "upload_idle_seconds": 60,
+    "upload_total_seconds": 1800,
+    "upload_client_seconds": 1860,
+    "upload_response_header_seconds": 1800
+  },
+  "recovery": {
+    "idempotency_retention_seconds": 604800,
+    "lease_seconds": 60,
+    "lease_renew_seconds": 15,
+    "processing_retry_after_seconds": 2,
+    "max_attempts": 3,
+    "backoff_base_seconds": 1,
+    "backoff_cap_seconds": 30,
+    "max_retry_after_seconds": 300,
+    "max_recovery_elapsed_seconds": 7200,
+    "operation_poll_seconds": 2,
+    "max_operation_poll_seconds": 120
+  },
+  "pagination": {
+    "default_size": 20,
+    "max_size": 100
+  },
+  "package_formats": [
+    "zip"
+  ],
+  "channels": [
+    "stable"
+  ],
+  "targets": [
+    {
+      "os": "linux",
+      "arch": "amd64"
+    }
+  ]
+}

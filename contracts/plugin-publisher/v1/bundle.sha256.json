@@ -1,0 +1,33 @@
+{
+  "protocol": "powerx.plugin-publisher/v1",
+  "contract_version": "1.0.0-rc.2",
+  "status": "market-ready-for-framework-review",
+  "runtime_status": "partial_foundation",
+  "bundle_sha256": "89141c00e0b99b6a803312119e4cbcb3e64224bf458e234e35fc5ffbdeacd8fa",
+  "files": {
+    ".gitignore": "4d56952b0fb13bf8f9b6c13a6d4c34a075bac3af447636a1df4335d7576e2f97",
+    "README.md": "a96313f7cbbe3052e9d9b7acc167f42518db3154187929bd6a8213ecbae0cde7",
+    "canonical-cases.json": "4bf727c27374abdbdf6dbde2a5391bcdc24b4f1a190af5f43d8461ab28f29201",
+    "check-openapi.mjs": "5beda7151747120aeb38b0ddb0922355f6de857b05b0c524abd045735c8d087b",
+    "conformance.go": "c5c00313d3074a758d361fdc2fc9a646c39cb87ae4b2592102dd14c37c789ed1",
+    "conformance.mjs": "8fbf65e03818543ffbde469ab2c456457db0b9dbc6a6b5656347e2effb688332",
+    "conformance.test.mjs": "bfa0054594200c88f6781376cc2ff67c1d1ddfc3847483eac4534dfe2ca09abc",
+    "conformance_test.go": "b9bf58d3b700b0c71063a76eb4a7ef804dcaac2ba4af04ef7bdd5dc770da4098",
+    "constants.json": "a87368acae5de87f3afc07524ae1d28c0bd7584c92237f0ac3c49cd699bf945a",
+    "encoding-cases.json": "a152082de7a229c59cb313e28b7869009c33fe946ad7ba2c0d584eab4e428875",
+    "errors.json": "60468c0200d8fb230a68a4ca9fd37f0280bd17106b242f0eb97fce255846e978",
+    "examples.json": "b33c85b48aebc63c5d23806af8291764302777dd6960b3073bc73a306f3c14d6",
+    "go.mod": "29ae6e204696cebab255ebe4405be659b16df41807bb7508686ad5a1b579b67e",
+    "go.sum": "44040141be21bff6f85c7a9ecb8a436c22cd4de2347b7ede5e70d452626b5c71",
+    "link-cases.json": "33d47b2731e89ac06fde8cf0b1f9ec9084aaf12989d256e236f9d3c7b5773850",
+    "openapi.yaml": "9bdf0b07e85c95f0f2e3d06edfb1a7edca97c702a1bd34d54c0486bc026ea336",
+    "package-lock.json": "3e2cc8cd04ab7267db65bf8a505a0e575e0f9989eb87e29a6baf3ff8ca962913",
+    "package.json": "30dd8c787b42a33c8c4dc453f0dec728b5b1be3346640c11472f56616fc87e0b",
+    "plugin-id-source.json": "16dedca1396aea0e41e85a6e599f151c4014a842ea31676a64036bead30be55f",
+    "plugin-id.cases.json": "3e8bc2bb4c672768db05496d9689b2c1890a4b6d9ef6b8be7fd19cd96757eba8",
+    "plugin-id.schema.json": "27f1a43ff8809a41bce9e936571a80129d74743b1a9861bfb677a08d3c7191b1",
+    "protocol.schema.json": "de9041ce8d779f166a93c975567328152add6323056cc8053b2a9a11b745ab00",
+    "recovery-cases.json": "49db922b29b9243ea18df9d37d6f52c855c50fd97a6c3187f25088654da1bbd5",
+    "schema-cases.json": "d4d36e0cbcd0bdaf7136b5bd8aac979f41fffd30fc376590128d65316a69cee4"
+  }
+}

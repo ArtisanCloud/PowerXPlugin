@@ -22,7 +22,7 @@ var makePath = regexp.MustCompile(`^[A-Za-z0-9/_.-]+$`)
 
 func safeMakePath(s string) bool { return makePath.MatchString(s) }
 
-var sourceRoots = []string{"Makefile", "plugin.yaml", "make-files", "scripts", "backend", "web-admin", "plugin.d", "contracts", "skills", "config/event_fabric.yaml", "README.md", "LICENSE"}
+var sourceRoots = []string{"Makefile", "plugin.yaml", "make-files", "scripts", "backend", "web-admin", "plugin.d", "contracts", "skills", "config/event_fabric.yaml", "config/event_fabric_service.yaml", "config/values.example.yaml", "README.md", "LICENSE"}
 var excludedDirs = map[string]bool{".git": true, ".px-plugin": true, ".publisher-out": true, ".nuxt": true, ".output": true, ".cache": true, ".vite": true, ".vite-temp": true, "bin": true, "dist": true, "coverage": true, "test-results": true, "uploads": true, "logs": true, "__pycache__": true}
 
 func excludedFile(name string) bool {
@@ -85,15 +85,17 @@ func validateDependencies(ctx context.Context, root string) error {
 }
 
 type treeWalk struct {
-	ctx          context.Context
-	root         string
-	destination  string
-	skipRelative string
-	hash         hash.Hash
-	bytes        int64
-	count        int
-	stack        map[string]bool
-	source       bool
+	ctx            context.Context
+	root           string
+	destination    string
+	hash           hash.Hash
+	bytes          int64
+	count          int
+	stack          map[string]bool
+	skipRelative   string
+	source         bool
+	excludeModules bool
+	approvedRoots  map[string]string
 }
 
 func (w *treeWalk) visit(rel string) error {
@@ -107,9 +109,20 @@ func (w *treeWalk) visit(rel string) error {
 		return err
 	}
 	name := filepath.Join(w.root, rel)
+	boundary := w.root
+	for prefix, root := range w.approvedRoots {
+		if rel == prefix || strings.HasPrefix(filepath.ToSlash(rel), prefix+"/") {
+			name = filepath.Join(root, strings.TrimPrefix(strings.TrimPrefix(filepath.ToSlash(rel), prefix), "/"))
+			boundary = root
+			break
+		}
+	}
 	info, err := os.Lstat(name)
 	if err != nil {
 		return failure(SourceUnsafe, err)
+	}
+	if w.source && w.excludeModules && (info.Name() == "node_modules" || info.Name() == ".publisher-dependencies" || info.Name() == ".idea" || info.Name() == ".vscode" || info.Name() == ".DS_Store") {
+		return nil
 	}
 	if !w.source && (info.Name() == ".git" || info.Name() == ".px-plugin") {
 		return failure(ArtifactInvalid, nil)
@@ -121,7 +134,7 @@ func (w *treeWalk) visit(rel string) error {
 	if err != nil {
 		return failure(SourceUnsafe, err)
 	}
-	within, err := filepath.Rel(w.root, resolved)
+	within, err := filepath.Rel(boundary, resolved)
 	if err != nil || !filepath.IsLocal(within) {
 		return failure(SourceUnsafe, err)
 	}

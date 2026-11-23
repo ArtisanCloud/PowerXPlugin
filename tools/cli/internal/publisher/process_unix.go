@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"sync"
 	"syscall"
@@ -63,10 +64,11 @@ func probeTools() (BuildTools, error) {
 	}
 	return BuildTools{Go: strings.TrimSpace(string(goVersion)), Node: node.Version, NodeOS: node.OS, NodeArch: node.Arch}, nil
 }
-func runBuildCommand(ctx context.Context, dir string, args []string, out io.Writer, started func(int) error) error {
-	cmd := exec.CommandContext(ctx, "make", args...)
+func runOwnedCommand(ctx context.Context, program, dir string, args []string, input io.Reader, out io.Writer, started func(int) error) error {
+	cmd := exec.CommandContext(ctx, program, args...)
 	cmd.Dir = dir
 	cmd.Env = buildEnv()
+	cmd.Stdin = input
 	cmd.Stdout = out
 	cmd.Stderr = out
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -100,6 +102,8 @@ type buildLog struct {
 }
 
 const MaxBuildLog = 4 << 20
+
+var buildLogURL = regexp.MustCompile(`https?://[^\s"'<>]+`)
 
 func newBuildLog(file string, roots ...string) (*buildLog, error) {
 	f, err := os.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
@@ -140,7 +144,8 @@ func (l *buildLog) line(s string) error {
 	} else if l.privateKey {
 		s = "[PUBLISHER_LOG_REDACTED]"
 	}
-	for _, marker := range []string{"TOKEN", "SECRET", "PASSWORD", "AUTHORIZATION", "COOKIE", "API_KEY", "APIKEY", "://"} {
+	s = buildLogURL.ReplaceAllString(s, "[PUBLISHER_URL_REDACTED]")
+	for _, marker := range []string{"TOKEN", "SECRET", "PASSWORD", "AUTHORIZATION", "COOKIE", "API_KEY", "APIKEY"} {
 		if strings.Contains(upper, marker) {
 			s = "[PUBLISHER_LOG_REDACTED]"
 			break

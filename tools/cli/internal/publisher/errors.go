@@ -47,9 +47,33 @@ func (e *Error) ExitCode() int {
 	}
 }
 func AsError(err error) *Error {
+	var remote *marketError
+	if errors.As(err, &remote) {
+		e := failure(MarketRejected, nil)
+		e.Params = map[string]string{"reason": remote.Code}
+		if remote.Status == 401 {
+			e.Code = MarketCredential
+			e.MessageKey = MarketCredential
+		}
+		return errorRequestID(e, err)
+	}
 	var typed *Error
 	if errors.As(err, &typed) {
-		return typed
+		return errorRequestID(typed, err)
 	}
-	return failure(StorageFailure, err)
+	return errorRequestID(failure(StorageFailure, err), err)
+}
+
+func errorRequestID(value *Error, cause error) *Error {
+	var trace *marketRequestError
+	if !errors.As(cause, &trace) || !canonicalUUID(trace.requestID) {
+		return value
+	}
+	copy := *value
+	copy.Params = make(map[string]string, len(value.Params)+1)
+	for k, v := range value.Params {
+		copy.Params[k] = v
+	}
+	copy.Params["request_id"] = trace.requestID
+	return &copy
 }

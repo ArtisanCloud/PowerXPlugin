@@ -216,7 +216,7 @@ func freezePackage(ctx context.Context, snapshot, dist, stage string, p Plan, to
 			return 0, err
 		}
 	}
-	for _, rel := range []string{"plugin.d", "contracts", "skills", "config/event_fabric.yaml", "web-admin/i18n", "web-admin/public", "backend/etc/ai/providers.d", "README.md", "LICENSE"} {
+	for _, rel := range []string{"plugin.d", "contracts", "skills", "config/event_fabric.yaml", "config/event_fabric_service.yaml", "config/values.example.yaml", "backend/etc/ai/providers.d", "README.md", "LICENSE"} {
 		if _, err := os.Lstat(filepath.Join(snapshot, rel)); os.IsNotExist(err) {
 			continue
 		}
@@ -224,7 +224,19 @@ func freezePackage(ctx context.Context, snapshot, dist, stage string, p Plan, to
 			return 0, err
 		}
 	}
-	doc, err := decodeYAML(filepath.Join(stage, "plugin.yaml"))
+	frontend := filepath.Join(snapshot, "web-admin")
+	if _, err := os.Stat(filepath.Join(frontend, "package.json")); os.IsNotExist(err) {
+		frontend = filepath.Join(frontend, "nuxt")
+	}
+	for _, rel := range []string{"i18n", "public"} {
+		if _, err := os.Lstat(filepath.Join(frontend, rel)); os.IsNotExist(err) {
+			continue
+		}
+		if err := copyPackageTree(ctx, frontend, rel, filepath.Join(stage, "web-admin")); err != nil {
+			return 0, err
+		}
+	}
+	doc, err := readManifest(filepath.Join(stage, "plugin.yaml"))
 	if err != nil {
 		return 0, err
 	}
@@ -414,8 +426,15 @@ func datasetAssetFailure(err error) *Error {
 func checkReferences(root string, node any) error {
 	switch value := node.(type) {
 	case map[string]any:
-		for _, v := range value {
-			if err := checkReferences(root, v); err != nil {
+		for key, v := range value {
+			var err error
+			switch key {
+			case "path", "schema", "schema_ref", "template", "endpoint", "channel", "payload", "handler", "imports", "descriptor", "input", "output", "entrypoint":
+				err = checkReferenceValue(root, v)
+			default:
+				err = checkReferences(root, v)
+			}
+			if err != nil {
 				return err
 			}
 		}
@@ -425,9 +444,18 @@ func checkReferences(root string, node any) error {
 				return err
 			}
 		}
+	}
+	return nil
+}
+
+// Reference fields have file semantics. Schema IDs and descriptive text may
+// share the same prefix but are not paths in the package.
+func checkReferenceValue(root string, node any) error {
+	switch value := node.(type) {
 	case string:
-		if strings.HasPrefix(value, "contracts/") || strings.HasPrefix(value, "schema/") {
-			rel := value
+		ref := strings.TrimPrefix(value, "./")
+		if strings.HasPrefix(ref, "contracts/") || strings.HasPrefix(ref, "schema/") {
+			rel := ref
 			if strings.HasPrefix(rel, "schema/") {
 				rel = "contracts/" + rel
 			}
@@ -435,11 +463,19 @@ func checkReferences(root string, node any) error {
 				return err
 			}
 		}
+	case []any:
+		for _, item := range value {
+			if err := checkReferenceValue(root, item); err != nil {
+				return err
+			}
+		}
+	case map[string]any:
+		return checkReferences(root, value)
 	}
 	return nil
 }
-func packZIP(ctx context.Context, stage, file, version string) error {
-	f, err := os.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+func packZIP(ctx context.Context, stage, file string, p Plan) error {
+	f, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
 		return failure(StorageFailure, err)
 	}
@@ -450,20 +486,45 @@ func packZIP(ctx context.Context, stage, file, version string) error {
 			os.Remove(file)
 		}
 	}()
-	w := zip.NewWriter(f)
+	w := zip.NewWriter(&packageOutput{writer: f})
+	defer w.Close()
 	paths := []string{}
+	names := packagePaths{}
+	var uncompressed uint64
 	if err = filepath.WalkDir(stage, func(path string, e os.DirEntry, err error) error {
 		if err != nil {
+			return failure(ArtifactInvalid, err)
+		}
+		if err := ctx.Err(); err != nil {
 			return err
 		}
 		if !e.IsDir() {
+			rel, err := filepath.Rel(stage, path)
+			if err != nil {
+				return failure(ArtifactInvalid, err)
+			}
+			if err = names.add(p.Version+"/"+filepath.ToSlash(rel), false); err != nil {
+				return err
+			}
+			info, err := e.Info()
+			if err != nil || !info.Mode().IsRegular() || info.Mode()&(os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0 {
+				return failure(ArtifactInvalid, err)
+			}
+			if len(paths) >= MaxPackageEntries || uint64(info.Size()) > MaxPackageUncompressedBytes-uncompressed {
+				return failure(TooLarge, nil)
+			}
+			uncompressed += uint64(info.Size())
 			paths = append(paths, path)
 		}
 		return nil
 	}); err != nil {
-		return failure(ArtifactInvalid, err)
+		return err
+	}
+	if err := names.check(); err != nil {
+		return err
 	}
 	sort.Strings(paths)
+	uncompressed = 0
 	for _, path := range paths {
 		if ctx.Err() != nil {
 			w.Close()
@@ -479,7 +540,11 @@ func packZIP(ctx context.Context, stage, file, version string) error {
 			w.Close()
 			return failure(ArtifactInvalid, err)
 		}
-		header := &zip.FileHeader{Name: version + "/" + filepath.ToSlash(rel), Method: zip.Deflate}
+		if uint64(info.Size()) > MaxPackageUncompressedBytes-uncompressed {
+			return failure(TooLarge, nil)
+		}
+		uncompressed += uint64(info.Size())
+		header := &zip.FileHeader{Name: p.Version + "/" + filepath.ToSlash(rel), Method: zip.Deflate}
 		header.SetModTime(time.Date(1980, 1, 1, 0, 0, 0, 0, time.UTC))
 		mode := os.FileMode(0644)
 		if info.Mode().Perm()&0111 != 0 {
@@ -489,22 +554,32 @@ func packZIP(ctx context.Context, stage, file, version string) error {
 		entry, err := w.CreateHeader(header)
 		if err != nil {
 			w.Close()
-			return failure(ArtifactInvalid, err)
+			return AsError(err)
 		}
 		input, err := os.Open(path)
 		if err != nil {
 			w.Close()
 			return failure(ArtifactInvalid, err)
 		}
-		_, copyErr := io.Copy(entry, &contextReader{ctx: ctx, reader: input})
+		n, copyErr := io.Copy(entry, &contextReader{ctx: ctx, reader: io.LimitReader(input, info.Size()+1)})
 		input.Close()
 		if copyErr != nil {
 			w.Close()
-			return failure(ArtifactInvalid, copyErr)
+			return AsError(copyErr)
+		}
+		if n != info.Size() {
+			return failure(ArtifactInvalid, nil)
 		}
 	}
 	if err = w.Close(); err != nil {
-		return failure(ArtifactInvalid, err)
+		return AsError(err)
+	}
+	info, err := f.Stat()
+	if err != nil {
+		return failure(StorageFailure, err)
+	}
+	if err = validatePackageZIP(ctx, f, info.Size(), p); err != nil {
+		return err
 	}
 	if err = f.Sync(); err != nil {
 		return failure(StorageFailure, err)

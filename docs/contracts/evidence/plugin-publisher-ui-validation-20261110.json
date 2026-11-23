@@ -1,0 +1,236 @@
+{
+  "schema": "powerx.plugin-publisher-ui-validation/v1",
+  "validated_at": "2026-11-10T04:57:44.382474+00:00",
+  "source_commit": "5683e4293d89b276ee3669448ceefd9de06a75a7",
+  "branch": "025-framework-business-regression",
+  "worktree_uncommitted": true,
+  "published": false,
+  "global_cli_updated": false,
+  "scope": "F05 local developer page and development-only proxy",
+  "entry": "/__powerx/publisher",
+  "proxy": "/__powerx/publisher-api",
+  "paired_documents_version": "0.5",
+  "marketplace_changes": "two paired plan documents only",
+  "environment": {
+    "node": "v22.13.0",
+    "go": "go version go1.26.7 darwin/arm64",
+    "nuxt": "4.4.2",
+    "nuxt_ui": "3.3.7",
+    "vue_tsc": "3.1.1",
+    "typescript": "5.9.3",
+    "isolated_consumer_uses_local_framework_source": true
+  },
+  "checks": {
+    "unit": {
+      "passed": true,
+      "files": 3,
+      "tests": 28,
+      "command": "npm --prefix skeleton/web-admin/nuxt run test:unit -- tests/unit/publisher-proxy.spec.ts tests/unit/publisher-workspace.spec.ts tests/unit/publisher-page.spec.ts"
+    },
+    "targeted_vue_typescript": {
+      "passed": true,
+      "scope": "publisher TypeScript and Vue SFC using consumer Nuxt/UI/i18n types; unrelated regression components excluded"
+    },
+    "template_sync": true,
+    "ci_guardrails": true,
+    "production_build": true,
+    "production_boundary": {
+      "http": [
+        {
+          "path": "/__powerx/publisher",
+          "method": "GET",
+          "status": 200,
+          "content_type": "text/html;charset=utf-8",
+          "publisher_json": false
+        },
+        {
+          "path": "/__powerx/publisher-api/status",
+          "method": "GET",
+          "status": 200,
+          "content_type": "text/html;charset=utf-8",
+          "publisher_json": false
+        },
+        {
+          "path": "/__powerx/publisher-api/connect",
+          "method": "POST",
+          "status": 200,
+          "content_type": "text/html;charset=utf-8",
+          "publisher_json": false
+        },
+        {
+          "path": "/__powerx/publisher-api/builds",
+          "method": "POST",
+          "status": 200,
+          "content_type": "text/html;charset=utf-8",
+          "publisher_json": false
+        }
+      ],
+      "route_matched": [],
+      "runtime_markers": [],
+      "workbench_count": 0,
+      "passed": true,
+      "note": "Nuxt SPA returns HTTP 200 HTML for unmatched paths; no publisher route, JSON handler or runtime code is present."
+    },
+    "browser": {
+      "passed": true,
+      "real_go_cases": [
+        "private_bootstrap_handshake_and_info",
+        "version_validation_before_write",
+        "create_persisted_plan_and_preserve_draft",
+        "native_platform_admission_visible",
+        "selection_and_partition_restore",
+        "locale_switch_and_refresh"
+      ],
+      "controlled_ui_cases": [
+        "async_build_summary_across_tabs_and_cancel",
+        "terminal_poll_stop_and_same_artifact_verify",
+        "logs_as_plain_text",
+        "unimplemented_market_actions_explicitly_disabled",
+        "unknown_write_blocks_replay_until_explicit_query"
+      ],
+      "rendered": [
+        {
+          "name": "1440-light-system-dark",
+          "minimum": 6.92,
+          "checked": 40,
+          "bad": [],
+          "horizontalOverflow": false
+        },
+        {
+          "name": "1440-light-system-dark-modal",
+          "minimum": 7.58,
+          "checked": 9,
+          "bad": [],
+          "horizontalOverflow": false
+        },
+        {
+          "name": "1440-dark-system-light",
+          "minimum": 9.83,
+          "checked": 40,
+          "bad": [],
+          "horizontalOverflow": false
+        },
+        {
+          "name": "1440-dark-system-light-modal",
+          "minimum": 12,
+          "checked": 9,
+          "bad": [],
+          "horizontalOverflow": false
+        },
+        {
+          "name": "390-light-system-dark",
+          "minimum": 6.92,
+          "checked": 27,
+          "bad": [],
+          "horizontalOverflow": false
+        },
+        {
+          "name": "390-light-system-dark-modal",
+          "minimum": 7.58,
+          "checked": 9,
+          "bad": [],
+          "horizontalOverflow": false
+        },
+        {
+          "name": "390-dark-system-light",
+          "minimum": 9.83,
+          "checked": 27,
+          "bad": [],
+          "horizontalOverflow": false
+        },
+        {
+          "name": "390-dark-system-light-modal",
+          "minimum": 12,
+          "checked": 9,
+          "bad": [],
+          "horizontalOverflow": false
+        }
+      ],
+      "console_errors": [],
+      "console_warnings": [],
+      "browser_credentials_absent": true
+    }
+  },
+  "controlled_vs_runtime": {
+    "actual_go_plan_create_and_restore": true,
+    "actual_go_native_platform_rejection_on_macos": true,
+    "build_progress_cancel_logs_and_verify_use_browser_wire_fixture": true,
+    "real_linux_nuxt_runtime_accepted": false,
+    "market_authorization_upload_review_accepted": false,
+    "independent_generated_plugin_package_accepted": false,
+    "sdk_or_cli_released": false,
+    "remote_ci_executed": false
+  },
+  "cleanup": {
+    "processes": [
+      {
+        "pid": 13469,
+        "parent_pid": 1,
+        "process_group": 13469,
+        "role": "nuxt-development",
+        "executable": "node"
+      },
+      {
+        "pid": 13651,
+        "parent_pid": 13469,
+        "process_group": 13469,
+        "role": "owned-child",
+        "executable": "esbuild"
+      },
+      {
+        "pid": 21057,
+        "parent_pid": 1,
+        "process_group": 21057,
+        "role": "go-executor",
+        "executable": "px-plugin"
+      },
+      {
+        "pid": 86514,
+        "parent_pid": 1,
+        "process_group": 86514,
+        "role": "nuxt-production",
+        "executable": "node"
+      }
+    ],
+    "all_owned_services_and_children_exited": true,
+    "released_ports": [
+      59481,
+      57112,
+      58518
+    ],
+    "owned_bootstrap_removed": true,
+    "temporary_fixture_removed": true,
+    "daily_services_touched": false
+  },
+  "artifacts": "artifacts/plugin-publisher-ui-20261110-ichfaxq4",
+  "source_sha256": {
+    "framework/frontend/nuxt/framework-admin/publisher/workspace.ts": "09a9b59d679db2f1c0faac3eaf3a65454278b29dd43eeb801f3399f59d6ba327",
+    "framework/frontend/nuxt/framework-admin/publisher/module.ts": "774c9854fb07ffaa64eedd2b33de6a9a546dc6d3cb14db7dbae30445dadcf8f1",
+    "framework/frontend/nuxt/framework-admin/publisher/types.ts": "deb0adb5f2ea273e0b6012ee2429feec9e9c536b32b9ac7b9453d36d26713392",
+    "framework/frontend/nuxt/framework-admin/publisher/client.ts": "68e6aa46401298608011d050b01ce1e0dc38465b194ced459f10ad73c7196599",
+    "framework/frontend/nuxt/framework-admin/publisher/proxy.ts": "d74d57238d5fe3c0059c36ce128bd7a80d510612df61eb97d38ac94f80bad7de",
+    "framework/frontend/nuxt/framework-admin/publisher/locales/zh.json": "f7768bb455d68d235c2b9ed33a752f530f5979c61bc655c10bb15d4779e051a1",
+    "framework/frontend/nuxt/framework-admin/publisher/locales/en.json": "3139287a034e62ea13a9b7ecbbfc081b345ce680cbc82a1a70b5770273d464d1",
+    "framework/frontend/nuxt/framework-admin/publisher/runtime/PublisherPage.vue": "308a1dc8fb646c65cc96f62d0433840db49d9e832592357ce91d521bf83461f2",
+    "framework/frontend/nuxt/framework-admin/publisher/runtime/handler.ts": "941f019be6bf9f3968fc9a8314dfa9f2a1e55c9297baa1823742e04b2fa56ecf",
+    "framework/frontend/nuxt/framework-admin/layer/nuxt.config.ts": "072719ffdcd3d929095a9b53238d4015a7c2d2a661d2f68d960aad0eac2b1c10",
+    "framework/frontend/nuxt/framework-admin/layer/assets/css/sources.css": "f9eff80899a5a1f3a449da22c1ba26e6efc855337322a9ab0f18d5be424162a7",
+    "framework/frontend/nuxt/framework-admin/package.json": "cdb93ef0b741b2d95037bcfe77a7fcf79ba23ecda8e2a9bc216581f2703f61cc",
+    "package-lock.json": "c55059510db40db45e8d8e6b6a82922e5289a56fdb0b17f1b12efabf09630c56",
+    "skeleton/web-admin/nuxt/package-lock.json": "9baf3543d8ab39c6b3a2cff664fc923cf5733ca04f9b5a0382a6869ebba10e13",
+    "skeleton/web-admin/nuxt/app/components/AppSidebar.vue": "fcd2b7c5ce3b14b2730351b12b9fa02d2dc3eae7bdbd15da5ea3f74b964b58b1",
+    "skeleton/web-admin/nuxt/app/middleware/layout.global.ts": "f1c11171b40a3a0931cd952a3c1d26837abead14fdbac0cf34034a3f02a195d1",
+    "skeleton/web-admin/nuxt/.env.example": "392b97c48f600c37a99ddaeb9c6c58a87d8bed9c94ac46e4641dc6433051b687",
+    "skeleton/web-admin/nuxt/i18n/locales/en.json": "2dbe965fd14fadb7808692f5214282da7ab6544bcda19386ffbc33451dbc72e4",
+    "skeleton/web-admin/nuxt/i18n/locales/zh.json": "55466219726a611f370fa328b3c42b1fbe1afe0bef4727c574365017881e2e31",
+    "skeleton/web-admin/nuxt/tests/unit/publisher-proxy.spec.ts": "96952305b8d571f00146e86bb2ac06a7872fe88eced3b5c7a94594998e264f95",
+    "skeleton/web-admin/nuxt/tests/unit/publisher-workspace.spec.ts": "93659a78e6617cd6d54915466b0c246aecb7b1518719709e59ac34896ef43e6a",
+    "skeleton/web-admin/nuxt/tests/unit/publisher-page.spec.ts": "71f0840b012e32a389fe2b6b72e1abf79032eab70ce4d69f5b8ec491c1ec52a0",
+    ".github/workflows/ci.yml": "aa86d48931f01e8fad3f24b38c3a24af1f94855fcbb0e73ed868b86f3c890c72",
+    "docs/contracts/plugin-publisher-local-v1.md": "172a7bda124d1ba2f3addf89991a36db5cffceff9e68cb326624602d524cb630",
+    "docs/contracts/plugin-publisher-local-v1.openapi.yaml": "22b3a88b6b1a782bda6e4b5405fa4a3281341a8e5e18e93d2f2baa2018d5d3d0",
+    "docs/guides/features/plugin-developer-publisher/guide.md": "a9f99787622cfacb74d601f9e868c558abf70c76a9ef1ebad8a782be8bb65090",
+    "docs/marketplace/plugin-developer-publishing-center-plan.md": "7f7ee3a3685712b1d2d3f17bcbcc4bac4b73fb3ef24a6b3d45b75c0afd06fde4",
+    "docs/marketplace/plugin-publisher-implementation.md": "8e43a23dcf4dfb620af4d9b2e0132ff3ddc5c00917c390443140b4672f4dbf87"
+  }
+}

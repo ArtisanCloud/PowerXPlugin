@@ -60,6 +60,10 @@ function fixture(name, sourceTarget = '') {
   fs.mkdirSync(path.join(directory, 'backend/cmd/database'), { recursive: true })
   fs.mkdirSync(path.join(directory, 'backend/etc/ai/providers.d'), { recursive: true })
   fs.writeFileSync(path.join(directory, 'backend/etc/ai/providers.d/fixture.yaml'), 'provider: fixture\n')
+  fs.mkdirSync(path.join(directory, 'config'), { recursive: true })
+  fs.writeFileSync(path.join(directory, 'config/event_fabric_service.yaml'), 'version: v1\ntopics: []\n')
+  fs.writeFileSync(path.join(directory, 'config/values.example.yaml'), 'runtime:\n  event_bridge:\n    topic_manifest: config/event_fabric_service.yaml\n')
+  fs.writeFileSync(path.join(directory, 'config/private.yaml'), 'secret: fixture-private\n')
   fs.writeFileSync(
     path.join(directory, 'backend/go.mod'),
     'module example.com/distfixture\n\ngo 1.24\n'
@@ -178,6 +182,9 @@ for (const target of [
     assert.deepEqual(manifest.target, { os: target.os, arch: target.arch })
     assert.equal(manifest.version, '2.0.0')
     assert.equal(fs.readFileSync(path.join(artifact, 'backend/etc/ai/providers.d/fixture.yaml'), 'utf8'), 'provider: fixture\n')
+    for (const file of ['event_fabric_service.yaml', 'values.example.yaml'])
+      assert.equal(fs.readFileSync(path.join(artifact, 'config', file), 'utf8'), fs.readFileSync(path.join(directory, 'config', file), 'utf8'))
+    assert.equal(fs.existsSync(path.join(artifact, 'config/private.yaml')), false)
     assert.equal(fs.readFileSync(path.join(directory, 'plugin.yaml'), 'utf8'), original)
     for (const binary of ['plugin', 'migrate'])
       assert.deepEqual(readGoTarget(path.join(artifact, 'backend/bin', binary)), manifest.target)

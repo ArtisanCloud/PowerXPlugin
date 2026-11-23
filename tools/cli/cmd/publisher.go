@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/powerx-plugin/cli/internal/publisher"
 )
@@ -38,6 +39,9 @@ func executePublisher(ctx context.Context, args []string, out io.Writer, locale 
 		_, err := io.WriteString(out, publisher.Text(locale, "usage"))
 		return err
 	}
+	if args[0] == "market" || args[0] == "upload" || args[0] == "review" {
+		return executePublisherMarket(ctx, args, out, locale)
+	}
 	command := ""
 	if args[0] == "serve" {
 		command = "serve"
@@ -64,6 +68,7 @@ func executePublisher(ctx context.Context, args []string, out io.Writer, locale 
 	var input publisher.CreatePlan
 	var notesFile, id, listen, origin, planID string
 	page, size := 1, publisher.DefaultPageSize
+	parentPID := 0
 	switch command {
 	case "create":
 		flags.StringVar(&input.Version, "version", "", publisher.Text(locale, "flag.version"))
@@ -77,6 +82,7 @@ func executePublisher(ctx context.Context, args []string, out io.Writer, locale 
 		flags.IntVar(&page, "page", 1, publisher.Text(locale, "flag.page"))
 		flags.IntVar(&size, "size", publisher.DefaultPageSize, publisher.Text(locale, "flag.size"))
 	case "serve":
+		flags.IntVar(&parentPID, "parent-pid", 0, publisher.Text(locale, "flag.parent_pid"))
 		flags.StringVar(&listen, "listen", "127.0.0.1:0", publisher.Text(locale, "flag.listen"))
 		flags.StringVar(&origin, "origin", "", publisher.Text(locale, "flag.origin"))
 	case "build-run":
@@ -111,6 +117,9 @@ func executePublisher(ctx context.Context, args []string, out io.Writer, locale 
 			return err
 		}
 	}
+	if parentPID != 0 && (parentPID < 2 || parentPID != os.Getppid()) {
+		return publisherInput("parent_pid")
+	}
 	engine, err := publisher.Open(*entry)
 	if err != nil {
 		return err
@@ -141,11 +150,47 @@ func executePublisher(ctx context.Context, args []string, out io.Writer, locale 
 		}
 		return write(plans)
 	case "serve":
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		if parentPID != 0 {
+			go func() {
+				ticker := time.NewTicker(500 * time.Millisecond)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-ticker.C:
+						if os.Getppid() != parentPID {
+							cancel()
+							return
+						}
+					}
+				}
+			}()
+		}
 		server, err := publisher.Start(ctx, engine, publisher.ServerOptions{Listen: listen, Origin: origin})
 		if err != nil {
 			return err
 		}
 		defer server.Close()
+		if parentPID != 0 {
+			renewals := make(chan os.Signal, 1)
+			signal.Notify(renewals, syscall.SIGUSR1)
+			defer signal.Stop(renewals)
+			go func() {
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-renewals:
+						if err := server.RenewBootstrap(); err != nil {
+							_, _ = io.WriteString(os.Stderr, publisher.AsError(err).Code+"\n")
+						}
+					}
+				}
+			}()
+		}
 		if err = write(server.Info()); err != nil {
 			return err
 		}

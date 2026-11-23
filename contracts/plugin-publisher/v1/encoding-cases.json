@@ -1,0 +1,58 @@
+{
+  "cases": [
+    {
+      "name": "empty object exact byte budget",
+      "hex": "7b7d",
+      "max_bytes": 2,
+      "valid": true
+    },
+    {
+      "name": "empty object over budget",
+      "hex": "7b7d",
+      "max_bytes": 1,
+      "valid": false
+    },
+    {
+      "name": "BOM cannot bypass two-byte budget",
+      "hex": "efbbbf7b7d",
+      "max_bytes": 2,
+      "valid": false
+    },
+    {
+      "name": "BOM rejected even within budget",
+      "hex": "efbbbf7b7d",
+      "max_bytes": 5,
+      "valid": false
+    },
+    {
+      "name": "valid schema string with leading BOM",
+      "hex": "efbbbf22636f6d2e6578616d706c652e64656d6f22",
+      "max_bytes": 100,
+      "valid": false
+    },
+    {
+      "name": "multibyte scalar exact budget",
+      "hex": "22e4b8ad22",
+      "max_bytes": 5,
+      "valid": true
+    },
+    {
+      "name": "multibyte scalar over budget",
+      "hex": "22e4b8ad22",
+      "max_bytes": 4,
+      "valid": false
+    },
+    {
+      "name": "embedded U+FEFF is not a transport BOM",
+      "hex": "22efbbbf22",
+      "max_bytes": 5,
+      "valid": true
+    },
+    {
+      "name": "invalid UTF-8",
+      "hex": "22ff22",
+      "max_bytes": 3,
+      "valid": false
+    }
+  ]
+}

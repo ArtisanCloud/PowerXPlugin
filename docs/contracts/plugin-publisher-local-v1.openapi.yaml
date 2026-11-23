@@ -1,13 +1,13 @@
-openapi: 3.0.3
+openapi: 3.1.0
 info:
   title: PowerXPlugin 本地发布工具
-  version: 1.0.0
-  description: F02/F03 本地计划、会话及首个隔离构建配置已实现并受控验证；真实 Linux/Nuxt 运行、上传及送审尚未验收。
+  version: 1.1.0
+  description: 本地计划、构建、市场适配和送审契约；开发服务自动管理执行器，支持明确选择的本机或 Linux 容器构建与页面私密凭据绑定。市场继续消费 rc.2；正式开放、下载和安装验收另列。
 servers:
   - url: http://127.0.0.1:{port}
     variables:
       port:
-        default: "4242"
+        default: '4242'
         description: 实际端口由 serve 启动 JSON 返回
 security:
   - ToolSessionBearer: []
@@ -24,11 +24,14 @@ x-local-guards:
   write_timeout_seconds: 10
   idle_timeout_seconds: 30
   max_header_bytes: 16384
+  market_token_binding: protected local binding route; transient password input to OS credential store; response metadata only
+  upload_execution: asynchronous; independent market budgets
+  max_submission_record_bytes: 1048576
 paths:
   /v1/session:
     parameters:
-      - &a1
-        $ref: "#/components/parameters/Origin"
+      - &id001
+        $ref: '#/components/parameters/Origin'
     post:
       operationId: exchangeLocalPublisherSession
       summary: 交换一次性引导凭据
@@ -36,7 +39,7 @@ paths:
         - BootstrapBearer: []
       description: 无请求体。引导凭据来自工作区私有文件，仅可使用一次。
       responses:
-        "201":
+        '201':
           description: 短期工具会话
           content:
             application/json:
@@ -47,18 +50,18 @@ paths:
                   - data
                 properties:
                   data:
-                    $ref: "#/components/schemas/Session"
-        default: &a2
-          $ref: "#/components/responses/Error"
+                    $ref: '#/components/schemas/Session'
+        default: &id002
+          $ref: '#/components/responses/Error'
   /v1/info:
     parameters:
-      - *a1
+      - *id001
     get:
       operationId: getLocalPublisherInfo
       summary: 读取实际本地能力
       responses:
-        "200":
-          description: 当前仅支持 release-plans，build_targets 为空
+        '200':
+          description: 返回 release-plans/local-builds/market-connections/package-upload/operation-recovery；build_targets 由当前执行器平台和工具准入决定。
           content:
             application/json:
               schema:
@@ -68,11 +71,11 @@ paths:
                   - data
                 properties:
                   data:
-                    $ref: "#/components/schemas/LocalInfo"
-        default: *a2
+                    $ref: '#/components/schemas/LocalInfo'
+        default: *id002
   /v1/plans:
     parameters:
-      - *a1
+      - *id001
     post:
       operationId: createLocalPublisherPlan
       summary: 原子保存不可变本地计划
@@ -81,9 +84,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreatePlan"
+              $ref: '#/components/schemas/CreatePlan'
       responses:
-        "201":
+        '201':
           description: 本地计划已可靠保存，未执行构建或市场写入
           content:
             application/json:
@@ -94,12 +97,12 @@ paths:
                   - data
                 properties:
                   data:
-                    $ref: "#/components/schemas/Plan"
-        default: *a2
+                    $ref: '#/components/schemas/Plan'
+        default: *id002
     get:
       operationId: listLocalPublisherPlans
       summary: 分页读取本地计划
-      parameters: &a4
+      parameters: &id004
         - name: page
           in: query
           schema:
@@ -115,7 +118,7 @@ paths:
             maximum: 100
             default: 20
       responses:
-        "200":
+        '200':
           description: 完整历史上的有界分页，空结果为数组
           content:
             application/json:
@@ -126,15 +129,15 @@ paths:
                   - data
                 properties:
                   data:
-                    $ref: "#/components/schemas/PlanPage"
-        default: *a2
+                    $ref: '#/components/schemas/PlanPage'
+        default: *id002
   /v1/plans/{release_plan_id}:
     parameters:
-      - *a1
+      - *id001
       - name: release_plan_id
         in: path
         required: true
-        schema: &a3
+        schema: &id003
           type: string
           format: uuid
           pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
@@ -145,7 +148,7 @@ paths:
       operationId: getLocalPublisherPlan
       summary: 读取 UUID 对应计划
       responses:
-        "200":
+        '200':
           description: 已存在的同插件计划
           content:
             application/json:
@@ -156,12 +159,12 @@ paths:
                   - data
                 properties:
                   data:
-                    $ref: "#/components/schemas/Plan"
-        default: *a2
+                    $ref: '#/components/schemas/Plan'
+        default: *id002
   /v1/builds:
     parameters:
-      - &a6
-        $ref: "#/components/parameters/Origin"
+      - &id006
+        $ref: '#/components/parameters/Origin'
     post:
       operationId: startLocalPublisherBuild
       summary: 创建所属执行器中的隔离构建任务
@@ -174,11 +177,17 @@ paths:
               type: object
               additionalProperties: false
               properties:
-                release_plan_id: *a3
+                release_plan_id: *id003
+                executor:
+                  type: string
+                  enum:
+                    - native
+                    - container
               required:
                 - release_plan_id
+                - executor
       responses:
-        "202":
+        '202':
           description: 已接受独立任务
           content:
             application/json:
@@ -187,17 +196,17 @@ paths:
                 additionalProperties: false
                 properties:
                   data:
-                    $ref: "#/components/schemas/Build"
+                    $ref: '#/components/schemas/Build'
                 required:
                   - data
-        default: &a5
-          $ref: "#/components/responses/Error"
+        default: &id005
+          $ref: '#/components/responses/Error'
     get:
       operationId: listLocalPublisherBuilds
-      parameters: *a4
+      parameters: *id004
       summary: 分页读取构建任务
       responses:
-        "200":
+        '200':
           description: 任务列表
           content:
             application/json:
@@ -206,23 +215,23 @@ paths:
                 additionalProperties: false
                 properties:
                   data:
-                    $ref: "#/components/schemas/BuildPage"
+                    $ref: '#/components/schemas/BuildPage'
                 required:
                   - data
-        default: *a5
+        default: *id005
   /v1/builds/{build_id}:
     parameters:
-      - *a6
-      - &a7
+      - *id006
+      - &id007
         name: build_id
         in: path
         required: true
-        schema: *a3
+        schema: *id003
     get:
       operationId: getLocalPublisherBuild
       summary: 读取构建阶段及结果
       responses:
-        "200":
+        '200':
           description: 当前任务记录
           content:
             application/json:
@@ -231,20 +240,20 @@ paths:
                 additionalProperties: false
                 properties:
                   data:
-                    $ref: "#/components/schemas/Build"
+                    $ref: '#/components/schemas/Build'
                 required:
                   - data
-        default: *a5
+        default: *id005
   /v1/builds/{build_id}/cancel:
     parameters:
-      - *a6
-      - *a7
+      - *id006
+      - *id007
     post:
       operationId: cancelLocalPublisherBuild
       summary: 取消所属任务并等待进程组结束
       description: 无请求体。
       responses:
-        "200":
+        '200':
           description: 取消所属任务并等待进程组结束
           content:
             application/json:
@@ -253,20 +262,20 @@ paths:
                 additionalProperties: false
                 properties:
                   data:
-                    $ref: "#/components/schemas/Build"
+                    $ref: '#/components/schemas/Build'
                 required:
                   - data
-        default: *a5
+        default: *id005
   /v1/builds/{build_id}/verify:
     parameters:
-      - *a6
-      - *a7
+      - *id006
+      - *id007
     post:
       operationId: verifyLocalPublisherBuild
       summary: 复算同一冻结文件，不重建或压缩
       description: 无请求体。
       responses:
-        "200":
+        '200':
           description: 复算同一冻结文件，不重建或压缩
           content:
             application/json:
@@ -275,20 +284,20 @@ paths:
                 additionalProperties: false
                 properties:
                   data:
-                    $ref: "#/components/schemas/Artifact"
+                    $ref: '#/components/schemas/Artifact'
                 required:
                   - data
-        default: *a5
+        default: *id005
   /v1/builds/{build_id}/logs:
     parameters:
-      - *a6
-      - *a7
+      - *id006
+      - *id007
     get:
       operationId: logsLocalPublisherBuild
       summary: 读取有界脱敏诊断
       description: 日志已脱敏且有截断标记。
       responses:
-        "200":
+        '200':
           description: 读取有界脱敏诊断
           content:
             application/json:
@@ -297,10 +306,656 @@ paths:
                 additionalProperties: false
                 properties:
                   data:
-                    $ref: "#/components/schemas/BuildLog"
+                    $ref: '#/components/schemas/BuildLog'
                 required:
                   - data
-        default: *a5
+        default: *id005
+  /v1/markets:
+    parameters:
+      - &id008
+        $ref: '#/components/parameters/Origin'
+    get:
+      operationId: listPublisherMarkets
+      summary: 读取本插件市场连接
+      responses:
+        '200':
+          description: 已读取或落盘的结果
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MarketConnection'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: createPublisherMarket
+      summary: 创建不可变信任边界，不接收令牌
+      responses:
+        '201':
+          description: 已读取或落盘的结果
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/MarketConnection'
+        default:
+          $ref: '#/components/responses/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarketInput'
+  /v1/markets/{connection_id}:
+    parameters:
+      - *id008
+      - name: connection_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getPublisherMarket
+      summary: 读取脱敏市场连接
+      responses:
+        '200':
+          description: 已读取或落盘的结果
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/MarketConnection'
+        default:
+          $ref: '#/components/responses/Error'
+  /v1/markets/{connection_id}/verify:
+    parameters:
+      - *id008
+      - name: connection_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: publisherMarketVerify
+      summary: 验证已有系统凭据或移除本机凭据；无请求体
+      responses:
+        '200':
+          description: 已读取或落盘的结果
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/MarketConnection'
+        default:
+          $ref: '#/components/responses/Error'
+  /v1/markets/{connection_id}/disconnect:
+    parameters:
+      - *id008
+      - name: connection_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: publisherMarketDisconnect
+      summary: 验证已有系统凭据或移除本机凭据；无请求体
+      responses:
+        '200':
+          description: 已读取或落盘的结果
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/MarketConnection'
+        default:
+          $ref: '#/components/responses/Error'
+  /v1/markets/{connection_id}/versions:
+    parameters:
+      - *id008
+      - name: connection_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 1000000
+          default: 1
+      - name: size
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+    get:
+      operationId: readPublisherMarketVersions
+      summary: 有界读取市场版本，返回 items/total/page/size
+      responses:
+        '200':
+          description: 已读取或落盘的结果
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                properties:
+                  data:
+                    $ref: ../../contracts/plugin-publisher/v1/protocol.schema.json#/$defs/VersionsPage
+        default:
+          $ref: '#/components/responses/Error'
+  /v1/uploads:
+    parameters:
+      - *id008
+    get:
+      operationId: listPublisherUploads
+      summary: 读取本工作区上传任务
+      responses:
+        '200':
+          description: 已读取或落盘的结果
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Upload'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: startPublisherUpload
+      summary: 持久化原操作并启动异步上传，不上传 JSON 内嵌文件
+      responses:
+        '202':
+          description: 已读取或落盘的结果
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Upload'
+        default:
+          $ref: '#/components/responses/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UploadInput'
+  /v1/uploads/{upload_id}:
+    parameters:
+      - *id008
+      - name: upload_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getPublisherUpload
+      summary: 读取任务；非本进程活跃记录呈 pending
+      responses:
+        '200':
+          description: 已读取或落盘的结果
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Upload'
+        default:
+          $ref: '#/components/responses/Error'
+  /v1/uploads/{upload_id}/resume:
+    parameters:
+      - *id008
+      - name: upload_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: publisherUploadResume
+      summary: 恢复原操作或停止所属传输并只读核对；无请求体
+      responses:
+        '202':
+          description: 已读取或落盘的结果
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Upload'
+        default:
+          $ref: '#/components/responses/Error'
+  /v1/uploads/{upload_id}/cancel:
+    parameters:
+      - *id008
+      - name: upload_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: publisherUploadCancel
+      summary: 恢复原操作或停止所属传输并只读核对；无请求体
+      responses:
+        '200':
+          description: 已读取或落盘的结果
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Upload'
+        default:
+          $ref: '#/components/responses/Error'
+  /v1/submissions:
+    parameters:
+      - &id009
+        $ref: '#/components/parameters/Origin'
+    get:
+      operationId: listPublisherSubmissions
+      summary: 读取本地送审任务
+      responses:
+        '200':
+          description: 已持久化任务或只读结果
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Submission'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: startPublisherSubmission
+      summary: 持久化原操作和完整集合后异步送审
+      responses:
+        '202':
+          description: 已持久化任务或只读结果
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Submission'
+        default:
+          $ref: '#/components/responses/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmissionInput'
+  /v1/submissions/prepare:
+    parameters:
+      - *id009
+    post:
+      operationId: preparePublisherSubmission
+      summary: 读取当前完整集合与市场资料选项，受 M2 能力及 scope 门禁约束
+      responses:
+        '200':
+          description: 已持久化任务或只读结果
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/SubmissionPreparation'
+        default:
+          $ref: '#/components/responses/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - connection_id
+                - version_id
+              properties:
+                connection_id: &id010
+                  type: string
+                  format: uuid
+                version_id: *id010
+  /v1/submissions/preview:
+    parameters:
+      - *id009
+    post:
+      operationId: previewPublisherSubmission
+      summary: 仅本地规范化和校验，不发市场写请求
+      responses:
+        '200':
+          description: 已持久化任务或只读结果
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/SubmissionPreview'
+        default:
+          $ref: '#/components/responses/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmissionInput'
+  /v1/submissions/{submission_id}:
+    parameters:
+      - *id009
+      - name: submission_id
+        in: path
+        required: true
+        schema: *id010
+    get:
+      operationId: getPublisherSubmission
+      summary: 读取原操作、回执和当前申请状态
+      responses:
+        '200':
+          description: 已持久化任务或只读结果
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Submission'
+        default:
+          $ref: '#/components/responses/Error'
+  /v1/submissions/{submission_id}/resume:
+    parameters:
+      - *id009
+      - name: submission_id
+        in: path
+        required: true
+        schema: *id010
+    post:
+      operationId: publisherSubmissionResume
+      summary: 恢复原操作或停止所属请求并只读核对，无请求体
+      responses:
+        '202':
+          description: 已持久化任务或只读结果
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Submission'
+        default:
+          $ref: '#/components/responses/Error'
+  /v1/submissions/{submission_id}/cancel:
+    parameters:
+      - *id009
+      - name: submission_id
+        in: path
+        required: true
+        schema: *id010
+    post:
+      operationId: publisherSubmissionCancel
+      summary: 恢复原操作或停止所属请求并只读核对，无请求体
+      responses:
+        '200':
+          description: 已持久化任务或只读结果
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Submission'
+        default:
+          $ref: '#/components/responses/Error'
+  /v1/markets/{connection_id}/publications:
+    parameters:
+      - *id009
+      - name: connection_id
+        in: path
+        required: true
+        schema: *id010
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 1000000
+          default: 1
+      - name: size
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+    get:
+      operationId: listPublisherMarketPublications
+      summary: 有界读取市场申请历史，不提交或公开上架
+      responses:
+        '200':
+          description: 已持久化任务或只读结果
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                properties:
+                  data:
+                    $ref: ../../contracts/plugin-publisher/v1/protocol.schema.json#/$defs/PublicationsPage
+        default:
+          $ref: '#/components/responses/Error'
+  /v1/uploads/{upload_id}/requests:
+    parameters:
+      - $ref: '#/components/parameters/Origin'
+      - name: upload_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: page
+        in: query
+        schema: { type: integer, minimum: 1, maximum: 1000000, default: 1 }
+      - name: size
+        in: query
+        schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    get:
+      operationId: listPublisherUploadRequests
+      summary: 按页读取脱敏 HTTP 请求意图及响应标识，不表示业务完成
+      responses:
+        '200':
+          description: 请求记录分页
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [ data ]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/RequestTracePage'
+        default:
+          $ref: '#/components/responses/Error'
+  /v1/submissions/{submission_id}/requests:
+    parameters:
+      - $ref: '#/components/parameters/Origin'
+      - name: submission_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: page
+        in: query
+        schema: { type: integer, minimum: 1, maximum: 1000000, default: 1 }
+      - name: size
+        in: query
+        schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    get:
+      operationId: listPublisherSubmissionRequests
+      summary: 按页读取脱敏 HTTP 请求意图及响应标识，不表示业务完成
+      responses:
+        '200':
+          description: 请求记录分页
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [ data ]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/RequestTracePage'
+        default:
+          $ref: '#/components/responses/Error'
+  /v1/build-environment/start:
+    parameters:
+      - $ref: "#/components/parameters/Origin"
+    post:
+      operationId: publisherBuildEnvironmentStart
+      summary: 通过桌面应用启动当前本地容器引擎；不启动远程 context 或重放构建
+      responses:
+        "200":
+          description: 当前操作结果；不返回凭据
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                properties:
+                  data:
+                    $ref: "#/components/schemas/BuildEnvironment"
+        default:
+          $ref: "#/components/responses/Error"
+  /v1/markets/{connection_id}/bind:
+    parameters:
+      - $ref: "#/components/parameters/Origin"
+      - name: connection_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: publisherMarketBind
+      summary: 私密绑定发布令牌，验证身份和权限后写系统凭据库
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  writeOnly: true
+                  pattern: ^pxpub_[A-Za-z0-9_-]{43}$
+                  maxLength: 49
+      responses:
+        "200":
+          description: 当前操作结果；不返回凭据
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                properties:
+                  data:
+                    $ref: "#/components/schemas/MarketConnection"
+        default:
+          $ref: "#/components/responses/Error"
 components:
   securitySchemes:
     BootstrapBearer:
@@ -327,7 +982,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/Error"
+            $ref: '#/components/schemas/Error'
   schemas:
     Target:
       type: object
@@ -352,17 +1007,17 @@ components:
         - channel
         - target
       properties:
-        version: &a8
+        version: &id011
           type: string
           maxLength: 50
           pattern: ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$
-        channel: &a9
+        channel: &id012
           type: string
           enum:
             - stable
-        target: &a10
-          $ref: "#/components/schemas/Target"
-        release_notes: &a11
+        target: &id013
+          $ref: '#/components/schemas/Target'
+        release_notes: &id014
           type: string
           maxLength: 10000
           x-max-utf8-bytes: 10000
@@ -383,14 +1038,14 @@ components:
           type: string
           enum:
             - powerx.plugin-publisher-plan/v1
-        release_plan_id: *a3
+        release_plan_id: *id003
         plugin_id:
           type: string
-        version: *a8
-        channel: *a9
-        target: *a10
-        release_notes: *a11
-        created_at: &a12
+        version: *id011
+        channel: *id012
+        target: *id013
+        release_notes: *id014
+        created_at: &id015
           type: string
           format: date-time
     PlanPage:
@@ -405,7 +1060,7 @@ components:
         items:
           type: array
           items:
-            $ref: "#/components/schemas/Plan"
+            $ref: '#/components/schemas/Plan'
         total:
           type: integer
           minimum: 0
@@ -426,7 +1081,7 @@ components:
         session_token:
           type: string
           pattern: ^[A-Za-z0-9_-]{43}$
-        expires_at: *a12
+        expires_at: *id015
     Plugin:
       type: object
       additionalProperties: false
@@ -449,13 +1104,14 @@ components:
         - plugin
         - features
         - build_targets
+        - build_environment
       properties:
         protocol:
           type: string
           enum:
             - powerx.plugin-publisher-local/v1
         plugin:
-          $ref: "#/components/schemas/Plugin"
+          $ref: '#/components/schemas/Plugin'
         features:
           type: array
           items:
@@ -463,20 +1119,29 @@ components:
             enum:
               - release-plans
               - local-builds
+              - market-connections
+              - package-upload
+              - operation-recovery
+              - publication-submit
+              - managed-executor
+              - container-build
+              - credential-bind
           minItems: 2
-          maxItems: 2
+          maxItems: 9
         build_targets:
           type: array
           items:
-            $ref: "#/components/schemas/Target"
+            $ref: '#/components/schemas/Target'
           maxItems: 1
+        build_environment:
+          $ref: "#/components/schemas/BuildEnvironment"
     Error:
       type: object
       additionalProperties: false
       required:
         - error
       properties:
-        error: &a15
+        error: &id018
           type: object
           additionalProperties: false
           required:
@@ -508,6 +1173,17 @@ components:
                 - PUBLISHER_ARTIFACT_CHANGED
                 - PUBLISHER_NATIVE_RUNTIME_UNVERIFIED
                 - PUBLISHER_BUILD_CANCELLED
+                - PUBLISHER_MARKET_UNAVAILABLE
+                - PUBLISHER_MARKET_PROTOCOL
+                - PUBLISHER_MARKET_CAPABILITY
+                - PUBLISHER_MARKET_CREDENTIAL
+                - PUBLISHER_MARKET_IDENTITY
+                - PUBLISHER_MARKET_KEYRING
+                - PUBLISHER_MARKET_PENDING
+                - PUBLISHER_MARKET_REJECTED
+                - PUBLISHER_SUBMISSION_CHANGED
+                - PUBLISHER_SUBMISSION_STATE
+                - PUBLISHER_SUBMISSION_CAPABILITY
             message_key:
               type: string
             params:
@@ -522,6 +1198,10 @@ components:
       type: object
       additionalProperties: false
       properties:
+        cli_sha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          description: 容器内执行清单校验的同源 Linux CLI 摘要，不包含在插件安装包中。
         go:
           type: string
         node:
@@ -539,19 +1219,30 @@ components:
       type: object
       additionalProperties: false
       properties:
-        sha256: &a13
+        sha256: &id016
           type: string
           pattern: ^[0-9a-f]{64}$
         commit:
           type: string
         dirty:
-          type: boolean
-          nullable: true
+          type:
+            - boolean
+            - 'null'
         vcs:
           type: string
           enum:
             - git
             - filesystem
+        dependency_sha256:
+          type: object
+          propertyNames:
+            enum:
+              - go
+              - admin
+              - client
+          additionalProperties:
+            type: string
+            pattern: ^[0-9a-f]{64}$
       required:
         - sha256
         - dirty
@@ -563,7 +1254,7 @@ components:
         path:
           type: string
           pattern: ^work/[0-9a-f-]+/artifact\.zip$
-        sha256: *a13
+        sha256: *id016
         size:
           type: integer
           format: int64
@@ -592,10 +1283,11 @@ components:
           minimum: 1
         working_directory:
           type: string
-        started_at: &a14
+          description: 本机任务使用私有工作区的 source 目录，容器任务使用 run 目录。
+        started_at: &id017
           type: string
           format: date-time
-        exited_at: *a14
+        exited_at: *id017
       required:
         - parent_pid
         - leader_pid
@@ -610,13 +1302,13 @@ components:
           type: string
           enum:
             - powerx.plugin-publisher-build/v1
-        build_id: *a3
-        release_plan_id: *a3
+        build_id: *id003
+        release_plan_id: *id003
         plugin_id:
           type: string
-        version: *a8
+        version: *id011
         target:
-          $ref: "#/components/schemas/Target"
+          $ref: '#/components/schemas/Target'
         stage:
           type: string
           enum:
@@ -630,19 +1322,27 @@ components:
             - cancelled
             - interrupted
         source:
-          $ref: "#/components/schemas/BuildSource"
+          $ref: '#/components/schemas/BuildSource'
         tools:
-          $ref: "#/components/schemas/BuildTools"
+          $ref: '#/components/schemas/BuildTools'
         artifact:
-          $ref: "#/components/schemas/Artifact"
-        error: *a15
+          $ref: '#/components/schemas/Artifact'
+        error: *id018
         pid:
           type: integer
           minimum: 1
         process:
-          $ref: "#/components/schemas/BuildProcess"
-        created_at: *a14
-        updated_at: *a14
+          $ref: '#/components/schemas/BuildProcess'
+        created_at: *id017
+        updated_at: *id017
+        executor:
+          type: string
+          enum:
+            - native
+            - container
+        container_image:
+          type: string
+          pattern: ^sha256:[0-9a-f]{64}$
       required:
         - schema
         - build_id
@@ -660,7 +1360,7 @@ components:
         items:
           type: array
           items:
-            $ref: "#/components/schemas/Build"
+            $ref: '#/components/schemas/Build'
         total:
           type: integer
           minimum: 0
@@ -685,10 +1385,309 @@ components:
           x-max-utf8-bytes: 4194304
       required:
         - text
+    MarketInput:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - api_root
+        - console_base
+      properties:
+        name: &id019
+          type: string
+          minLength: 1
+          maxLength: 200
+        api_root: &id020
+          type: string
+          format: uri
+        console_base: &id021
+          type: string
+          format: uri
+    MarketConnection:
+      type: object
+      additionalProperties: false
+      required:
+        - connection_id
+        - name
+        - api_root
+        - console_base
+        - features
+        - contract_version
+        - bundle_sha256
+      properties:
+        name: *id019
+        api_root: *id020
+        console_base: *id021
+        connection_id: &id022
+          type: string
+          format: uuid
+        features:
+          type: array
+          items: &id023
+            type: string
+        contract_version: &id024
+          type: string
+          enum:
+            - 1.0.0-rc.2
+        bundle_sha256: &id025
+          type: string
+          enum:
+            - 89141c00e0b99b6a803312119e4cbcb3e64224bf458e234e35fc5ffbdeacd8fa
+        verified_at:
+          type: string
+          format: date-time
+        identity:
+          $ref: ../../contracts/plugin-publisher/v1/protocol.schema.json#/$defs/Me
+    UploadInput:
+      type: object
+      additionalProperties: false
+      required:
+        - connection_id
+        - build_id
+      properties:
+        connection_id: *id022
+        build_id: *id022
+    PublisherError: *id018
+    Upload:
+      type: object
+      additionalProperties: false
+      required:
+        - upload_id
+        - operation_id
+        - connection_id
+        - build_id
+        - user_id
+        - developer_id
+        - release_plan_id
+        - schema
+        - plugin_id
+        - version
+        - artifact
+        - contract_version
+        - bundle_sha256
+        - request_sha256
+        - stage
+        - attempts
+        - bytes_sent
+        - created_at
+        - updated_at
+      properties:
+        upload_id: *id022
+        operation_id: *id022
+        connection_id: *id022
+        build_id: *id022
+        user_id: *id022
+        developer_id: *id022
+        release_plan_id: *id022
+        schema:
+          type: string
+          enum:
+            - powerx.plugin-publisher-upload/v1
+        plugin_id: *id023
+        version: *id023
+        artifact:
+          $ref: '#/components/schemas/Artifact'
+        contract_version: *id024
+        bundle_sha256: *id025
+        request_sha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        stage:
+          type: string
+          enum:
+            - queued
+            - uploading
+            - reconciling
+            - processing
+            - uploaded
+            - pending
+            - succeeded
+            - failed
+        attempts:
+          type: integer
+          minimum: 0
+          maximum: 3
+        bytes_sent:
+          type: integer
+          minimum: 0
+          maximum: 2147483648
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        error:
+          $ref: '#/components/schemas/PublisherError'
+        receipt:
+          $ref: ../../contracts/plugin-publisher/v1/protocol.schema.json#/$defs/UploadReceipt
+        current_version:
+          $ref: ../../contracts/plugin-publisher/v1/protocol.schema.json#/$defs/MarketVersion
+    SubmissionInput:
+      type: object
+      additionalProperties: false
+      required:
+        - connection_id
+        - version_id
+        - version
+        - metadata
+        - expected_artifacts
+      properties:
+        connection_id: *id010
+        version_id: *id010
+        version: &id026
+          type: string
+          maxLength: 50
+        metadata: &id027
+          $ref: ../../contracts/plugin-publisher/v1/protocol.schema.json#/$defs/PublicationMetadata
+        expected_artifacts: &id028
+          $ref: ../../contracts/plugin-publisher/v1/protocol.schema.json#/$defs/Artifacts
+    SubmissionPreview:
+      type: object
+      additionalProperties: false
+      required:
+        - input
+        - request_sha256
+      properties:
+        input:
+          $ref: '#/components/schemas/SubmissionInput'
+        request_sha256: &id029
+          type: string
+          pattern: ^[a-f0-9]{64}$
+    SubmissionPreparation:
+      type: object
+      additionalProperties: false
+      required:
+        - version
+        - options
+      properties:
+        version:
+          $ref: ../../contracts/plugin-publisher/v1/protocol.schema.json#/$defs/MarketVersion
+        options:
+          $ref: ../../contracts/plugin-publisher/v1/protocol.schema.json#/$defs/PublicationOptions
+    Submission:
+      type: object
+      additionalProperties: false
+      required:
+        - connection_id
+        - version_id
+        - version
+        - metadata
+        - expected_artifacts
+        - submission_id
+        - operation_id
+        - user_id
+        - developer_id
+        - schema
+        - contract_version
+        - bundle_sha256
+        - plugin_id
+        - request_sha256
+        - stage
+        - attempts
+        - created_at
+        - updated_at
+      properties:
+        connection_id: *id010
+        version_id: *id010
+        version: *id026
+        metadata: *id027
+        expected_artifacts: *id028
+        submission_id: *id010
+        operation_id: *id010
+        user_id: *id010
+        developer_id: *id010
+        schema:
+          type: string
+          enum:
+            - powerx.plugin-publisher-submission/v1
+        contract_version:
+          type: string
+          enum:
+            - 1.0.0-rc.2
+        bundle_sha256: *id025
+        plugin_id:
+          type: string
+        request_sha256: *id029
+        stage:
+          type: string
+          enum:
+            - queued
+            - reconciling
+            - sending
+            - processing
+            - submitted
+            - pending
+            - failed
+            - succeeded
+        attempts:
+          type: integer
+          minimum: 0
+          maximum: 3
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        receipt:
+          $ref: ../../contracts/plugin-publisher/v1/protocol.schema.json#/$defs/SubmissionReceipt
+        current_publication:
+          $ref: ../../contracts/plugin-publisher/v1/protocol.schema.json#/$defs/Publication
+        error:
+          $ref: '#/components/schemas/PublisherError'
+    RequestTrace:
+      type: object
+      additionalProperties: false
+      required: [ schema, task_kind, task_id, operation_id, client_request_id, method, response_type, http_status, started_at ]
+      properties:
+        schema: { type: string, const: powerx.plugin-publisher-request/v1 }
+        task_kind: { type: string, enum: [ uploads, submissions ] }
+        task_id: { type: string, format: uuid }
+        operation_id: { type: string, format: uuid }
+        client_request_id: { type: string, format: uuid }
+        server_request_id: { type: string, format: uuid }
+        method: { type: string, enum: [ GET, POST ] }
+        response_type:
+          type: string
+          enum: [ DiscoveryResponse, MeResponse, PluginResponse, VersionsPageResponse, MarketVersionResponse, UploadReceiptResponse, OperationResponse, PublicationOptionsResponse, PublicationsPageResponse, SubmissionReceiptResponse ]
+        http_status:
+          oneOf:
+            - { type: integer, const: 0 }
+            - { type: integer, minimum: 100, maximum: 599 }
+        started_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time }
+    RequestTracePage:
+      type: object
+      additionalProperties: false
+      required: [ items, total, page, size ]
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/RequestTrace'
+        total: { type: integer, minimum: 0 }
+        page: { type: integer, minimum: 1, maximum: 1000000 }
+        size: { type: integer, minimum: 1, maximum: 100 }
+    BuildEnvironment:
+      type: object
+      additionalProperties: false
+      required:
+        - native_available
+        - container_available
+        - container_ready
+        - can_start
+      properties:
+        native_available: &a1
+          type: boolean
+        container_available: *a1
+        container_ready: *a1
+        can_start: *a1
 x-local-build-profile:
   id: make-dist-pure-go-js/v1
   executor: native-linux-amd64
-  go_minimum: "1.24"
+  go_minimum: '1.24'
   node_minimum_major: 20
   cgo_enabled: false
   native_frontend_files: false

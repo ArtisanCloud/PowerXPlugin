@@ -1,0 +1,130 @@
+{
+  "invalid_input": {
+    "http_status": 400,
+    "retryable": false
+  },
+  "package_plugin_id_mismatch": {
+    "http_status": 400,
+    "retryable": false
+  },
+  "package_version_mismatch": {
+    "http_status": 400,
+    "retryable": false
+  },
+  "package_target_mismatch": {
+    "http_status": 400,
+    "retryable": false
+  },
+  "package_digest_mismatch": {
+    "http_status": 400,
+    "retryable": false
+  },
+  "package_invalid": {
+    "http_status": 400,
+    "retryable": false
+  },
+  "publisher_scope_unsupported": {
+    "http_status": 400,
+    "retryable": false
+  },
+  "publisher_unauthorized": {
+    "http_status": 401,
+    "retryable": false
+  },
+  "publisher_forbidden": {
+    "http_status": 403,
+    "retryable": false
+  },
+  "not_found": {
+    "http_status": 404,
+    "retryable": false
+  },
+  "request_timeout": {
+    "http_status": 408,
+    "retryable": true
+  },
+  "artifact_conflict": {
+    "http_status": 409,
+    "retryable": false
+  },
+  "version_locked": {
+    "http_status": 409,
+    "retryable": false
+  },
+  "idempotency_conflict": {
+    "http_status": 409,
+    "retryable": false
+  },
+  "artifact_set_changed": {
+    "http_status": 409,
+    "retryable": false
+  },
+  "artifact_changed": {
+    "http_status": 409,
+    "retryable": false
+  },
+  "publication_state": {
+    "http_status": 409,
+    "retryable": false
+  },
+  "license_blocked": {
+    "http_status": 409,
+    "retryable": false
+  },
+  "security_blocked": {
+    "http_status": 409,
+    "retryable": false
+  },
+  "channel_mismatch": {
+    "http_status": 409,
+    "retryable": false
+  },
+  "version_not_newer": {
+    "http_status": 409,
+    "retryable": false
+  },
+  "feature_unavailable": {
+    "http_status": 409,
+    "retryable": false
+  },
+  "publisher_token_limit": {
+    "http_status": 409,
+    "retryable": false
+  },
+  "package_too_large": {
+    "http_status": 413,
+    "retryable": false
+  },
+  "package_budget_exceeded": {
+    "http_status": 413,
+    "retryable": false
+  },
+  "unsupported_media_type": {
+    "http_status": 415,
+    "retryable": false
+  },
+  "rate_limited": {
+    "http_status": 429,
+    "retryable": true
+  },
+  "internal_error": {
+    "http_status": 500,
+    "retryable": true
+  },
+  "storage_unavailable": {
+    "http_status": 503,
+    "retryable": true
+  },
+  "publication_options_unavailable": {
+    "http_status": 503,
+    "retryable": true
+  },
+  "publisher_unavailable": {
+    "http_status": 503,
+    "retryable": true
+  },
+  "request_too_large": {
+    "http_status": 413,
+    "retryable": false
+  }
+}

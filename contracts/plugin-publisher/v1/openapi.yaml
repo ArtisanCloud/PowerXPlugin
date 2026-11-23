@@ -1,0 +1,845 @@
+openapi: 3.1.0
+info:
+  title: PowerX Plugin Publisher API
+  version: 1.0.0-rc.2
+  description: "P01 market-owned contract for Framework review. Credential and read/recovery foundation is implemented
+    in source; upload handlers and runtime deployment remain pending. M1 supports ZIP/stable/linux-amd64; M2 operations are reserved and
+    must not be advertised until implemented. Cookie browser APIs remain independent. Policy and cross-field
+    constraints: contracts/plugin-publisher/v1/README.md."
+servers:
+  - url: https://market.example/api/v1
+    description: Illustrative API root; clients use their explicitly configured market root, including any
+      deployment subpath.
+x-protocol: powerx.plugin-publisher/v1
+x-contract-status: market-ready-for-framework-review
+x-runtime-status: partial_foundation
+tags:
+  - name: Publisher
+    description: Machine publication using scoped market publisher tokens.
+  - name: Publisher credentials
+    description: Owner-managed tokens using the market browser session and CSRF.
+paths:
+  /publisher/discovery:
+    get:
+      operationId: discoverPluginPublisher
+      summary: Discover actual machine publication capabilities and policy
+      tags:
+        - Publisher
+      x-stage: M1
+      security: []
+      description: No identity or credentials returned. M1 features are package-upload and idempotent-writes only;
+        formats=[zip], channels=[stable], targets=[linux/amd64]. Declaration is enabled only after
+        handlers/migrations are ready. A disabled feature does not disable owner-authorized operation recovery
+        queries.
+      parameters:
+        - &a1
+          name: X-Request-ID
+          in: header
+          required: false
+          schema:
+            $ref: ./protocol.schema.json#/$defs/OperationID
+      responses:
+        "200":
+          description: Effective capabilities and fixed rc.2 budgets. The illustrative contract file does not enable
+            this route.
+          headers:
+            X-Request-ID: &a2
+              description: Server-correlated UUID. Invalid caller request IDs are rejected or replaced; secrets never appear
+                in it.
+              schema:
+                $ref: ./protocol.schema.json#/$defs/OperationID
+            Cache-Control: &a3
+              description: All publisher and credential-management responses are private and must not be cached.
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: ./protocol.schema.json#/$defs/DiscoveryResponse
+        "400":
+          $ref: "#/components/responses/Error400"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /publisher/me:
+    get:
+      operationId: getPublisherIdentity
+      summary: Read the current publisher binding and expiration
+      tags:
+        - Publisher
+      x-stage: M1
+      x-required-scopes: []
+      security: &a4
+        - publisherToken: []
+      parameters:
+        - *a1
+      responses:
+        "200":
+          description: Owner-scoped, sanitized response. Unknown query parameters and duplicate query fields are rejected.
+          headers:
+            X-Request-ID: *a2
+            Cache-Control: *a3
+          content:
+            application/json:
+              schema:
+                $ref: ./protocol.schema.json#/$defs/MeResponse
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /publisher/plugins/{plugin_id}:
+    get:
+      operationId: getPublisherPlugin
+      summary: Check owned, token-scoped plugin
+      tags:
+        - Publisher
+      x-stage: M1
+      x-required-scopes:
+        - plugins:read
+      security: *a4
+      parameters:
+        - &a5
+          name: plugin_id
+          in: path
+          required: true
+          schema:
+            $ref: ./protocol.schema.json#/$defs/PluginID
+        - *a1
+      responses:
+        "200":
+          description: Owner-scoped, sanitized response. Unknown query parameters and duplicate query fields are rejected.
+          headers:
+            X-Request-ID: *a2
+            Cache-Control: *a3
+          content:
+            application/json:
+              schema:
+                $ref: ./protocol.schema.json#/$defs/PluginResponse
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /publisher/plugins/{plugin_id}/versions:
+    get:
+      operationId: listPublisherVersions
+      summary: List owned versions and artifact UUIDs
+      tags:
+        - Publisher
+      x-stage: M1
+      x-required-scopes:
+        - plugins:read
+      security: *a4
+      parameters:
+        - *a5
+        - &a6
+          name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000000
+            default: 1
+        - &a7
+          name: size
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - *a1
+      responses:
+        "200":
+          description: Owner-scoped, sanitized response. Unknown query parameters and duplicate query fields are rejected.
+          headers:
+            X-Request-ID: *a2
+            Cache-Control: *a3
+          content:
+            application/json:
+              schema:
+                $ref: ./protocol.schema.json#/$defs/VersionsPageResponse
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /publisher/plugins/{plugin_id}/versions/{version_id}:
+    get:
+      operationId: getPublisherVersion
+      summary: Read the current version state and complete artifact set
+      tags:
+        - Publisher
+      x-stage: M1
+      x-required-scopes:
+        - plugins:read
+      security: *a4
+      parameters:
+        - *a5
+        - &a8
+          name: version_id
+          in: path
+          required: true
+          schema:
+            $ref: ./protocol.schema.json#/$defs/UUID
+        - *a1
+      responses:
+        "200":
+          description: Owner-scoped, sanitized response. Unknown query parameters and duplicate query fields are rejected.
+          headers:
+            X-Request-ID: *a2
+            Cache-Control: *a3
+          content:
+            application/json:
+              schema:
+                $ref: ./protocol.schema.json#/$defs/MarketVersionResponse
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /publisher/plugins/{plugin_id}/package:
+    post:
+      operationId: uploadPublisherPackage
+      summary: Upload frozen ZIP bytes and register an owned draft artifact
+      tags:
+        - Publisher
+      x-stage: M1
+      x-required-scopes:
+        - plugins:read
+        - packages:write
+      security: *a4
+      description: Stream one ZIP, max 2 GiB plus 1 MiB multipart overhead, exactly one occurrence of each of the 8
+        declared fields (release_notes may be empty). Reject unknown/duplicate fields and extra file parts.
+        Scalar multipart integers use decimal digits only. Validate formal manifest id/version/target and
+        complete runtime; never execute package code. Compute actual bytes/size independently, including POST
+        replays. A completed operation binds user+developer, plugin, type and canonical request SHA256.
+        Recheck authorization and ownership before committing. No storage keys, arbitrary URLs, tenant IDs or
+        publication status are writable. Same-version/platform bytes cannot be overwritten. Read the operation
+        first after a lost response to avoid unnecessary whole-file transfer.
+      parameters:
+        - *a5
+        - &a9
+          name: Idempotency-Key
+          in: header
+          required: true
+          description: Lowercase UUIDv4, persisted before sending. Namespace is stable market user + developer + UUID,
+            not the token ID. The same key with different type/plugin/content conflicts.
+          schema:
+            $ref: ./protocol.schema.json#/$defs/OperationID
+        - *a1
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: ./protocol.schema.json#/$defs/UploadRequest
+            encoding:
+              file:
+                contentType: application/zip
+      responses:
+        "200":
+          description: Same operation/content replay; original receipt. This does not state that the version is
+            currently editable.
+          headers:
+            X-Request-ID: *a2
+            Cache-Control: *a3
+          content:
+            application/json:
+              schema:
+                $ref: ./protocol.schema.json#/$defs/UploadReceiptResponse
+        "201":
+          description: Actual bytes saved, Artifact/version registration and operation receipt durably committed;
+            version remains private.
+          headers:
+            X-Request-ID: *a2
+            Cache-Control: *a3
+          content:
+            application/json:
+              schema:
+                $ref: ./protocol.schema.json#/$defs/UploadReceiptResponse
+        "202":
+          description: Same operation is still processing; query its persisted operation. This is not a successful upload.
+          headers:
+            X-Request-ID: *a2
+            Cache-Control: *a3
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+                maximum: 300
+              description: Delta-seconds; default 2.
+          content:
+            application/json:
+              schema:
+                $ref: ./protocol.schema.json#/$defs/OperationProcessingResponse
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "408":
+          $ref: "#/components/responses/Error408"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "413":
+          $ref: "#/components/responses/Error413"
+        "415":
+          $ref: "#/components/responses/Error415"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /publisher/operations/{operation_id}:
+    get:
+      operationId: getPublisherOperation
+      summary: Reconcile a stable write operation across credential replacement
+      tags:
+        - Publisher
+      x-stage: M1
+      x-required-scopes: []
+      security: *a4
+      parameters:
+        - name: operation_id
+          in: path
+          required: true
+          schema:
+            $ref: ./protocol.schema.json#/$defs/OperationID
+        - *a1
+      responses:
+        "200":
+          description: Owner-scoped, sanitized response. Unknown query parameters and duplicate query fields are rejected.
+          headers:
+            X-Request-ID: *a2
+            Cache-Control: *a3
+            Retry-After:
+              description: Present when the operation is processing.
+              schema:
+                type: integer
+                minimum: 1
+                maximum: 300
+          content:
+            application/json:
+              schema:
+                $ref: ./protocol.schema.json#/$defs/OperationResponse
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+        "503":
+          $ref: "#/components/responses/Error503"
+      description: Always revalidate active token, same market user/developer, plugin scope and the
+        operation-specific permission. Replaced tokens may recover the same owner operation; revoked tokens
+        cannot. HTTP 200 contains processing/succeeded/failed, not the version publication state. Retention is
+        at least 7 days after the latest terminal transition; processing operations are never purged by this
+        TTL. A 404, including after retention, cannot prove an old request will not arrive; any resend must
+        preserve key and frozen content.
+      x-operation-scope-alternatives:
+        package-upload:
+          - plugins:read
+          - packages:write
+        publication-submit:
+          - publications:read
+          - publications:submit
+  /publisher/publication-options:
+    get:
+      operationId: getPublisherPublicationOptions
+      summary: Read authoritative Core-version and license selections
+      tags:
+        - Publisher
+      x-stage: M2
+      x-required-scopes:
+        - plugins:read
+      security: *a4
+      parameters:
+        - *a1
+      responses:
+        "200":
+          description: Owner-scoped, sanitized response. Unknown query parameters and duplicate query fields are rejected.
+          headers:
+            X-Request-ID: *a2
+            Cache-Control: *a3
+          content:
+            application/json:
+              schema:
+                $ref: ./protocol.schema.json#/$defs/PublicationOptionsResponse
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /publisher/plugins/{plugin_id}/publications:
+    get:
+      operationId: listPublisherPublications
+      summary: Read review and publication records
+      tags:
+        - Publisher
+      x-stage: M2
+      x-required-scopes:
+        - plugins:read
+        - publications:read
+      security: *a4
+      parameters:
+        - *a5
+        - *a6
+        - *a7
+        - *a1
+      responses:
+        "200":
+          description: Owner-scoped, sanitized response. Unknown query parameters and duplicate query fields are rejected.
+          headers:
+            X-Request-ID: *a2
+            Cache-Control: *a3
+          content:
+            application/json:
+              schema:
+                $ref: ./protocol.schema.json#/$defs/PublicationsPageResponse
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /publisher/plugins/{plugin_id}/versions/{version_id}/submit:
+    post:
+      operationId: submitPublisherVersion
+      summary: Submit metadata and the complete immutable artifact set for independent review
+      tags:
+        - Publisher
+      x-stage: M2
+      x-required-scopes:
+        - plugins:read
+        - publications:read
+        - publications:submit
+      security: *a4
+      description: M2 only; unavailable in M1. Normalize metadata per the shared fingerprint algorithm. Every
+        expected artifact references its real UUID and OS/arch/digest/size. Lock and compare the complete
+        current set, verify every artifact and persist the snapshot. Browser, reviewer and publication
+        services must use the same snapshot. Approval does not publish; this route cannot approve or publish.
+      parameters:
+        - *a5
+        - *a8
+        - *a9
+        - *a1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ./protocol.schema.json#/$defs/SubmitRequest
+      responses:
+        "200":
+          description: Same operation and normalized request replay; original receipt.
+          headers:
+            X-Request-ID: *a2
+            Cache-Control: *a3
+          content:
+            application/json:
+              schema:
+                $ref: ./protocol.schema.json#/$defs/SubmissionReceiptResponse
+        "201":
+          description: One independent review request durably committed, status=submitted; still private.
+          headers:
+            X-Request-ID: *a2
+            Cache-Control: *a3
+          content:
+            application/json:
+              schema:
+                $ref: ./protocol.schema.json#/$defs/SubmissionReceiptResponse
+        "202":
+          description: Original operation still processing.
+          headers:
+            X-Request-ID: *a2
+            Cache-Control: *a3
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+                maximum: 300
+          content:
+            application/json:
+              schema:
+                $ref: ./protocol.schema.json#/$defs/OperationProcessingResponse
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "408":
+          $ref: "#/components/responses/Error408"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "413":
+          $ref: "#/components/responses/Error413"
+        "415":
+          $ref: "#/components/responses/Error415"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /dev/publish-tokens:
+    get:
+      operationId: listOwnPublishTokens
+      summary: List only the current user and developer binding tokens
+      tags:
+        - Publisher credentials
+      x-stage: M1
+      security: &a10
+        - marketSession: []
+      parameters:
+        - *a6
+        - *a7
+        - *a1
+      responses:
+        "200":
+          description: Sanitized paginated token metadata; never raw secret or stored token hash.
+          headers:
+            X-Request-ID: *a2
+            Cache-Control: *a3
+          content:
+            application/json:
+              schema:
+                $ref: ./protocol.schema.json#/$defs/TokensPageResponse
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+        "503":
+          $ref: "#/components/responses/Error503"
+    post:
+      operationId: createOwnPublishToken
+      summary: Create a publisher token and reveal its secret once
+      tags:
+        - Publisher credentials
+      x-stage: M1
+      security: *a10
+      description: "Active market user/member/developer and own registered plugins required. Default TTL 7 days,
+        minimum 5 minutes, maximum 30 days. Max 20 active tokens per market user/developer and 50 explicit
+        plugin IDs per token. plugins:read is required; packages:write depends on it. M2 scopes cannot be
+        issued before their capability is enabled. Server stores only a verifier hash. No refresh or plaintext
+        recovery. A lost create response is not automatically replayed: inspect token list and revoke the
+        unbound token before explicitly creating another."
+      parameters:
+        - &a11
+          name: X-Market-CSRF
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 32
+            maxLength: 128
+        - *a1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ./protocol.schema.json#/$defs/CreateTokenRequest
+      responses:
+        "201":
+          description: Secret returned exactly once; Cache-Control:no-store. Later list/get/revoke cannot return it.
+          headers:
+            X-Request-ID: *a2
+            Cache-Control: *a3
+          content:
+            application/json:
+              schema:
+                $ref: ./protocol.schema.json#/$defs/CreatedTokenResponse
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "409":
+          $ref: "#/components/responses/Error409"
+        "413":
+          $ref: "#/components/responses/Error413"
+        "415":
+          $ref: "#/components/responses/Error415"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+        "503":
+          $ref: "#/components/responses/Error503"
+  /dev/publish-tokens/{token_id}/revoke:
+    post:
+      operationId: revokeOwnPublishToken
+      summary: Revoke a token belonging to the current stable identity
+      tags:
+        - Publisher credentials
+      x-stage: M1
+      security: *a10
+      description: "Idempotent for an already revoked token: preserve the first revoked_at and reason. Foreign
+        identities receive 404. Revoke is ordered with commit-time authorization; it does not undo completed
+        uploads or approvals."
+      parameters:
+        - name: token_id
+          in: path
+          required: true
+          schema:
+            $ref: ./protocol.schema.json#/$defs/UUID
+        - *a11
+        - *a1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ./protocol.schema.json#/$defs/RevokeTokenRequest
+      responses:
+        "200":
+          description: Revoked metadata, without token or verifier hash.
+          headers:
+            X-Request-ID: *a2
+            Cache-Control: *a3
+          content:
+            application/json:
+              schema:
+                $ref: ./protocol.schema.json#/$defs/PublishTokenResponse
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "404":
+          $ref: "#/components/responses/Error404"
+        "413":
+          $ref: "#/components/responses/Error413"
+        "415":
+          $ref: "#/components/responses/Error415"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+        "503":
+          $ref: "#/components/responses/Error503"
+components:
+  securitySchemes:
+    publisherToken:
+      type: http
+      scheme: bearer
+      bearerFormat: pxpub_ + unpadded base64url of 32 random bytes
+      description: Publisher-specific credential only; Host keys, instance credentials, market login session Bearer
+        tokens and cookies are not valid machine credentials.
+    marketSession:
+      type: apiKey
+      in: cookie
+      name: powerx_market_session
+      description: Real market login session. Token-management writes also require trusted Origin and X-Market-CSRF;
+        publisher tokens cannot manage tokens.
+  responses:
+    Error400:
+      description: HTTP 400; body code equals the HTTP status. Stable machine error/retryability mapping is
+        errors.json. Infrastructure failures without a valid envelope are treated as unknown outcomes.
+      headers:
+        X-Request-ID: *a2
+        Cache-Control: *a3
+      content:
+        application/json:
+          schema:
+            $ref: ./protocol.schema.json#/$defs/Error400
+    Error401:
+      description: HTTP 401; body code equals the HTTP status. Stable machine error/retryability mapping is
+        errors.json. Infrastructure failures without a valid envelope are treated as unknown outcomes.
+      headers:
+        X-Request-ID: *a2
+        Cache-Control: *a3
+        WWW-Authenticate:
+          description: Publisher handlers return Bearer; cookie token-management handlers do not require this header.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: ./protocol.schema.json#/$defs/Error401
+    Error403:
+      description: HTTP 403; body code equals the HTTP status. Stable machine error/retryability mapping is
+        errors.json. Infrastructure failures without a valid envelope are treated as unknown outcomes.
+      headers:
+        X-Request-ID: *a2
+        Cache-Control: *a3
+      content:
+        application/json:
+          schema:
+            $ref: ./protocol.schema.json#/$defs/Error403
+    Error404:
+      description: HTTP 404; body code equals the HTTP status. Stable machine error/retryability mapping is
+        errors.json. Infrastructure failures without a valid envelope are treated as unknown outcomes.
+      headers:
+        X-Request-ID: *a2
+        Cache-Control: *a3
+      content:
+        application/json:
+          schema:
+            $ref: ./protocol.schema.json#/$defs/Error404
+    Error408:
+      description: HTTP 408; body code equals the HTTP status. Stable machine error/retryability mapping is
+        errors.json. Infrastructure failures without a valid envelope are treated as unknown outcomes.
+      headers:
+        X-Request-ID: *a2
+        Cache-Control: *a3
+      content:
+        application/json:
+          schema:
+            $ref: ./protocol.schema.json#/$defs/Error408
+    Error409:
+      description: HTTP 409; body code equals the HTTP status. Stable machine error/retryability mapping is
+        errors.json. Infrastructure failures without a valid envelope are treated as unknown outcomes.
+      headers:
+        X-Request-ID: *a2
+        Cache-Control: *a3
+      content:
+        application/json:
+          schema:
+            $ref: ./protocol.schema.json#/$defs/Error409
+    Error413:
+      description: HTTP 413; body code equals the HTTP status. Stable machine error/retryability mapping is
+        errors.json. Infrastructure failures without a valid envelope are treated as unknown outcomes.
+      headers:
+        X-Request-ID: *a2
+        Cache-Control: *a3
+      content:
+        application/json:
+          schema:
+            $ref: ./protocol.schema.json#/$defs/Error413
+    Error415:
+      description: HTTP 415; body code equals the HTTP status. Stable machine error/retryability mapping is
+        errors.json. Infrastructure failures without a valid envelope are treated as unknown outcomes.
+      headers:
+        X-Request-ID: *a2
+        Cache-Control: *a3
+      content:
+        application/json:
+          schema:
+            $ref: ./protocol.schema.json#/$defs/Error415
+    Error429:
+      description: HTTP 429; body code equals the HTTP status. Stable machine error/retryability mapping is
+        errors.json. Infrastructure failures without a valid envelope are treated as unknown outcomes.
+      headers:
+        X-Request-ID: *a2
+        Cache-Control: *a3
+        Retry-After:
+          description: Delta-seconds, 1..300. Clients stop automatic retries if their remaining budget cannot
+            accommodate this delay.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 300
+      content:
+        application/json:
+          schema:
+            $ref: ./protocol.schema.json#/$defs/Error429
+    Error500:
+      description: HTTP 500; body code equals the HTTP status. Stable machine error/retryability mapping is
+        errors.json. Infrastructure failures without a valid envelope are treated as unknown outcomes.
+      headers:
+        X-Request-ID: *a2
+        Cache-Control: *a3
+      content:
+        application/json:
+          schema:
+            $ref: ./protocol.schema.json#/$defs/Error500
+    Error503:
+      description: HTTP 503; body code equals the HTTP status. Stable machine error/retryability mapping is
+        errors.json. Infrastructure failures without a valid envelope are treated as unknown outcomes.
+      headers:
+        X-Request-ID: *a2
+        Cache-Control: *a3
+        Retry-After:
+          description: Delta-seconds, 1..300. Clients stop automatic retries if their remaining budget cannot
+            accommodate this delay.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 300
+      content:
+        application/json:
+          schema:
+            $ref: ./protocol.schema.json#/$defs/Error503

@@ -8,6 +8,12 @@ local authentication remains plugin-supplied. Missing adapters never fall back.
 
 `customerfw` provides generic C-end external customer identity and authorization primitives for plugin mini-app routes.
 
+`NewServiceMembershipVerifier(gatewayClient)` separately verifies a specified
+customer's current tenant membership and primary contact with the plugin's service
+credential. It does not use customer JWTs, local membership data or the membership
+cache, and is not part of the customer-login Runtime. See the
+[service verification contract](../../../../../docs/contracts/customer-membership-service-framework.md).
+
 The `CustomerRuntime` identity/auth boundary is intentionally limited to:
 
 - validating customer tokens

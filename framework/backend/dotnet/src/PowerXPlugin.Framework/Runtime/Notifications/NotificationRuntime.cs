@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using PowerXPlugin.Framework.Runtime.Common;
 
@@ -34,25 +35,65 @@ public sealed class LocalNotificationPublisher(ILocalNotificationOutbox outbox) 
     internal static void ValidateScope(NotificationScope scope) { if (!Guid.TryParse(scope.TenantUuid, out var id) || id == Guid.Empty || id.ToString() != scope.TenantUuid) throw new NotificationException(NotificationErrors.InvalidArgument); }
     internal static void Validate(CreateNotificationRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.Title) || string.IsNullOrWhiteSpace(request.Content) || request.Title != request.Title.Trim() || request.Content != request.Content.Trim() || request.Title.Length > 512 || request.Content.Length > 32768 || request.IdempotencyKey?.Length > 256 || request.MemberUuid is not null && (!Guid.TryParse(request.MemberUuid, out var member) || member == Guid.Empty || member.ToString() != request.MemberUuid)) throw new NotificationException(NotificationErrors.InvalidArgument);
+        if (string.IsNullOrWhiteSpace(request.Title) || string.IsNullOrWhiteSpace(request.Content) || request.Title != request.Title.Trim() || request.Content != request.Content.Trim() || request.Title.Length > 512 || request.Content.Length > 32768 || request.IdempotencyKey is not null && (request.IdempotencyKey.Length is < 1 or > 256 || request.IdempotencyKey.Any(c => c < 33 || c > 126)) || request.MemberUuid is not null && (!Guid.TryParse(request.MemberUuid, out var member) || member == Guid.Empty || member.ToString() != request.MemberUuid)) throw new NotificationException(NotificationErrors.InvalidArgument);
     }
 }
 
 /// <summary>Typed direct client for the currently published Core notification creation contract.</summary>
-public sealed class PowerXNotificationClient(string baseUrl, string tenantUuid, IServiceCredentialProvider credentials, HttpClient? http = null, string apiPrefix = CoreApiEndpoint.DefaultAPIPrefix) : INotificationPublisher, INotificationReadAcknowledger
+public sealed partial class PowerXNotificationClient(string baseUrl, string tenantUuid, IServiceCredentialProvider credentials, HttpClient? http = null, string apiPrefix = CoreApiEndpoint.DefaultAPIPrefix) : INotificationPublisher, INotificationReadAcknowledger
 {
-    private readonly string _base = string.IsNullOrWhiteSpace(baseUrl) ? throw new NotificationException(NotificationErrors.Unavailable) : CoreApiEndpoint.BaseUrl(baseUrl, apiPrefix); private readonly string _tenant = tenantUuid; private readonly IServiceCredentialProvider _credentials = credentials ?? throw new ArgumentNullException(nameof(credentials)); private readonly HttpClient _http = http ?? new();
+    private readonly string _base = string.IsNullOrWhiteSpace(baseUrl) ? throw new NotificationException(NotificationErrors.Unavailable) : CoreApiEndpoint.BaseUrl(baseUrl, apiPrefix); private readonly string _tenant = tenantUuid; private readonly IServiceCredentialProvider _credentials = credentials ?? throw new ArgumentNullException(nameof(credentials)); private readonly HttpClient _http = http ?? new HttpClient(new HttpClientHandler { AllowAutoRedirect = false });
     public async Task<Notification> CreateAsync(NotificationScope scope, CreateNotificationRequest request, CancellationToken ct = default)
     {
         LocalNotificationPublisher.ValidateScope(scope); LocalNotificationPublisher.Validate(request);
         if (!string.Equals(scope.TenantUuid, _tenant, StringComparison.Ordinal)) throw new NotificationException(NotificationErrors.TenantMismatch);
-        // Core's published notifications endpoint has no idempotency field/header. Do not silently drop it.
-        if (!string.IsNullOrWhiteSpace(request.IdempotencyKey)) throw new NotificationException(NotificationErrors.IdempotencyUnsupported);
+        if (request.IdempotencyKey is not null) return await CreateIdempotentAsync(scope, request, ct);
         var credential = (await _credentials.GetCredentialAsync(ct)).Validate();
         using var message = new HttpRequestMessage(HttpMethod.Post, _base + "/notifications");
         message.Headers.Authorization = new AuthenticationHeaderValue(credential.NormalizedAuthScheme, credential.Value);
         message.Content = new StringContent(JsonSerializer.Serialize(new { title = request.Title, content = request.Content, type = request.Type, category = request.Category, is_important = request.IsImportant, member_uuid = request.MemberUuid, metadata = request.Metadata, navigation = request.Navigation }), Encoding.UTF8, "application/json");
         try { using var response = await _http.SendAsync(message, ct); var raw = await response.Content.ReadAsStringAsync(ct); if (!response.IsSuccessStatusCode) throw new NotificationException(response.StatusCode switch { HttpStatusCode.Unauthorized => NotificationErrors.Unauthorized, HttpStatusCode.Forbidden => NotificationErrors.Forbidden, HttpStatusCode.BadRequest => NotificationErrors.InvalidArgument, _ => NotificationErrors.Upstream }); using var json = JsonDocument.Parse(raw); if (!json.RootElement.TryGetProperty("data", out var data)) throw new NotificationException(NotificationErrors.InvalidResponse); var result = JsonSerializer.Deserialize<HostNotification>(data.GetRawText(), new JsonSerializerOptions(JsonSerializerDefaults.Web)) ?? throw new NotificationException(NotificationErrors.InvalidResponse); if (string.IsNullOrWhiteSpace(result.Id) || request.Navigation is not null && (result.Actions is null || !result.Actions.Any(a => a.Type == "primary" && a.Action == "navigate" && a.Label == request.Navigation.Label && a.Params is not null && a.Params.TryGetValue("path", out var path) && path == request.Navigation.Path))) throw new NotificationException(NotificationErrors.InvalidResponse); return new Notification(result.Id, result.Title ?? string.Empty, result.Content ?? string.Empty, result.Type ?? string.Empty, result.Category ?? string.Empty, result.IsRead, result.IsImportant, result.CreatedAt, result.UpdatedAt, result.UserId, result.Metadata, result.Actions); } catch (NotificationException) { throw; } catch (HttpRequestException e) { throw new NotificationException(NotificationErrors.Upstream, e); } catch (JsonException e) { throw new NotificationException(NotificationErrors.InvalidResponse, e); }
+    }
+    private async Task<Notification> CreateIdempotentAsync(NotificationScope scope, CreateNotificationRequest request, CancellationToken ct)
+    {
+        if (request.MemberUuid is null || request.Title.EnumerateRunes().Count() > 255) throw new NotificationException(NotificationErrors.InvalidArgument);
+        var credential = (await _credentials.GetCredentialAsync(ct)).Validate();
+        using var message = new HttpRequestMessage(HttpMethod.Post, _base + "/notifications/idempotent");
+        message.Headers.Authorization = new AuthenticationHeaderValue(credential.NormalizedAuthScheme, credential.Value);
+        message.Content = new StringContent(JsonSerializer.Serialize(new { idempotency_key = request.IdempotencyKey, title = request.Title, content = request.Content, type = request.Type, category = request.Category, is_important = request.IsImportant, member_uuid = request.MemberUuid, metadata = request.Metadata, navigation = request.Navigation }), Encoding.UTF8, "application/json");
+        try
+        {
+            using var response = await _http.SendAsync(message, ct);
+            var raw = await response.Content.ReadAsStringAsync(ct);
+            if (!response.IsSuccessStatusCode) throw new NotificationException(response.StatusCode switch
+            {
+                HttpStatusCode.NotFound or HttpStatusCode.NotImplemented => NotificationErrors.IdempotencyUnsupported,
+                HttpStatusCode.Conflict => NotificationErrors.IdempotencyConflict,
+                HttpStatusCode.Unauthorized => NotificationErrors.Unauthorized, HttpStatusCode.Forbidden => NotificationErrors.Forbidden,
+                HttpStatusCode.BadRequest or HttpStatusCode.RequestEntityTooLarge => NotificationErrors.InvalidArgument,
+                HttpStatusCode.ServiceUnavailable => NotificationErrors.Unavailable, _ => NotificationErrors.Upstream
+            });
+            using var json = JsonDocument.Parse(raw);
+            if (!json.RootElement.TryGetProperty("data", out var data) || !data.TryGetProperty("contract", out var contract) || contract.GetString() != "notification_create.v1"
+                || !data.TryGetProperty("idempotency_key", out var key) || key.GetString() != request.IdempotencyKey
+                || !data.TryGetProperty("replayed", out var replayed) || replayed.ValueKind is not (JsonValueKind.True or JsonValueKind.False)
+                || !data.TryGetProperty("notification", out var notification) || notification.ValueKind != JsonValueKind.Object
+                || !notification.TryGetProperty("isRead", out var isRead) || isRead.ValueKind is not (JsonValueKind.True or JsonValueKind.False)
+                || !notification.TryGetProperty("isImportant", out var important) || important.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) throw new NotificationException(NotificationErrors.InvalidResponse);
+            var result = notification.Deserialize<HostNotification>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            if (result is null || !Guid.TryParse(result.Id, out var id) || id == Guid.Empty || id.ToString() != result.Id
+                || result.UserId != request.MemberUuid || result.Title != request.Title || result.Content != request.Content
+                || result.Type != (request.Type == "" ? "info" : request.Type) || result.Category != (request.Category == "" ? "system" : request.Category) || result.IsImportant != request.IsImportant
+                || result.CreatedAt == default || result.UpdatedAt < result.CreatedAt
+                || !JsonNode.DeepEquals(JsonSerializer.SerializeToNode(result.Metadata), JsonSerializer.SerializeToNode(request.Metadata))
+                || request.Navigation is not null && (result.Actions is null || !result.Actions.Any(a => a.Type == "primary" && a.Action == "navigate" && a.Label == request.Navigation.Label && a.Params is not null && a.Params.TryGetValue("path", out var path) && path == request.Navigation.Path)))
+                throw new NotificationException(NotificationErrors.InvalidResponse);
+            return new Notification(result.Id, result.Title!, result.Content!, result.Type!, result.Category!, result.IsRead, result.IsImportant, result.CreatedAt, result.UpdatedAt, result.UserId, result.Metadata, result.Actions);
+        }
+        catch (NotificationException) { throw; }
+        catch (HttpRequestException e) { throw new NotificationException(NotificationErrors.Upstream, e); }
+        catch (JsonException e) { throw new NotificationException(NotificationErrors.InvalidResponse, e); }
+        catch (InvalidOperationException e) { throw new NotificationException(NotificationErrors.InvalidResponse, e); }
     }
     public async Task<NotificationReadReceipt> AcknowledgeAsync(NotificationScope scope, NotificationReadRequest request, CancellationToken ct = default)
     {
@@ -78,5 +119,5 @@ public sealed class PowerXNotificationClient(string baseUrl, string tenantUuid, 
     private sealed class HostNotification { public string Id { get; init; } = ""; public string? Title { get; init; } public string? Content { get; init; } public string? Type { get; init; } public string? Category { get; init; } [JsonPropertyName("isRead")] public bool IsRead { get; init; } [JsonPropertyName("isImportant")] public bool IsImportant { get; init; } [JsonPropertyName("createdAt")] public DateTimeOffset CreatedAt { get; init; } [JsonPropertyName("updatedAt")] public DateTimeOffset UpdatedAt { get; init; } [JsonPropertyName("userId")] public string? UserId { get; init; } public IReadOnlyDictionary<string, JsonElement>? Metadata { get; init; } public IReadOnlyList<NotificationAction>? Actions { get; init; } }
 }
 public static class NotificationRuntimeExtensions { public static IServiceCollection AddPowerXNotificationRuntime(this IServiceCollection s, ProviderMode m, Func<IServiceProvider, INotificationPublisher> l, Func<IServiceProvider, INotificationPublisher> d) => s.AddPowerXRuntime("notifications", m, l, d); }
-public static class NotificationErrors { public const string InvalidArgument="FRAMEWORK_NOTIFICATION_INVALID_ARGUMENT", InvalidResponse="FRAMEWORK_NOTIFICATION_INVALID_RESPONSE", TenantMismatch="FRAMEWORK_NOTIFICATION_TENANT_MISMATCH", IdempotencyUnsupported="FRAMEWORK_NOTIFICATION_IDEMPOTENCY_UNSUPPORTED", Unavailable="FRAMEWORK_NOTIFICATION_UNAVAILABLE", Unauthorized="FRAMEWORK_NOTIFICATION_UNAUTHORIZED", Forbidden="FRAMEWORK_NOTIFICATION_FORBIDDEN", Upstream="FRAMEWORK_NOTIFICATION_UPSTREAM_DEPENDENCY"; }
+public static class NotificationErrors { public const string InvalidArgument="FRAMEWORK_NOTIFICATION_INVALID_ARGUMENT", InvalidResponse="FRAMEWORK_NOTIFICATION_INVALID_RESPONSE", TenantMismatch="FRAMEWORK_NOTIFICATION_TENANT_MISMATCH", IdempotencyUnsupported="FRAMEWORK_NOTIFICATION_IDEMPOTENCY_UNSUPPORTED", IdempotencyConflict="FRAMEWORK_NOTIFICATION_IDEMPOTENCY_CONFLICT", Unavailable="FRAMEWORK_NOTIFICATION_UNAVAILABLE", Unauthorized="FRAMEWORK_NOTIFICATION_UNAUTHORIZED", Forbidden="FRAMEWORK_NOTIFICATION_FORBIDDEN", Upstream="FRAMEWORK_NOTIFICATION_UPSTREAM_DEPENDENCY"; }
 public sealed class NotificationException(string code, Exception? inner = null) : InvalidOperationException(code, inner) { public string Code { get; } = code; }

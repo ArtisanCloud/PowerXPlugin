@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "checked_at": "2026-11-11T13:43:26.412050+00:00",
+  "status": "FRAMEWORK_CONTROLLED_VALIDATION_PASSED_PUBLIC_RELEASE_PENDING",
+  "published": false,
+  "framework_local_base": "5683e4293d89b276ee3669448ceefd9de06a75a7",
+  "publication_base": "c878d6b9ff83ea6c423d7956b818af1969200cd3",
+  "capability_id": "com.corex.customer.memberships.service_read",
+  "source_contract": {
+    "source_repository": "ArtisanCloud/PowerX",
+    "source_commit": "7e09b5ed5fd792df6645165923d701147b98503a",
+    "source_worktree_uncommitted": true,
+    "snapshot_date": "2026-11-11",
+    "sha256": {
+      "customer-membership-service-verification.md": "d78ea721a5cad6aae3b893b343e5cc120470f31ef81a750fb24d66070a4bcc6e",
+      "customer-membership-service-verification.openapi.yaml": "df4f2daa9015ff729161eea1c297caf29dcbaf3ce92a648aa8566bfd4b4e0b38"
+    },
+    "core_receipt_sha256": "d5f17690495e504dbc53e362346f9c44792ed67ec2e504d413ab6fafa16095b9",
+    "core_live_ecommerce_acceptance_complete": false
+  },
+  "source_sha256": {
+    "framework/backend/go/internal/integration/gateway/client.go": "c0ae0891b5dade5bcb83fa635a2cb519ae2b9c5637ccdc3be14222ee4e06c9d6",
+    "framework/backend/go/runtime/customerfw/README.md": "724d08abf47369aaa4142481338033a9e167685a87dc93da4800517c149c3ad4",
+    "framework/backend/go/runtime/customerfw/service_membership_verifier.go": "a296783c2faa9eb90e148d17ff42166585209f5f525589ccc6a72a523538b8c2",
+    "framework/backend/go/runtime/customerfw/service_membership_verifier_test.go": "6cea0231ff675ba1b53bf9c7198bb4109174053f5b9476c8e1cc4ede7daa7fd0",
+    "framework/backend/go/runtime/customerfw/testdata/customer-membership-service.v1.json": "203306aa004f2122e55509b246d2d651c5c0265c2631979eae2c19810818c51a",
+    "framework/backend/go/runtime/customerfw/testdata/customer-membership-service-verification.openapi.yaml": "df4f2daa9015ff729161eea1c297caf29dcbaf3ce92a648aa8566bfd4b4e0b38",
+    "framework/backend/go/runtime/customerfw/testdata/customer-membership-service-source.json": "4e412709fe9db4e4dfc38954caa709881cd7fb54e2de9e546de8eb098ef8d0bb",
+    "docs/contracts/customer-membership-service-verification.md": "d78ea721a5cad6aae3b893b343e5cc120470f31ef81a750fb24d66070a4bcc6e",
+    "docs/contracts/customer-membership-service-verification.openapi.yaml": "df4f2daa9015ff729161eea1c297caf29dcbaf3ce92a648aa8566bfd4b4e0b38",
+    "docs/contracts/customer-membership-service-source.json": "4e412709fe9db4e4dfc38954caa709881cd7fb54e2de9e546de8eb098ef8d0bb",
+    "docs/contracts/customer-membership-service-framework.md": "6629e9bd861edc88973f1dad7448f1f7d7064f76d07ad2ed5d98feb5a793513a"
+  },
+  "checks": {
+    "framework_full_go_packages": 64,
+    "service_membership_pass_events": 110,
+    "affected_race": "passed",
+    "affected_vet": "passed",
+    "transport": "controlled_http_round_tripper_no_listeners",
+    "credential_schemes": [
+      "API Key",
+      "STS"
+    ],
+    "credential_refresh": "passed",
+    "next_call_revocation_no_cache": "passed",
+    "cancellation_and_deadline": "passed",
+    "closed_schema_and_corrupt_responses": "passed",
+    "original_core_error_status_reason_trace": "passed"
+  },
+  "log_sha256": {
+    "focused.jsonl": "899e619045db65439780110ae82d5f2465ea5b5bcf2b86f52aee9630c59c3b5d",
+    "full.log": "8a9e237a959b04919b23744c545d7964ace3c77899d9a2659423927465cb99cb",
+    "race.log": "667f7da72fe9c70cb2617a02480eaa73e44ddb946d948190b3e9ccb030d4f4b8",
+    "vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "boundaries": {
+    "core_modified": false,
+    "ecommerce_modified": false,
+    "business_database_modified": false,
+    "daily_services_restarted": false,
+    "persistent_temporary_service_started": false,
+    "parallel_publisher_changes_included": false,
+    "nuxt_or_dotnet_release": false,
+    "live_core_grant_or_transaction_acceptance": false
+  },
+  "next_step": "CI and Go SDK publication; Core owner then publishes the scoped capability, restarts Core and grants ecommerce; ecommerce upgrades and verifies actual SDK calls before binding CheckoutCustomers."
+}

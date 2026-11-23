@@ -1,0 +1,12 @@
+{
+  "source_repository": "ArtisanCloud/PowerX",
+  "source_commit": "7e09b5ed5fd792df6645165923d701147b98503a",
+  "source_worktree_uncommitted": true,
+  "snapshot_date": "2026-11-11",
+  "sha256": {
+    "customer-membership-service-verification.md": "d78ea721a5cad6aae3b893b343e5cc120470f31ef81a750fb24d66070a4bcc6e",
+    "customer-membership-service-verification.openapi.yaml": "df4f2daa9015ff729161eea1c297caf29dcbaf3ce92a648aa8566bfd4b4e0b38"
+  },
+  "core_receipt_sha256": "d5f17690495e504dbc53e362346f9c44792ed67ec2e504d413ab6fafa16095b9",
+  "core_live_ecommerce_acceptance_complete": false
+}

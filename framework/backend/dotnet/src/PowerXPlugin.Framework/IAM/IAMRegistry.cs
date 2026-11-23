@@ -11,6 +11,8 @@ public class IAMRegistry
 
     public IDirectoryService? Directory { get; private set; }
     public IAuthzService? Authz { get; private set; }
+    public IMemberAuthorityDirectory GetMemberAuthorityDirectory() => Directory as IMemberAuthorityDirectory
+        ?? throw new IAMAdapterException("IAM_ORGANIZATION_ADAPTER_NOT_BOUND");
     public IIdentityContextService? IdentityContext { get; private set; }
     public IAuthorizationBaselineService? AuthorizationBaselines { get; private set; }
     public IAuthorizationBaselineService GetAuthorizationBaselines() => AuthorizationBaselines

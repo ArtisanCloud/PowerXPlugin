@@ -2,7 +2,7 @@
 
 核对日期：2026-11-09。本文区分当前源码与开发者发布中心规划，不声明真实市场上传、SDK 发布或宿主安装已经验收。
 
-统一规范见[开发者发布中心与市场对接方案](../../marketplace/plugin-developer-publishing-center-plan.md)及[实现设计与命令迁移](../../marketplace/plugin-publisher-implementation.md)。市场侧维护同版文档；正式 publisher OpenAPI 尚待 P01 冻结。
+统一规范见[开发者发布中心与市场对接方案](../../marketplace/plugin-developer-publishing-center-plan.md)及[实现设计与命令迁移](../../marketplace/plugin-publisher-implementation.md)。市场侧维护同版文档；正式 publisher OpenAPI 已由 P01 rc.2 交付，Framework 按同版便携包消费。
 
 ## 1 当前能力
 
@@ -14,7 +14,7 @@
 | Go `px-plugin dist` | 输出 experimental 提示 | 当前没有实际打包实现 |
 | Go `px-plugin publish` | 发送 JSON 至 `/internal/plugins/releases`，携带本地文件 URI | 不向开发者市场接口传送真实文件字节，不用于新发布中心 |
 | TypeScript publish | 本地生成发布 ID、上传地址和回执 | 不代表已签名、已上传或已进入市场审核 |
-| Go `px-plugin publisher plan/serve` | 本地 UUID 计划及独立会话服务，实际命令见[本地契约](../../contracts/plugin-publisher-local-v1.md) | 已实现基础及 F03 首个隔离构建配置，见[构建契约](../../contracts/plugin-publisher-build-v1.md)；真实 Linux/Nuxt 运行、市场上传、送审和页面代理尚未验收 |
+| Go `px-plugin publisher plan/serve` | 本地 UUID 计划及独立会话服务，实际命令见[本地契约](../../contracts/plugin-publisher-local-v1.md) | 已实现基础及 F03 首个隔离构建配置，见[构建契约](../../contracts/plugin-publisher-build-v1.md)；市场上传/恢复及页面代理已完成受控实现和隔离联调；真实 Linux/Nuxt、系统凭据库、市场正式开放仍待验，送审属于 M2 |
 | 市场开发者网页 | 浏览器登录后上传文件、管理草稿及提交审核 | 使用现有会话、CSRF 和归属校验；批准与上架分开 |
 
 对应源码：[构建规则](../../../skeleton/make-files/build.mk)、[Go publish](../../../tools/cli/cmd/publish.go)、[HTTP 客户端](../../../tools/cli/internal/publish/client.go)、[TypeScript 流水线](../../../tools/cli/src/lib/publish/pipeline.ts)。
@@ -62,7 +62,7 @@ make package VERSION=1.2.0 PLATFORM=linux TARGET_ARCH=amd64
 
 页面及 CLI 将复用 Go 引擎，页面通过开发同源代理访问回环执行器。生产构建不注册发布页面和执行接口。首期支持一个已登记插件、Linux 执行器的 `linux/amd64`、正式 SemVer 和 stable。
 
-市场 API root 下的 `/publisher`、`powerx.plugin-publisher/v1` 及发布令牌仍属待实现机器协议；需要正式 OpenAPI、scope、预算和 fixture 就绪后接入。不把旧 `publish create/deploy`、内存 Plan 记录或本地回执当作该链路。
+市场 API root 下的 `/publisher`、`powerx.plugin-publisher/v1` 及发布令牌已按 rc.2 接入 Go `publisher` 引擎，包含 scope、预算、系统凭据及共享 fixture；操作见[页面指南](../features/plugin-developer-publisher/guide.md)和[适配契约](../../contracts/plugin-publisher-market-v1.md)。市场 discovery 未开放能力时明确拒绝上传。不把旧 `publish create/deploy`、内存 Plan 记录或本地回执当作该链路。
 
 ## 4 失败恢复与完成判据
 
@@ -73,7 +73,7 @@ make package VERSION=1.2.0 PLATFORM=linux TARGET_ARCH=amd64
 - 首期恢复任务及服务端结果，必要时整包重传；不提供字节级断点续传。
 - 新协议不可用时明确禁用远端动作，保留本地构建与导出；可显式进入市场网页，不自动调用旧内部接口或更换凭据。
 
-当前 Go/TypeScript publish 尚未具备以上新协议恢复能力。幂等和恢复行为由后续 F04/P05 实现验收。
+旧 Go/TypeScript `publish` 不承载新协议恢复；新 `publisher upload` 已使用持久化原 operation 和 rc.2 恢复策略，并完成隔离市场字节上传/恢复。实际 Linux/Nuxt 及正式市场开放验收仍保留。
 
 ## 5 交付阶段及验收
 

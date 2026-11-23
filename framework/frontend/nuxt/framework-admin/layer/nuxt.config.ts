@@ -6,6 +6,7 @@ const layerDir = dirname(fileURLToPath(import.meta.url))
 const appDir = resolve(layerDir, 'app')
 
 const config: NuxtConfig = {
+  modules: [resolve(layerDir, '../publisher/module.ts')],
   runtimeConfig: {
     public: {
       powerx: {

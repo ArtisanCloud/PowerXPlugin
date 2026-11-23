@@ -1,5 +1,7 @@
 # Quickstart: Async Runtime Scheduler 模式切换验收
 
+> 历史阶段记录：事件独立 mode/provider、dual 与 fallback 规则已被当前[统一模式判定](../../docs/guides/develop/standalone/mode-resolution.md)取代，不作为现行配置或验收依据。
+
 ## 1. 前置条件
 
 1. 当前分支：`017-async-runtime-scheduler-switch`

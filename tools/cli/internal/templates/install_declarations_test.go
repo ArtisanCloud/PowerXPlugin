@@ -23,6 +23,7 @@ func TestGeneratedPluginInstallIdentity(t *testing.T) {
 			for _, name := range []string{
 				"plugin.yaml", "skills/template/SKILL.md", "contracts/capabilities/com.powerx.plugins.base.template.create.yaml",
 				"backend/cmd/database/seed/seed.go", "backend/internal/services/integration/capability_invoker.go",
+				"config/event_fabric_service.yaml", "config/values.example.yaml",
 			} {
 				name = strings.ReplaceAll(name, "com.powerx.plugins.base", id)
 				raw, err := os.ReadFile(filepath.Join(dir, name))

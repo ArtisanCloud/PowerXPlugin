@@ -1,0 +1,37 @@
+version: v1
+topics:
+  - key: _topic.template.update
+    namespace: {{ .PluginID }}.template
+    name: update
+    acl:
+      - principal_type: plugin
+        principal_id: {{ .PluginID }}
+        actions: [publish]
+  - key: _topic.audit.template.updated
+    namespace: {{ .PluginID }}.audit.template
+    name: updated
+    acl:
+      - principal_type: plugin
+        principal_id: {{ .PluginID }}
+        actions: [publish]
+  - key: _topic.template.validate.completed
+    namespace: {{ .PluginID }}.template.validate
+    name: completed
+    acl:
+      - principal_type: plugin
+        principal_id: {{ .PluginID }}
+        actions: [publish]
+  - key: _topic.template.batch_clone.completed
+    namespace: {{ .PluginID }}.template.batch_clone
+    name: completed
+    acl:
+      - principal_type: plugin
+        principal_id: {{ .PluginID }}
+        actions: [publish]
+  - key: _topic.template.update.completed
+    namespace: {{ .PluginID }}.template.update
+    name: completed
+    acl:
+      - principal_type: plugin
+        principal_id: {{ .PluginID }}
+        actions: [publish]

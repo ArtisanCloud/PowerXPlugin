@@ -4,11 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	iamdelegated "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/delegated"
 	"strings"
 	"time"
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/event"
 	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
+	fweventfabric "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/eventfabric"
+	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
 	fwtaskbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/taskbus"
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
@@ -34,17 +37,23 @@ type taskBusRuntime struct {
 	StartConsumer func(ctx context.Context)
 }
 
-func resolveTaskBusRuntime(cfg *config.Config, wsHub fwwsbus.LocalHub, log *pxlog.Entry, pxc *client.PowerXServiceClient, descriptors []frameworkrealtime.Descriptor) taskBusRuntime {
-	mode := resolveTaskBusProviderMode(cfg)
-	switch mode {
+var errHostEventTopicsRequired = errors.New("EVENT_FABRIC_HOST_TOPICS_REQUIRED")
+
+func resolveTaskBusRuntime(cfg *config.Config, mode fwprovider.RuntimeMode, wsHub fwwsbus.LocalHub, log *pxlog.Entry, pxc *client.PowerXServiceClient, descriptors []frameworkrealtime.Descriptor) taskBusRuntime {
+	switch mode.TaskBusProvider() {
 	case "host":
 		return taskBusRuntime{
-			Provider: newHostTaskBusProvider(cfg, pxc),
+			Provider: newHostTaskBusProvider(cfg, mode, pxc),
 		}
 	case "redis":
 		return taskBusRuntime{
-			Provider:      newRedisTaskBusProvider(cfg),
-			StartConsumer: newRedisConsumerStarter(cfg, wsHub, log, descriptors),
+			Provider: newRedisTaskBusProvider(cfg),
+			StartConsumer: func() func(context.Context) {
+				if cfg == nil || cfg.EventBridge == nil || !cfg.EventBridge.Enabled {
+					return nil
+				}
+				return newRedisConsumerStarter(cfg, wsHub, log, descriptors)
+			}(),
 		}
 	default:
 		if log != nil {
@@ -56,39 +65,46 @@ func resolveTaskBusRuntime(cfg *config.Config, wsHub fwwsbus.LocalHub, log *pxlo
 	}
 }
 
-func resolveTaskBusProvider(cfg *config.Config, log *pxlog.Entry) fweventbridge.TaskBusProvider {
-	return resolveTaskBusRuntime(cfg, nil, log, nil, nil).Provider
-}
-
-func resolveTaskBusProviderMode(cfg *config.Config) string {
-	return resolveTaskBusProviderModeByProxy(cfg, "")
-}
-
-func resolveTaskBusProviderModeByProxy(cfg *config.Config, powerXProxy string) string {
-	if strings.TrimSpace(powerXProxy) == "1" {
-		return "host"
-	}
+func newEventBridgeEmitter(cfg *config.Config, mode fwprovider.RuntimeMode, selected taskBusRuntime) (fweventbridge.Emitter, *fweventfabric.Runtime, error) {
+	eventCfg := &config.EventBridgeConfig{}
 	if cfg != nil && cfg.EventBridge != nil {
-		providerMode := strings.ToLower(strings.TrimSpace(cfg.EventBridge.TaskBusProvider))
-		if providerMode != "" {
-			return providerMode
+		eventCfg = cfg.EventBridge
+	}
+	factory, err := fweventbridge.NewFactory(fweventbridge.Config{Enabled: eventCfg.Enabled, RuntimeMode: mode, LocalQueueSize: eventCfg.LocalQueueSize})
+	if err != nil {
+		return nil, nil, err
+	}
+	factory.WithMetrics(bridgeRecorder{})
+	var reliable *fweventfabric.Runtime
+	factory.WithTaskBusProvider(func() (fweventbridge.Emitter, error) {
+		if mode.TaskBusProvider() == "host" && len(eventCfg.TopicBindings) == 0 && len(eventCfg.PublishTopicKeys) == 0 && len(eventCfg.ConsumeTopicKeys) == 0 {
+			return nil, errHostEventTopicsRequired
 		}
+		if selected.Provider == nil {
+			return nil, fweventbridge.ErrTaskBusRequired
+		}
+		emitter, err := selected.Provider.NewEmitter()
+		if err != nil {
+			return nil, err
+		}
+		if mode.TaskBusProvider() == "host" {
+			var ok bool
+			reliable, ok = emitter.(*fweventfabric.Runtime)
+			if !ok {
+				return nil, fweventbridge.ErrReliableHostRequired
+			}
+		}
+		return emitter, nil
+	})
+	emitter, err := factory.NewEmitter()
+	if err != nil && reliable != nil {
+		_ = reliable.Close()
+		reliable = nil
 	}
-	return "redis"
+	return emitter, reliable, err
 }
 
-func validateTaskBusProviderConflict(cfg *config.Config, powerXProxy string) error {
-	if cfg == nil || cfg.EventBridge == nil {
-		return nil
-	}
-	resolved := resolveTaskBusProviderModeByProxy(cfg, powerXProxy)
-	if strings.TrimSpace(cfg.EventBridge.TaskBusProvider) != resolved {
-		cfg.EventBridge.TaskBusProvider = resolved
-	}
-	return nil
-}
-
-func newHostTaskBusProvider(cfg *config.Config, pxc *client.PowerXServiceClient) fweventbridge.TaskBusProvider {
+func newHostTaskBusProvider(cfg *config.Config, mode fwprovider.RuntimeMode, pxc *client.PowerXServiceClient) fweventbridge.TaskBusProvider {
 	gateway := &config.GatewayConfig{}
 	eventCfg := &config.EventBridgeConfig{}
 	if cfg != nil {
@@ -115,11 +131,30 @@ func newHostTaskBusProvider(cfg *config.Config, pxc *client.PowerXServiceClient)
 	if cfg != nil && cfg.GRPCUpstream != nil {
 		hostCfg.TenantUUID = cfg.GRPCUpstream.TenantUUID
 	}
+	if eventCfg.TenantUUID != "" {
+		if hostCfg.TenantUUID != "" && hostCfg.TenantUUID != eventCfg.TenantUUID {
+			return notConfiguredTaskBusProvider{reason: "EVENT_FABRIC_TENANT_CONFIG_CONFLICT"}
+		}
+		hostCfg.TenantUUID = eventCfg.TenantUUID
+	}
 	switch hostCfg.AuthScheme {
 	case "api_key", "api-key":
 		hostCfg.AuthScheme = "apikey"
 	}
-	if hostCfg.AuthScheme != "apikey" && cfg != nil && cfg.Context != nil && strings.EqualFold(strings.TrimSpace(cfg.Context.ProviderMode), "delegated") {
+	if hostCfg.TenantUUID == "" && hostCfg.AuthScheme == "apikey" {
+		hostCfg.ResolveTenant = func(ctx context.Context) (string, error) {
+			reader, err := iamdelegated.NewCoreClientWithAPIKey(iamdelegated.CoreClientConfig{PluginID: hostCfg.SourcePlugin, BaseURL: hostCfg.BaseURL, APIPrefix: hostCfg.APIPrefix, Timeout: hostCfg.Timeout}, hostCfg.APIKey)
+			if err != nil {
+				return "", err
+			}
+			tenant, err := reader.GetTenant(ctx, "")
+			if err != nil {
+				return "", err
+			}
+			return tenant.TenantUUID, nil
+		}
+	}
+	if hostCfg.AuthScheme != "apikey" && mode.ProviderMode == fwprovider.ModeDelegated {
 		hostCfg.TokenProvider = client.NewPowerXSTSTokenProvider(pxc).TokenFunc()
 	}
 	return fwtaskbus.NewHostProvider(hostCfg)

@@ -1,0 +1,37 @@
+version: v1
+topics:
+  - key: _topic.template.update
+    namespace: com.powerx.plugins.base.template
+    name: update
+    acl:
+      - principal_type: plugin
+        principal_id: com.powerx.plugins.base
+        actions: [publish]
+  - key: _topic.audit.template.updated
+    namespace: com.powerx.plugins.base.audit.template
+    name: updated
+    acl:
+      - principal_type: plugin
+        principal_id: com.powerx.plugins.base
+        actions: [publish]
+  - key: _topic.template.validate.completed
+    namespace: com.powerx.plugins.base.template.validate
+    name: completed
+    acl:
+      - principal_type: plugin
+        principal_id: com.powerx.plugins.base
+        actions: [publish]
+  - key: _topic.template.batch_clone.completed
+    namespace: com.powerx.plugins.base.template.batch_clone
+    name: completed
+    acl:
+      - principal_type: plugin
+        principal_id: com.powerx.plugins.base
+        actions: [publish]
+  - key: _topic.template.update.completed
+    namespace: com.powerx.plugins.base.template.update
+    name: completed
+    acl:
+      - principal_type: plugin
+        principal_id: com.powerx.plugins.base
+        actions: [publish]

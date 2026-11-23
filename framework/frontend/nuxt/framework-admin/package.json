@@ -10,9 +10,12 @@
   "files": [
     "index.ts",
     "module.ts",
+    "publisher",
     "layer"
   ],
   "peerDependencies": {
+    "@nuxt/ui": "^3.3.7",
+    "@nuxtjs/i18n": "^10.2.3",
     "nuxt": "^4.2.0",
     "@artisan-cloud/plugin-framework-client": "0.0.15",
     "valibot": "^1.2.0",

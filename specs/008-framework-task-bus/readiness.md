@@ -1,5 +1,7 @@
 # Readiness Checklist — 008-framework-task-bus
 
+> 历史阶段记录：事件独立 mode/provider、dual 与 fallback 规则已被当前[统一模式判定](../../docs/guides/develop/standalone/mode-resolution.md)取代，不作为现行配置或验收依据。
+
 > 目的：为“下一阶段 Event / TaskBus 开发”提供统一开工基线，明确**已完成**、**未完成**与**落地顺序**。
 
 ## 1) 当前实现状态（基于本仓库代码）

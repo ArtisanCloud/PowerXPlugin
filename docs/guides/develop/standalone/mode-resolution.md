@@ -6,7 +6,7 @@
 
 当前唯一有效口径：
 
-- `POWERX_PROVIDER_MODE` 决定业务 provider 数据源：`local` 或 `delegated`
+- `POWERX_PROVIDER_MODE` 决定业务 provider 和事件运行时：`local` 或 `delegated`
 - `POWERX_PROXY` 决定是否接宿主代理/网关链路：`0` 或 `1`
 - `NUXT_PUBLIC_INSIDE_POWERX` 只决定前端是否按宿主嵌入上下文运行
 
@@ -42,6 +42,25 @@
 - 只有 `POWERX_PROVIDER_MODE=delegated + POWERX_PROXY=1` 才执行宿主 delegated 环境契约校验。
 - `POWERX_PROVIDER_MODE=local + POWERX_PROXY=1` 是合法调试组合，不得被强行当成 delegated。
 - `POWERX_PROVIDER_MODE=delegated + POWERX_PROXY=0` 可以启动，但 delegated client/provider 不可用时必须明确失败。
+
+### 事件链路使用同一份启动解析结果
+
+启动时将业务 Provider 与 proxy link 解析为不可变的 `RuntimeMode`，事件工厂和 TaskBus 装配直接消费它，不再各自读取环境变量或从 YAML 重新选路：
+
+| POWERX_PROVIDER_MODE | POWERX_PROXY | 事件总线开启时的实现 |
+|---|---|---|
+| `local` | `0` 或 `1` | 本地 Redis TaskBus |
+| `delegated` | `0` 或 `1` | Core Event Fabric Host |
+
+`POWERX_PROXY` 只保留代理联调职责，不决定事件总线归属；`local + proxy=1` 不查询 Core 凭据租户或主题，也不要求 Event Fabric owner/grant/ACL。选择本地 Redis 是按 provider 直接装配，不是 Host 失败后的降级。
+
+`runtime.event_bridge.enabled` 只控制是否启用总线；关闭时明确使用进程内事件队列，不初始化 Host／Redis 总线。开启后的凭据、主题映射或 provider 初始化失败必须明确失败，不切回本地队列、不双写。Host 连接仍须提供有效凭据及对应租户的主题映射／业务 key；模式解析不授予权限，也不制造这些配置。
+
+`runtime.event_bridge.mode`、`taskbus_provider`、`fallback_to_local` 已移除。旧配置（包括 YAML 合并键中的旧字段）返回 `EVENT_BRIDGE_ROUTING_FIELDS_REMOVED`，不会忽略字段后使用默认配置。迁移时删除这三个字段，保留 enabled、连接参数、主题声明、队列容量和 payload 配置；无需为了切换模式手动同步另一组字段。当前 `eventbridge.Config` 的 Go 调用方改为传入已解析的 `RuntimeMode`，不再传 mode／fallback。
+
+Host 总线开启但既无主题映射也无发布／消费业务 key 时，启动明确报 `EVENT_FABRIC_HOST_TOPICS_REQUIRED`；需按 Event Fabric 接入契约配置资源，不能通过改模式、生成假映射或本地降级消除该错误。
+
+Skeleton 与新生成插件通过 `runtime.event_bridge.topic_manifest: config/event_fabric_service.yaml` 从包内声明加载业务 key；`config/values.example.yaml` 将同一声明交给 Core 安装流程。只有选择 Host 事件运行时才读取凭据租户并查询权威映射；这些资源和身份字段不参与模式选择。Host 返回 `EVENT_FABRIC_OWNER_FORBIDDEN` 时保留拒绝，不降级；本地启动不执行该查询。此前要求为本地启动调整 Core owner 的方案已撤回，[历史诊断及更正](../../../contracts/event-fabric-local-debug-activation.md)保留原证据。
 
 ## 4. 前端变量职责
 
@@ -168,8 +187,8 @@
 ## 9. 代码定位
 
 1. provider mode 解析入口：
-   - 当前：`skeleton/backend/go-gin/internal/bootstrap/iam_resolver.go`
-   - 目标：迁移为 provider resolver，不继续借 IAM 命名
+   - `skeleton/backend/go-gin/internal/bootstrap/provider_resolver.go`
+   - 统一规则：`framework/backend/go/runtime/provider/runtime_mode.go`
 2. 启动期模式日志与契约检查：
    - `skeleton/backend/go-gin/cmd/plugin/main.go`
    - 关键日志：`Runtime mode resolved (2x2)`、`WS/Capability routing`

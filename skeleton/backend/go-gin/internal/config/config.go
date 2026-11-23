@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -103,16 +104,15 @@ type Config struct {
 	skipRuntimeGatewayValidation bool
 }
 
-// EventBridgeConfig 控制事件桥接（本地 emitter / TaskBus emitter / 双写）的行为。
+// EventBridgeConfig retains feature/resource settings; routing uses the resolved RuntimeMode.
 type EventBridgeConfig struct {
+	TopicManifest    string            `yaml:"topic_manifest" json:"topic_manifest"`
+	TenantUUID       string            `yaml:"tenant_uuid" json:"tenant_uuid"`
 	TopicBindings    map[string]string `yaml:"topic_bindings" json:"topic_bindings"`
 	PublishTopicKeys []string          `yaml:"publish_topic_keys" json:"publish_topic_keys"`
 	ConsumeTopicKeys []string          `yaml:"consume_topic_keys" json:"consume_topic_keys"`
 	Enabled          bool              `yaml:"enabled" json:"enabled"`
-	Mode             string            `yaml:"mode" json:"mode"` // local|taskbus|dual（为空时按 enabled 推断）
-	FallbackToLocal  bool              `yaml:"fallback_to_local" json:"fallback_to_local"`
 	LocalQueueSize   int               `yaml:"local_queue_size" json:"local_queue_size"`
-	TaskBusProvider  string            `yaml:"taskbus_provider" json:"taskbus_provider"` // host|redis
 	RedisURL         string            `yaml:"redis_url" json:"redis_url"`
 	RedisStream      string            `yaml:"redis_stream" json:"redis_stream"`
 	RedisGroup       string            `yaml:"redis_group" json:"redis_group"`
@@ -507,6 +507,9 @@ func loadWithOptions(opts loadOptions) (*Config, error) {
 	// 尝试加载 YAML 配置文件
 	configDir, err := loadYAMLConfig(cfg)
 	if err != nil {
+		if errors.Is(err, ErrEventBridgeRoutingRemoved) {
+			return nil, err
+		}
 		pxlog.WarnCtx(pxlog.WithLogFields(context.Background(), map[string]interface{}{
 			"module":     "config",
 			"biz_scene":  "config_load",
@@ -557,6 +560,9 @@ func loadWithOptions(opts loadOptions) (*Config, error) {
 
 	// 验证配置
 	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+	if err := cfg.loadEventBridgeResources(configDir); err != nil {
 		return nil, err
 	}
 	if err := applyRecoveryRedisBindings(cfg); err != nil {
@@ -1718,18 +1724,15 @@ func (c *Config) Validate() error {
 	// EventBridge 配置默认值与验证
 	if c.EventBridge == nil {
 		c.EventBridge = &EventBridgeConfig{
-			Enabled:         false,
-			Mode:            "",
-			FallbackToLocal: true,
-			LocalQueueSize:  1024,
-			TaskBusProvider: "redis",
-			RedisURL:        "redis://localhost:6379",
-			RedisStream:     "powerx.taskbus.events",
-			RedisGroup:      "powerx.plugin",
-			RedisConsumer:   "",
-			RedisMaxLen:     10000,
-			SourcePlugin:    "",
-			PayloadVersion:  "v1",
+			Enabled:        false,
+			LocalQueueSize: 1024,
+			RedisURL:       "redis://localhost:6379",
+			RedisStream:    "powerx.taskbus.events",
+			RedisGroup:     "powerx.plugin",
+			RedisConsumer:  "",
+			RedisMaxLen:    10000,
+			SourcePlugin:   "",
+			PayloadVersion: "v1",
 		}
 	}
 	if c.EventBridge.LocalQueueSize <= 0 {
@@ -1737,17 +1740,6 @@ func (c *Config) Validate() error {
 	}
 	if strings.TrimSpace(c.EventBridge.PayloadVersion) == "" {
 		c.EventBridge.PayloadVersion = "v1"
-	}
-	providerMode := strings.ToLower(strings.TrimSpace(c.EventBridge.TaskBusProvider))
-	if providerMode == "" {
-		c.EventBridge.TaskBusProvider = "redis"
-	} else {
-		switch providerMode {
-		case "host", "redis":
-			c.EventBridge.TaskBusProvider = providerMode
-		default:
-			return NewConfigError("event_bridge.taskbus_provider must be one of: host, redis")
-		}
 	}
 	if strings.TrimSpace(c.EventBridge.RedisURL) == "" {
 		c.EventBridge.RedisURL = "redis://localhost:6379"
@@ -1760,23 +1752,6 @@ func (c *Config) Validate() error {
 	}
 	if c.EventBridge.RedisMaxLen <= 0 {
 		c.EventBridge.RedisMaxLen = 10000
-	}
-	mode := strings.ToLower(strings.TrimSpace(c.EventBridge.Mode))
-	if mode == "" {
-		if c.EventBridge.Enabled {
-			mode = "taskbus"
-		} else {
-			mode = "local"
-		}
-	}
-	switch mode {
-	case "local", "taskbus", "dual":
-		c.EventBridge.Mode = mode
-	default:
-		return NewConfigError("event_bridge.mode must be one of: local, taskbus, dual")
-	}
-	if !c.EventBridge.Enabled && c.EventBridge.Mode != "local" {
-		c.EventBridge.Mode = "local"
 	}
 
 	// WS Bus 配置默认值与验证

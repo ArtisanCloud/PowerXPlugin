@@ -43,20 +43,37 @@ bindings := runtime.TopicBindings() // 返回副本，可用于构造订阅 Topi
 
 `NewHostRuntime` 的静态映射入口现在要求明确的凭据租户 UUID，所有 FullTopic 都必须属于该租户；没有无租户／跨租户通配 Runtime。System host-values 的平面 `topic_bindings` 只服务 System 自己，不表示业务租户已经完成准备。
 
-`runtime/taskbus.HostProvider` 同时提供带 context 的 `NewResolvedRuntime(ctx)`；配置该租户的服务凭据、`PublishTopicKeys` 和 `ConsumeTopicKeys`。不得同时提供静态 `TopicBindings`。`NewEmitter()` 在显式配置业务 key 时选择这个解析入口，查询失败明确返回错误。Skeleton 与两份模板已转发这些字段：
+`runtime/taskbus.HostProvider` 同时提供带 context 的 `NewResolvedRuntime(ctx)`；配置该租户的服务凭据、`PublishTopicKeys` 和 `ConsumeTopicKeys`。不得同时提供静态 `TopicBindings`。`NewEmitter()` 在显式配置业务 key 时选择这个解析入口，查询失败明确返回错误。Skeleton 与两份模板已转发这些字段；事件传输统一消费启动解析的 `RuntimeMode`，`POWERX_PROVIDER_MODE=local` 选择本地 Redis，`delegated` 选择 Host；`POWERX_PROXY` 只控制代理联调，不能把本地事件运行时切成 Host。
+
+Skeleton 和生成插件默认从包内声明读取业务 key 与发布／消费方向，安装种子放在 `config/values.example.yaml`，开发配置引用同一路径：
 
 ```yaml
 runtime:
   event_bridge:
     enabled: true
-    mode: taskbus
-    taskbus_provider: host
-    fallback_to_local: false
+    source_plugin: com.powerx.plugins.example
+    topic_manifest: config/event_fabric_service.yaml
+```
+
+声明使用安装合同的 v1 `key/namespace/name/acl` 结构；默认模板采用完整插件 ID 命名空间和本插件 principal，不申请旧 WS 文件中的共享 namespace 或成员 ACL。启动读取器限制包内相对路径、符号链接边界、256 KiB、单份 YAML 文档及唯一业务 key；声明和显式 key 不得混用。它只提取 key 与方向，不创建主题或推导 FullTopic。Core 仍独立验证归属、投递策略、实时 ACL 和映射。发布中心源码快照、冻结 ZIP 及 `make dist` / release 均携带这两份文件，不复制整个私有 config 目录。
+
+直接配置业务 key 的调用方可以省略 `topic_manifest`，使用以下单独配置：
+
+```yaml
+runtime:
+  event_bridge:
+    enabled: true
     source_plugin: com.powerx.plugins.example
     topic_bindings: {}
     publish_topic_keys: [example.changed.v1]
     consume_topic_keys: []
 ```
+
+原 `mode/taskbus_provider/fallback_to_local` 已移除，旧字段明确报 `EVENT_BRIDGE_ROUTING_FIELDS_REMOVED`。保留凭据和主题配置；Host 初始化失败不降级、不双写。迁移与四组合规则见[模式判定规则](../guides/develop/standalone/mode-resolution.md)。
+
+Host 运行时选用 API Key 且未显式提供凭据租户时，Skeleton 通过正式 IAM directory `GET /tenant/iam/tenant` 读取该 Key 的真实租户，再用同一 Key 调用 `resolve_topics`；需要既有 `com.corex.iam.directory.read` 声明和授权。SDK 的 `ResolveTenant(ctx)` 只在租户缺失时调用一次，错误或空身份不切换凭据／默认租户；显式租户与 gRPC 注入租户冲突时拒绝启动。STS 继续使用宿主明确注入的租户，不读取页面会话。本地 Redis 运行时不执行这些 Core 查询；即使 `POWERX_PROXY=1`、无服务 Key、无主题映射，也不以 Core owner 或主题准备作为启动前提。
+
+`grant-status=granted` 只证明服务能力授权；精确插件 owner、租户实例状态和主题准备是另外的准入条件。2026-11-12 曾在错误的 proxy 驱动选路下，把本地启动带到 Core 并取得 `EVENT_FABRIC_OWNER_FORBIDDEN`；该记录不再是本地启动的验收要求。2026-11-13 已按 provider 修正装配，本地启动不需要更改 Core 授权。默认 WS 的 `com.corex.eventfabric.publish` 不替代 `service_publish`；新声明只要求可靠发布，不顺带申请可靠消费。历史诊断与更正保存在仓库 `docs/contracts/event-fabric-local-debug-activation.md`，记录实际拒绝、资源范围与后续管理操作边界，属于环境证据，不作为权威合同包的一部分。
 
 这份配置只针对实际运行凭据的单个租户。处理其他业务租户时，应用必须按其真实服务凭据分别装配，不能仅修改全局配置里的租户 UUID。原有显式静态映射入口仍用于自己的凭据租户；不在解析错误时切回它。发布方向不能使用仅解析了消费权限的主题，消费方向也不能使用仅解析了发布权限的主题。
 

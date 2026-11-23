@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -36,7 +37,7 @@ func TestHostProviderForwardsTenantResolvedTopicKeys(t *testing.T) {
 	}))
 	defer s.Close()
 	cfg := &config.Config{Gateway: &config.GatewayConfig{BaseURL: s.URL, AuthScheme: "apikey", APIKey: "tenant-key"}, Context: &config.ContextConfig{ProviderMode: "local"}, GRPCUpstream: &config.GRPCUpstream{TenantUUID: tenant}, EventBridge: &config.EventBridgeConfig{SourcePlugin: plugin, PublishTopicKeys: []string{"fixture.changed"}}}
-	emitter, err := newHostTaskBusProvider(cfg, nil).NewEmitter()
+	emitter, err := newHostTaskBusProvider(cfg, fwprovider.RuntimeMode{ProviderMode: fwprovider.ModeLocal, ProxyEnabled: true}, nil).NewEmitter()
 	require.NoError(t, err)
 	runtime, ok := emitter.(*eventfabric.Runtime)
 	require.True(t, ok)

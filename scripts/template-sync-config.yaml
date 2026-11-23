@@ -221,7 +221,7 @@ mappings:
       - ".cache/**"
       - "etc/config.yaml"
     replacements:
-      - globs: ["cmd/database/migrate/regression.go", "internal/**/regression/**/*.go"]
+      - globs: ["cmd/database/migrate/regression.go", "internal/**/regression/**/*.go", "internal/config/event_resources.go"]
         literal: "{{"
         replace: '{{ "{{" }}'
       - globs: ["**/*.go", "**/*.proto", "go.mod", "go.sum"]
@@ -451,12 +451,17 @@ mappings:
     source: skeleton
     include:
       - "config/event_fabric.yaml"
+      - "config/event_fabric_service.yaml"
+      - "config/values.example.yaml"
     targets:
       - path: scaffold/templates
         suffix: .tmpl
       - path: tools/cli/internal/templates/data
         suffix: .tmpl
     replacements:
+      - globs: ["config/event_fabric_service.yaml", "config/values.example.yaml"]
+        literal: "com.powerx.plugins.base"
+        replace: "{{ .PluginID }}"
       - globs: ["config/event_fabric.yaml"]
         literal: "plugin:com.powerx.plugins.base"
         replace: "plugin:{{ .PluginID }}"

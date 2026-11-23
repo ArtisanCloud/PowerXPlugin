@@ -1,0 +1,259 @@
+{
+  "date": "2026-11-13",
+  "recorded_at_utc": "2026-11-13T05:59:48.947397+00:00",
+  "task": "repair local+proxy event startup without Core authorization dependency",
+  "result": "passed current private config assembly, actual Redis PING, isolated native startup healthz=200 and real Redis publish/consume/ACK",
+  "branch": "025-framework-business-regression",
+  "base_commit": "5683e4293d89b276ee3669448ceefd9de06a75a7",
+  "source_is_uncommitted": true,
+  "rule": {
+    "authority": "immutable provider.RuntimeMode",
+    "local_proxy_0": "Redis",
+    "local_proxy_1": "Redis",
+    "delegated_proxy_0": "Host Event Fabric",
+    "delegated_proxy_1": "Host Event Fabric",
+    "proxy": "proxy/debug link only; does not select event runtime",
+    "no_fallback": true,
+    "host_authorization_unchanged": true,
+    "removed_yaml_routing_still_rejected": true
+  },
+  "actual_user_config": {
+    "database_bootstrap": false,
+    "events_published": false,
+    "host_runtime_created": false,
+    "provider_mode": "local",
+    "proxy_enabled": true,
+    "publish_key_count": 5,
+    "redis_ping_ok": true,
+    "scope": "current private config and dotenv loaded; event runtime initialization only, no SQL connection or Redis writes; read-only Redis PING",
+    "taskbus_provider": "redis"
+  },
+  "native_startup": {
+    "phase": "passed",
+    "services": [
+      {
+        "name": "redis",
+        "pid": 87051,
+        "ppid": 87040,
+        "argv": [
+          "/opt/homebrew/bin/redis-server",
+          "--bind",
+          "127.0.0.1",
+          "--port",
+          "56370",
+          "--save",
+          "",
+          "--appendonly",
+          "no",
+          "--dir",
+          "<validation-root>",
+          "--daemonize",
+          "no"
+        ]
+      },
+      {
+        "name": "migrate",
+        "pid": 87054,
+        "ppid": 87040,
+        "argv": [
+          "<validation-root>/bin/database",
+          "migrate"
+        ]
+      },
+      {
+        "name": "plugin",
+        "pid": 87058,
+        "ppid": 87040,
+        "argv": [
+          "<validation-root>/bin/plugin"
+        ]
+      },
+      {
+        "name": "redis-roundtrip",
+        "pid": 87123,
+        "ppid": 87040,
+        "argv": [
+          "go",
+          "test",
+          "-overlay",
+          "<validation-root>/redis-roundtrip-overlay.json",
+          "-vet=off",
+          "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/skeleton/backend/go-gin/cmd/plugin",
+          "-run",
+          "^TestActualLocalRedisRoundTrip$",
+          "-count=1"
+        ]
+      }
+    ],
+    "core_fixture_requests": [],
+    "core_fixture": {
+      "pid": 87040,
+      "port": 56369,
+      "behavior": "503 for every request; no credentials accepted"
+    },
+    "provider_mode": "local",
+    "proxy": "1",
+    "redis_port": 56370,
+    "http_port": 56371,
+    "grpc_port": 56372,
+    "sqlite": "owned temporary file; no daily database access",
+    "topic_manifest": "",
+    "host_topics": 0,
+    "host_tenant": "",
+    "background_workers": false,
+    "debug_host_registration": false,
+    "healthz": {
+      "status": 200,
+      "body": "{\"plugin_id\":\"com.powerx.plugins.base\",\"service\":\"PowerX Base Plugin\",\"status\":\"ok\",\"version\":\"0.1.0\"}\n"
+    },
+    "redis_roundtrip": "real Redis publish -> consume -> ACK verified",
+    "event_fabric_requests": [],
+    "cleanup": {
+      "owned_processes_exited": true,
+      "released_ports": [
+        56369,
+        56370,
+        56371,
+        56372
+      ]
+    },
+    "fixture_scope": {
+      "platform": "native darwin/arm64",
+      "database": "owned temporary SQLite; isolated migration only",
+      "redis": "owned actual Redis with persistence disabled",
+      "core": "owned HTTP fixture always returns 503; gRPC target unavailable loopback",
+      "background_workers": "explicitly disabled; separate real Redis consumer/ACK probe",
+      "debug_host_registration": "disabled to prevent any Core mutation",
+      "daily_service_restart": false
+    }
+  },
+  "checks": {
+    "framework-tests.jsonl": {
+      "passed_test_and_subtest_events": 92,
+      "passed_packages": [
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/eventfabric",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/taskbus"
+      ],
+      "skipped_tests": [],
+      "log_sha256": "57b80efa651d467b34c76dedbdd09108d1f1d7b75cd48327a6d96a40b08082de"
+    },
+    "skeleton-tests.jsonl": {
+      "passed_test_and_subtest_events": 141,
+      "passed_packages": [
+        "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config",
+        "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/bootstrap",
+        "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/cmd/plugin",
+        "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/tests/unit",
+        "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/tests/integration"
+      ],
+      "skipped_tests": [],
+      "log_sha256": "429bb13d1f51ff12922c396f93cb5dc3d9c02c09c82f5ac6ceb37fb0f790ddab"
+    },
+    "generated-tests.jsonl": {
+      "passed_test_and_subtest_events": 6,
+      "passed_packages": [
+        "github.com/powerx-plugin/cli/internal/templates"
+      ],
+      "skipped_tests": [],
+      "log_sha256": "c33a2f9dfe0b2574d3eea930b473a93165d1985a45a0307321b71c4e600a4fec",
+      "framework_snapshot": "v0.0.27-dev.g98f1e6d6247ecf73",
+      "consumer_mode": "GOWORK=off, no replace; copied CLI source, temporary SDK Go proxy, actual init and generated backend compile"
+    },
+    "go_vet": "passed Framework provider/eventbridge/taskbus/eventfabric and Skeleton config/bootstrap/main",
+    "template_sync": "passed scaffold and CLI copies",
+    "contract_provenance": "EVENT_FABRIC_CONTRACT_OK"
+  },
+  "commands": {
+    "framework_race": "cd framework/backend/go && go test -race -json ./runtime/provider ./eventbridge ./runtime/taskbus ./runtime/eventfabric",
+    "skeleton_race": "cd skeleton/backend/go-gin && go test -race -json ./internal/config ./internal/bootstrap ./cmd/plugin ./tests/unit ./tests/integration",
+    "generated": "cd tools/cli && PX_TEST_GENERATED_BUILD=1 PX_TEST_FRAMEWORK_SNAPSHOT=1 go test -json ./internal/templates -run 'TestGeneratedBackendBuild|TestGeneratedPluginInstallIdentity|TestRenderAll_EmbeddedTemplatesParse|TestPublisherPackagedFrameworkConsumer' -count=1",
+    "native_build": "go build -o <validation-root>/bin/ ./skeleton/backend/go-gin/cmd/plugin ./skeleton/backend/go-gin/cmd/database",
+    "native_start": "CONFIG_PATH=<owned config> POWERX_PROVIDER_MODE=local POWERX_PROXY=1 POWERX_DISABLE_BACKGROUND_WORKERS=true <validation-root>/bin/plugin"
+  },
+  "scope": {
+    "repository": "PowerXPlugin only",
+    "core_edits": false,
+    "core_grant_or_resource_mutations": false,
+    "dotenv_unchanged": true,
+    "private_config_unchanged": true,
+    "daily_databases_modified": false,
+    "user_services_restarted": false,
+    "new_branches_or_worktrees": false,
+    "sdk_or_cli_release": false
+  },
+  "changed_files_this_fix": [
+    "docs/contracts/event-fabric-framework.md",
+    "docs/contracts/event-fabric-local-debug-activation.md",
+    "docs/guides/async_runtime/event_fabric/integration_playbook.md",
+    "docs/guides/async_runtime/scheduler/README.md",
+    "docs/guides/async_runtime/task/README.md",
+    "docs/guides/async_runtime/task/mechanism.md",
+    "docs/guides/config-reference.md",
+    "docs/guides/develop/standalone/mode-resolution.md",
+    "docs/guides/features/017-async-runtime-scheduler-switch/guide.md",
+    "docs/guides/features/017-async-runtime-scheduler-switch/usecase-us1-mode-switch.md",
+    "framework/backend/go/eventbridge/emitter.go",
+    "framework/backend/go/eventbridge/emitter_test.go",
+    "framework/backend/go/runtime/provider/runtime_mode.go",
+    "framework/backend/go/runtime/provider/runtime_mode_test.go",
+    "scaffold/templates/backend/go-gin/cmd/plugin/taskbus_provider.go.tmpl",
+    "scaffold/templates/backend/go-gin/internal/config/recovery_redis.go.tmpl",
+    "skeleton/backend/go-gin/cmd/plugin/event_bridge_runtime_test.go",
+    "skeleton/backend/go-gin/cmd/plugin/event_credential_tenant_test.go",
+    "skeleton/backend/go-gin/cmd/plugin/taskbus_provider.go",
+    "skeleton/backend/go-gin/internal/config/recovery_redis.go",
+    "skeleton/backend/go-gin/internal/config/recovery_redis_test.go",
+    "tools/cli/internal/contracts/data/media-contracts/event-fabric-framework.md",
+    "tools/cli/internal/templates/data/backend/go-gin/cmd/plugin/taskbus_provider.go.tmpl",
+    "tools/cli/internal/templates/data/backend/go-gin/internal/config/recovery_redis.go.tmpl"
+  ],
+  "source_sha256": {
+    "docs/contracts/event-fabric-framework.md": "b6e963eba15ec7485bd0a0f7e0a5a0ba7059b9206a9840f0b179e4afb9b57186",
+    "docs/contracts/event-fabric-local-debug-activation.md": "b3203665ce2502fb5e4c7ffdb9238c0fbfba7b610934996542bdc36b565bde6e",
+    "docs/guides/async_runtime/event_fabric/integration_playbook.md": "7a6f566fc155ab6f117527216cad2ba7502f363cbce7cfa9866c3e2a3fcd1cdc",
+    "docs/guides/async_runtime/scheduler/README.md": "db2ca0bef2cca43ce7f472e6ace1b8b2c420bf1c550fbf3fe9cc964e6e16385c",
+    "docs/guides/async_runtime/task/README.md": "f5a6e26bcb8a794518e9a4f18478ba660e5cb25962589f43805fcbb7e916ef14",
+    "docs/guides/async_runtime/task/mechanism.md": "45d528211bac6c55b525ebc0a967fcf5f2c5036b477fcac61f589ac80484bd2c",
+    "docs/guides/config-reference.md": "e1918a181283d71211b4c23052b08f46b33c46d66b72ff5cb56a96b703f77315",
+    "docs/guides/develop/standalone/mode-resolution.md": "a680562e7beccef61799d8d86740bde38c14fea0477c830ad6d14a1dc816b1e5",
+    "docs/guides/features/017-async-runtime-scheduler-switch/guide.md": "d9065608c40419d3fff5571da01d0f76a5012959c32476461f41baea2d483260",
+    "docs/guides/features/017-async-runtime-scheduler-switch/usecase-us1-mode-switch.md": "2266af5e6ae955ae6b2abe631413b4241526c175b6108d95daa20e091317d9d9",
+    "framework/backend/go/eventbridge/emitter.go": "d1a3c60c6341f3278d96b599567612229cff883ba3e66ec1b6afdf68dbe87749",
+    "framework/backend/go/eventbridge/emitter_test.go": "3d2d6a2ce52656fa0a15f08a64f98fb74ff3a236091807d428b9eb97c0f8fedd",
+    "framework/backend/go/runtime/provider/runtime_mode.go": "5f52968f8c6aac8eb659fb5b29ce2bfa44b73dddf2ed2c98eb933818fe8cb02c",
+    "framework/backend/go/runtime/provider/runtime_mode_test.go": "1839e8317690837f40233d49117c471b34ba556f0b1df6e42883ed5ffa11af1a",
+    "scaffold/templates/backend/go-gin/cmd/plugin/taskbus_provider.go.tmpl": "334bacc07f8da22e6f0c2bbd18864d81621769681579715aef98445bd87c7df3",
+    "scaffold/templates/backend/go-gin/internal/config/recovery_redis.go.tmpl": "65b5fc0771c5927637332809311961b277aac1d44573cde059d696c498ca54e1",
+    "skeleton/backend/go-gin/cmd/plugin/event_bridge_runtime_test.go": "230087545ee4112c843ac66722d8d02efe3007a62ed1cbb7165d23753b1ff988",
+    "skeleton/backend/go-gin/cmd/plugin/event_credential_tenant_test.go": "e2e77dc156c8c19463ca5b3699151a4eb4eda0255b731e19da3b8ccfd7923a39",
+    "skeleton/backend/go-gin/cmd/plugin/taskbus_provider.go": "b09cd3ad2ea292c0d3002c0a84c13af4211d347d208ae5492aecfb58256ae4a4",
+    "skeleton/backend/go-gin/internal/config/recovery_redis.go": "65b5fc0771c5927637332809311961b277aac1d44573cde059d696c498ca54e1",
+    "skeleton/backend/go-gin/internal/config/recovery_redis_test.go": "6cd2d6eb7c8f5ece3f34c5cf98b5ea9e2a4f993b423831df7ce6334f5431f376",
+    "tools/cli/internal/contracts/data/media-contracts/event-fabric-framework.md": "b6e963eba15ec7485bd0a0f7e0a5a0ba7059b9206a9840f0b179e4afb9b57186",
+    "tools/cli/internal/templates/data/backend/go-gin/cmd/plugin/taskbus_provider.go.tmpl": "334bacc07f8da22e6f0c2bbd18864d81621769681579715aef98445bd87c7df3",
+    "tools/cli/internal/templates/data/backend/go-gin/internal/config/recovery_redis.go.tmpl": "65b5fc0771c5927637332809311961b277aac1d44573cde059d696c498ca54e1"
+  },
+  "pre_existing_deletion_preserved": "skeleton/backend/go-gin/tests/integration/event_bridge_fallback_test.go",
+  "supersedes_assumptions_in": [
+    "runtime-mode-unification-20261112.json",
+    "event-fabric-startup-unblock-20261112.json"
+  ],
+  "historical_evidence_retained": true,
+  "limits": [
+    "Native local backend/event runtime checked; complete Linux/Nuxt package and market installation remain separate acceptance",
+    "Daily backend was not restarted; actual private config and actual Redis were checked without SQL connections or Redis writes"
+  ],
+  "cleanup": {
+    "temporary_validation_removed": true,
+    "owned_services_stopped": true,
+    "ports_released": [
+      56369,
+      56370,
+      56371,
+      56372
+    ],
+    "owned_processes_remaining": []
+  }
+}

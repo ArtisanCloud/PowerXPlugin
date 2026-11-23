@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"encoding/json"
+	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	"sync/atomic"
 	"testing"
 
@@ -14,10 +15,9 @@ import (
 
 func TestEventBridge_TaskBusMode_E2EWithStub(t *testing.T) {
 	factory, err := fweventbridge.NewFactory(fweventbridge.Config{
-		Enabled:         true,
-		Mode:            "taskbus",
-		FallbackToLocal: false,
-		LocalQueueSize:  10,
+		RuntimeMode:    fwprovider.RuntimeMode{ProviderMode: fwprovider.ModeLocal},
+		Enabled:        true,
+		LocalQueueSize: 10,
 	})
 	require.NoError(t, err)
 

@@ -43,6 +43,7 @@ jobs:
             artifacts/framework-session-termination-*/references.json
             artifacts/framework-session-termination-*/validation.log
             artifacts/framework-session-termination-*/browser-validation.json
+            artifacts/framework-session-termination-*/cleanup.json
 
   event-fabric-contract:
     runs-on: ubuntu-24.04
@@ -201,8 +202,14 @@ jobs:
         run: cd framework/backend/go && go test ./...
       - name: Go test (skeleton backend)
         run: cd skeleton/backend/go-gin && go test ./... -count=1
+      - name: Publisher engine and portable contract
+        run: |
+          python3 scripts/contracts/check-plugin-publisher-bundle.py
+          go test -race ./tools/cli/internal/publisher ./tools/cli/cmd
+          go vet ./tools/cli/internal/publisher ./tools/cli/cmd
+          (cd contracts/plugin-publisher/v1 && GOWORK=off go test -race ./... && GOWORK=off go vet ./...)
       - name: Generated backend with packaged Framework snapshot
-        run: PX_TEST_GENERATED_BUILD=1 PX_TEST_FRAMEWORK_SNAPSHOT=1 go test ./tools/cli/internal/templates -run '^(TestGeneratedBackendBuild|TestIAMBaselineGeneratedPlugin)$' -count=1 -timeout=10m
+        run: PX_TEST_GENERATED_BUILD=1 PX_TEST_FRAMEWORK_SNAPSHOT=1 go test ./tools/cli/internal/templates -run '^(TestGeneratedBackendBuild|TestIAMBaselineGeneratedPlugin|TestPublisherPackagedFrameworkConsumer)$' -count=1 -timeout=10m
 
   frontend:
     runs-on: ubuntu-latest
@@ -231,6 +238,10 @@ jobs:
         run: |
           cd skeleton/web-admin/nuxt
           npm run test:unit -- tests/unit/api-auth-errors.spec.ts tests/unit/api-auth-feedback.spec.ts tests/unit/host-session-v2.spec.ts tests/unit/bridge-v2-interoperability.spec.ts tests/unit/session-termination-v2.spec.ts tests/unit/session-termination-admin.spec.ts tests/unit/session-termination-adapter.spec.ts tests/unit/session-termination-router.spec.ts tests/unit/framework-realtime.spec.ts tests/unit/useAuth.fallback.spec.ts tests/unit/userStore.spec.ts
+      - name: Publisher shared Node conformance
+        run: cd contracts/plugin-publisher/v1 && npm ci --ignore-scripts && npm test
+      - name: Publisher development proxy and workspace contracts
+        run: cd skeleton/web-admin/nuxt && npm run test:unit -- tests/unit/publisher-proxy.spec.ts tests/unit/publisher-workspace.spec.ts tests/unit/publisher-page.spec.ts tests/unit/publisher-market.spec.ts tests/unit/publisher-review.spec.ts tests/unit/publisher-request-trace.spec.ts
       - name: Build
         run: cd skeleton/web-admin/nuxt && npm run build
 
@@ -348,7 +359,13 @@ jobs:
           token: ${{ secrets.CI_CHECKOUT_TOKEN || github.token }}
       - name: Install system dependencies
         run: |
-          apt-get update
+          sed -i \
+            -e 's|http://archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' \
+            -e 's|http://security.ubuntu.com/ubuntu|https://security.ubuntu.com/ubuntu|g' \
+            /etc/apt/sources.list.d/ubuntu.sources
+          getent ahosts archive.ubuntu.com
+          getent ahosts security.ubuntu.com
+          apt-get -o APT::Update::Error-Mode=any update
           apt-get install -y build-essential
       - uses: actions/setup-go@v5
         with:

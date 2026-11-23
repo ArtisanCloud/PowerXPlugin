@@ -95,11 +95,9 @@ runtime:
     channel: ""
   run_migrate: false
   event_bridge:
+    topic_manifest: config/event_fabric_service.yaml
     enabled: true
-    mode: "taskbus" # local | taskbus | dual
-    fallback_to_local: false
     local_queue_size: 1024
-    taskbus_provider: "redis" # standalone 推荐 redis；宿主模式改为 host
     redis_url: "redis://localhost:6379"
     redis_stream: "powerx.taskbus.events"
     redis_group: "powerx.plugin"

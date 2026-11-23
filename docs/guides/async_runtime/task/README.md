@@ -13,8 +13,8 @@
 1. `skeleton/plugin.yaml` 已声明目标 `_topic.*`
 2. 后端默认强鉴权（必须携带有效凭证）
 3. 推荐配置：
-   - standalone：`runtime.event_bridge.taskbus_provider=redis`
-   - standalone + proxy：`runtime.event_bridge.taskbus_provider=host`
+   - 本地：`POWERX_PROVIDER_MODE=local`，proxy 为 `0` 或 `1` 均选择 Redis TaskBus
+   - 委派：`POWERX_PROVIDER_MODE=delegated`，proxy 为 `0` 或 `1` 均选择 Host Event Fabric
 4. proxy 场景需先准备底座 API Key（profile `permission_ids` 已覆盖）
 
 ## 3. 手工验证（最短路径）

@@ -43,6 +43,7 @@ Thumbs.db
 # Testing artifacts (coverage reports, playwright output, temp CLI scaffolds)
 /artifacts/regression/
 /artifacts/framework-release-*/
+/artifacts/framework-session-termination-*/
 tmp/
 !tmp/README.md
 .cache/

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	"strings"
 	"testing"
 	"time"
@@ -20,10 +21,9 @@ func TestEventBridge_MetricsInstrumentation_EmitAndConsume(t *testing.T) {
 	ebmetrics.Reset()
 
 	factory, err := fweventbridge.NewFactory(fweventbridge.Config{
-		Enabled:         false,
-		Mode:            "local",
-		FallbackToLocal: true,
-		LocalQueueSize:  10,
+		RuntimeMode:    fwprovider.RuntimeMode{ProviderMode: fwprovider.ModeLocal},
+		Enabled:        false,
+		LocalQueueSize: 10,
 	})
 	require.NoError(t, err)
 	factory.WithMetrics(bridgeRecorder{})

@@ -1,0 +1,156 @@
+{
+  "date": "2026-11-12",
+  "recorded_at_utc": "2026-11-12T15:28:53.475694+00:00",
+  "task": "Framework Event Fabric startup resource and credential assembly",
+  "result": "Framework source and controlled checks passed; actual startup blocked by Core exact plugin owner authorization",
+  "branch": "025-framework-business-regression",
+  "base_commit": "5683e4293d89b276ee3669448ceefd9de06a75a7",
+  "working_tree_uncommitted": true,
+  "toolchain": {
+    "go": "go version go1.26.7 darwin/arm64",
+    "node": "v22.13.0"
+  },
+  "configuration": {
+    "provider_mode": "local",
+    "proxy": "1",
+    "dotenv_unchanged": true,
+    "no_new_routing_switch": true,
+    "topic_manifest": "config/event_fabric_service.yaml",
+    "tenant_source": "same API Key, official IAM directory if no explicit credential tenant; never user JWT or a default System tenant"
+  },
+  "source_sha256": {
+    "framework/backend/go/iam/delegated/core_client.go": "89bcd0cfe5fbaefda228e765de80fa4b0be38d76dd290d3ab6edd4474a3eb09d",
+    "framework/backend/go/runtime/taskbus/provider.go": "4bee29a05281b9fdc347103e3cb26d115e931311a865fb0db1c6fa9898e6f6e3",
+    "framework/backend/go/runtime/taskbus/provider_resolve_test.go": "978ff33de983c303b07044d6ef54faf27518baaa73aa76e7b00c91a7a1c1c795",
+    "skeleton/backend/go-gin/internal/config/config.go": "0fb3da29bad3a6f12062c4ccdae1f94f7a959b5fb4fbb36a459de2592e0ab6c7",
+    "skeleton/backend/go-gin/internal/config/event_resources.go": "f1eba778f3d344ca4916760bb87a2e8caa75c255abd241b4a4280426361d61b0",
+    "skeleton/backend/go-gin/internal/config/event_resources_test.go": "cd5ec780a38e84459161380a8b273f518739f03016b2b9d842a0a8e6a7291504",
+    "skeleton/backend/go-gin/cmd/plugin/taskbus_provider.go": "db8719ea8722099df44e91718b4904ad71472eb1dac6257fc38eb457abc7b2a3",
+    "skeleton/backend/go-gin/cmd/plugin/event_credential_tenant_test.go": "be83de2379f97e455ff5b9b8a36fa82f1eaeb400574b787bcc43de3eb097b728",
+    "skeleton/config/event_fabric_service.yaml": "7fcf82ae70f88532118c5cf07282b6cbdbbed1f20712c9b2471f28f9c4d69cab",
+    "skeleton/config/values.example.yaml": "71578ecfa286e8b518434ec5b1321ae71cd6e4caa6f8b564fedffe42ab40c35f",
+    "skeleton/plugin.d/capabilities.yaml": "1b0bd5a837b057eb13c444a98dfb860b671b12e0fbfbbaef5797a94265880c19",
+    "skeleton/backend/etc/config.example.yaml": "f585819b71abf52a9c23c0ad938d486dec3308101819c14c4a9799bdbfd77d1e",
+    "skeleton/make-files/build.mk": "c92ae0eb11cb5ae4de9b9e8a2aa140600cec8519b5b2d1830ed9d912f654a8ab",
+    "tools/cli/internal/publisher/source.go": "274ea4a6df664511441869d610c7cb46c0f8d604dcf2b4151fb75faacd13233c",
+    "tools/cli/internal/publisher/artifact.go": "0209d3d62a115ca19fd876193294c6fea0cbcf692a9061660af008bffedb1699",
+    "tools/cli/internal/publisher/build_test.go": "af6ad6d818e571628a3687c1ec350128b27b8cb2773ed10f4192e1880deb5cde",
+    "tools/cli/internal/templates/install_declarations_test.go": "db5a535f4e9b6e8065413cfe0217e52078b1eaa1f9977117e24cab57f2562279",
+    "scripts/template-sync-config.yaml": "9750afd2d12d6572ec276a0a739e89098bb3fe7e572b450656f8ef7103331596",
+    "tests/packaging/dist-target.test.mjs": "6c8bf1d8a1874d504038caecfd99cf6a2e51a32f15e60c48de1031797fc43a32"
+  },
+  "checks": {
+    "framework-tests.jsonl": {
+      "passed_test_and_subtest_events": 237,
+      "passed_packages": [
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/taskbus",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/eventfabric",
+        "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/delegated"
+      ],
+      "skipped_tests": [
+        "TestLiveWSIdentityRevalidationRejectsUnissuedHandle"
+      ],
+      "failed_tests": [],
+      "output_sha256": "c3d6f7d74c16d51e93123909ffd83f78a9abbd06d757f2724666247f9823041a"
+    },
+    "skeleton-tests.jsonl": {
+      "passed_test_and_subtest_events": 133,
+      "passed_packages": [
+        "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config",
+        "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/bootstrap",
+        "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/cmd/plugin",
+        "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/tests/unit",
+        "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/tests/integration"
+      ],
+      "skipped_tests": [],
+      "failed_tests": [],
+      "output_sha256": "df40f5415a25322765634bd6c25fc90324bd28abc92cda42f16283ca94cdd4ca"
+    },
+    "publisher-tests.jsonl": {
+      "passed_test_and_subtest_events": 17,
+      "passed_packages": [
+        "github.com/powerx-plugin/cli/internal/publisher"
+      ],
+      "skipped_tests": [],
+      "failed_tests": [],
+      "output_sha256": "12876daf3b908cbf29968da3e95ff4cba9cbd56ecc8ee54121c8047c8dd5f6b3"
+    },
+    "generated-tests.jsonl": {
+      "passed_test_and_subtest_events": 6,
+      "passed_packages": [
+        "github.com/powerx-plugin/cli/internal/templates"
+      ],
+      "skipped_tests": [],
+      "failed_tests": [],
+      "output_sha256": "fa8e7d38e8c1cff8da910e1c933b83d4cc9cfead8076a98f22551ceab886810e"
+    },
+    "make_dist": {
+      "passed": 10,
+      "failed": 0,
+      "scope": "actual make rules on controlled Go + pure-JS fixtures; host, linux/amd64, linux/arm64, windows/amd64; public SDK and native Nuxt runtime not accepted",
+      "private_config_excluded": true,
+      "declarations_packaged": true
+    },
+    "go_vet": "passed Framework IAM/provider/eventbridge/taskbus/eventfabric, Skeleton config/bootstrap/main, publisher and templates; config/main rerun after final parser changes",
+    "manifest": "manifestcheck --plugin-only passed; permission declarations passed: 52 permissions, 7 page bindings",
+    "template_sync": "passed npm run sync:templates -- --check",
+    "authority_contract": "EVENT_FABRIC_CONTRACT_OK; Core pinned documents and source hashes unchanged",
+    "independent_consumer": {
+      "framework_snapshot": "v0.0.27-dev.g6807d220519683cc",
+      "published": false,
+      "mode": "GOWORK=off, no local replace, temporary Go module proxy",
+      "scope": "build CLI from copied source, actual init, compile generated main against packaged SDK; separate generated-backend regression and two plugin identity checks"
+    }
+  },
+  "commands": {
+    "framework_race": "cd framework/backend/go && go test -race -json ./iam/delegated ./runtime/provider ./eventbridge ./runtime/taskbus ./runtime/eventfabric",
+    "skeleton_race": "cd skeleton/backend/go-gin && go test -race -json ./internal/config ./internal/bootstrap ./cmd/plugin ./tests/unit ./tests/integration",
+    "publisher_race": "cd tools/cli && go test -race -json ./internal/publisher -run 'TestBuild|TestSourceMutationAndInterruptedRecovery' -count=1",
+    "generated": "cd tools/cli && PX_TEST_GENERATED_BUILD=1 PX_TEST_FRAMEWORK_SNAPSHOT=1 go test -json ./internal/templates -run 'TestGeneratedBackendBuild|TestGeneratedPluginInstallIdentity|TestRenderAll_EmbeddedTemplatesParse|TestPublisherPackagedFrameworkConsumer' -count=1",
+    "make_dist": "node --test tests/packaging/dist-target.test.mjs"
+  },
+  "real_core_read_only_probe": {
+    "consume_topic_count": 0,
+    "http_status": 502,
+    "provider_mode": "local",
+    "proxy_enabled": true,
+    "publish_topic_count": 5,
+    "reason_code": "EVENT_FABRIC_OWNER_FORBIDDEN",
+    "request_id": "60e2a64d-cf2b-44c0-abbf-90e55b2eb0f3",
+    "scope": "config load and real service-credential IAM/resolve_topics reads; no DB bootstrap or resource writes",
+    "static_mapping_count": 0,
+    "topic_manifest": "config/event_fabric_service.yaml",
+    "trace_id": "4077ef26-25c2-456d-8cd5-7c68b3062e7f"
+  },
+  "core_authorization": {
+    "grant_status": {
+      "com.corex.eventfabric.service_publish": "granted",
+      "com.corex.eventfabric.service_consume": "granted",
+      "com.corex.capabilities.grant_status.read": "granted"
+    },
+    "grant_is_not_plugin_ownership": true,
+    "debug_alias_owner_probe": {
+      "plugin_id": "com.powerx.plugins.base.local",
+      "http_status": 502,
+      "reason_code": "EVENT_FABRIC_OWNER_FORBIDDEN",
+      "request_id": "f608d347-8991-4f27-8b61-1dda5b100baa"
+    },
+    "business_events_sent": 0,
+    "core_resource_writes": 0,
+    "core_source_edits": 0
+  },
+  "remaining": [
+    "Core exact plugin owner authorization for com.powerx.plugins.base",
+    "Core formal instance and 5 declared topic/ACL/binding preparation in credential tenant; debug mount alone does not prepare resources",
+    "Real application startup after approved Core setup; daily services have not been restarted",
+    "Native Linux/Nuxt complete plugin, public download and PowerX install remain separate acceptance"
+  ],
+  "cleanup": {
+    "services_started_by_agent": [],
+    "user_services_modified": false,
+    "temporary_validation_removed": true,
+    "owned_processes_remaining": []
+  }
+}

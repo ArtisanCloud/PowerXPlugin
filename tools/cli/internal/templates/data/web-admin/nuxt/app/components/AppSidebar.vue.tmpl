@@ -20,6 +20,15 @@
         </UButton>
       </div>
 
+      <div v-if="publisherDevelopment">
+        <UButton to="/powerx/publisher" variant="ghost" color="neutral" class="w-full justify-start" data-testid="publisher-navigation"
+          :ui="{ base: 'text-(--ui-text-highlighted)' }"
+          :class="{ 'bg-(--ui-bg-elevated) font-semibold': isExactActive('/powerx/publisher') }">
+          <UIcon name="i-lucide-package-open" class="w-4 h-4 mr-3" />
+          {{ "{{ t('navigation.publisher') }}" }}
+        </UButton>
+      </div>
+
       <div v-if="canReadTemplates || canReadCustomers">
         <div class="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
           {{ "{{ t('navigation.businessOperations') }}" }}
@@ -445,6 +454,7 @@ import { useUserStore } from "~/stores/user";
 const { t } = useI18n();
 const route = useRoute();
 const runtimeConfig = useRuntimeConfig();
+const publisherDevelopment = import.meta.dev;
 const auth = useAuth();
 
 const showTemplatesMenu = ref(true);
@@ -486,6 +496,7 @@ const isKnowledgeSpaceRoute = computed(() => {
 });
 
 onMounted(() => {
+  if (!auth.isAuthenticated.value) return;
   if (!userStore.context && !userStore.isLoading) {
     userStore.fetchUserContext().catch(() => {
       /* ignore sidebar fetch errors */

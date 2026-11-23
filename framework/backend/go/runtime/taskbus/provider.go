@@ -31,6 +31,7 @@ type HostProviderConfig struct {
 	Token            string
 	TokenProvider    wsbus.TokenProvider
 	TenantUUID       string
+	ResolveTenant    func(context.Context) (string, error)
 	UserAgent        string
 	PublishPath      string
 	RegisterPath     string
@@ -97,6 +98,16 @@ func (p *HostProvider) NewEmitter() (eventbridge.Emitter, error) {
 	if len(p.cfg.PublishTopicKeys) > 0 || len(p.cfg.ConsumeTopicKeys) > 0 {
 		return p.NewResolvedRuntime(context.Background())
 	}
+	if p.cfg.TenantUUID == "" && p.cfg.ResolveTenant != nil {
+		tenant, err := p.cfg.ResolveTenant(context.Background())
+		if err != nil {
+			return nil, err
+		}
+		cfg := p.cfg
+		cfg.TenantUUID = tenant
+		cfg.ResolveTenant = nil
+		return NewHostProvider(cfg).NewEmitter()
+	}
 	cfg := eventfabric.Config{BaseURL: p.cfg.BaseURL, APIPrefix: p.cfg.APIPrefix, AuthScheme: p.cfg.AuthScheme, APIKey: p.cfg.APIKey, BearerToken: p.cfg.Token, Timeout: p.cfg.Timeout, StreamTimeout: 40 * time.Second}
 	var tokens eventfabric.TokenProvider
 	if p.cfg.TokenProvider != nil {
@@ -111,6 +122,16 @@ func (p *HostProvider) NewEmitter() (eventbridge.Emitter, error) {
 func (p *HostProvider) NewResolvedRuntime(ctx context.Context) (*eventfabric.Runtime, error) {
 	if p == nil || p.cfg.PublishPath != "" || p.cfg.RegisterPath != "" || len(p.cfg.TopicBindings) > 0 {
 		return nil, &eventfabric.HTTPError{StatusCode: 400, ReasonCode: "EVENT_FABRIC_RUNTIME_CONFIG_INVALID"}
+	}
+	if p.cfg.TenantUUID == "" && p.cfg.ResolveTenant != nil {
+		tenant, err := p.cfg.ResolveTenant(ctx)
+		if err != nil {
+			return nil, err
+		}
+		cfg := p.cfg
+		cfg.TenantUUID = tenant
+		cfg.ResolveTenant = nil
+		return NewHostProvider(cfg).NewResolvedRuntime(ctx)
 	}
 	var tokens eventfabric.TokenProvider
 	if p.cfg.TokenProvider != nil {

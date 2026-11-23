@@ -146,7 +146,8 @@ dist-backend: dist-target-check
 .PHONY: frontend-build
 frontend-build: ## 构建 Host 包（POWERX_PROXY=1, baseURL=$(POWERX_ADMIN_BASE)）
 	@echo "==> 构建 web-admin（Host 包） POWERX_PROXY=1 baseURL=$(POWERX_ADMIN_BASE)"
-	cd $(FRONTEND_DIR) && \
+	cd "$(FRONTEND_DIR)" && \
+	  NODE_PATH="$$PWD/node_modules$${NODE_PATH:+:$$NODE_PATH}" \
 	  POWERX_PROXY=1 \
 	  NUXT_PUBLIC_INSIDE_POWERX=1 \
 	  POWERX_PLUGIN_ID="$(PLUGIN_ID)" \

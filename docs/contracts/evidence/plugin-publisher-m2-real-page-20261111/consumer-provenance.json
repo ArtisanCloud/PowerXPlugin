@@ -1,0 +1,25 @@
+{
+  "cli_version": "px-plugin version dev (commit 5683e42-dirty)",
+  "cli_sha256": "9ee49dae84203cb0ebccd06b2e40b64f9a1da50787f889953b7c1eb7e529af51",
+  "sdk_tarballs": [
+    {
+      "name": "@artisan-cloud/plugin-framework-client",
+      "version": "0.0.15",
+      "sha256": "423d02223ec0b6a41b725e3c88ca96d4f0892c0502968cfac7a0ff6c1e208e6f",
+      "filename": "423d02223ec0b6a4-artisan-cloud-plugin-framework-client-0.0.15.tgz"
+    },
+    {
+      "name": "@artisan-cloud/plugin-framework-admin",
+      "version": "0.0.14",
+      "sha256": "9af0d9ee3428b473858f521c8dd9a90d97fed16852099473b922f54bf4bf8900",
+      "filename": "9af0d9ee3428b473-artisan-cloud-plugin-framework-admin-0.0.14.tgz"
+    }
+  ],
+  "generated_manifest_sha256": "31b89a9658a5ed925ccb04f0af66d28077252205ec198ac04f89c901e638cecf",
+  "independent_npm_install": true,
+  "source_workspace_link": false,
+  "registry_release": false,
+  "native_package_build": false,
+  "installed_publisher_files": 14,
+  "installed_exact_source_bytes": true
+}

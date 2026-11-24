@@ -11,7 +11,7 @@
 ## 环境与实际交付物
 
 - 按[市场交接记录](../../../../PowerXPluginMarket/docs/marketplace/plugin-publisher-market-m2-joint-record.md)在 Market 根目录运行 `python3 scripts/publisher-joint-lab.py`；使用本轮新 handoff，不复用历史地址。实际 PostgreSQL、MinIO、Identity/Publisher/Catalog Gin 与生产 Nuxt 均由该脚本隔离启动。
-- Framework 当前 CLI 生成 `com.example.publisher-joint` 的独立插件；前端从实际 npm tarball 安装 Admin `0.0.14`／Client `0.0.15`，未用 workspace symlink，也未正式发布 SDK。摘要见[消费记录](../../artifacts/plugin-publisher-m2-real-page-20261111/consumer-provenance.json)。
+- Framework 当前 CLI 生成 `com.example.publisher-joint` 的独立插件；前端从实际 npm tarball 安装 Admin `0.0.14`／Client `0.0.15`，未用 workspace symlink，也未正式发布 SDK。摘要见[消费记录](../contracts/evidence/plugin-publisher-m2-real-page-20261111/consumer-provenance.json)。
 - 在真实市场网页签发仅上传、M2 送审、只读恢复三组凭据，经 CLI 私密 stdin 绑定到同一个连接，存入本机 macOS 系统凭据库。用户和开发者 UUID 保持相同；令牌未写入源码、记录、截图或日志，三组凭据均已撤销，系统条目删除后查找返回不存在。
 - 市场侧使用本次专用实验 root 账号，通过真实后台页面执行驳回、批准和上架；不代表普通发布者取得审核权限或生产人工审查完成。
 - 唯一故障注入为市场实验代理丢弃首个已提交的 201 响应，以及 Framework 临时代理暂停原 operation 查询；正式路由、DTO、能力和业务响应未改写。代理随后移除暂停，全部临时服务已关闭。
@@ -43,7 +43,7 @@
 | 重提 operation | `95085481-6a6c-4938-84cb-45525dc3af56` |
 | 重提 Publication UUID | `6efcf61c-1232-4c08-aff7-a88b398abe3e` |
 
-完整任务、指纹及逐次请求 UUID 见[页面联合记录](../../artifacts/plugin-publisher-m2-real-page-20261111/page-record.json)。这些是已关闭的隔离环境历史证据，不能用旧地址继续请求。
+送审任务、状态、指纹和逐次请求 UUID 见[页面联合记录摘要](../contracts/evidence/plugin-publisher-m2-real-page-20261111/page-record.summary.json)。该记录来自已关闭的隔离环境。
 
 ## 仍待验收
 
@@ -60,4 +60,4 @@
 
 使用重新启动的真实隔离 Market、CLI 生成的独立插件与修正后的 SDK tarball，验证待审核、已驳回、通过待上架、已上架四种状态；重提准备快照确实保留 rejected，批准与上架后卡片仍正确更新。两次送审各写入一次，取得不同 operation 和 Publication UUID；旧申请资料、集合、回执及旧控制台链接保持。批准后目录仍为 404，显式上架后为 200。
 
-发布模块 54 项测试、严格 Vue/TypeScript 检查及模板同步通过。四态各有桌面浅色／窄屏深色截图，另补桌面深色／窄屏浅色；覆盖手动主题与系统相反、导航切换、默认／选中／悬停／聚焦／禁用文字，最低实测对比度 5.91:1。页面错误和焦点警告均为 0。见[截图索引](../../artifacts/plugin-publisher-review-status-20261112/README.md)及[独立验证记录](../contracts/evidence/plugin-publisher-review-status-validation-20261112.json)。本轮凭据已撤销、系统凭据条目已删除，临时服务及子进程、schema/bucket 和临时目录均已清理；受控包与原生包、公开下载、宿主安装的验收边界继续保留。
+发布模块 54 项测试、严格 Vue/TypeScript 检查及模板同步通过。四态各有桌面浅色／窄屏深色截图，另补桌面深色／窄屏浅色；覆盖手动主题与系统相反、导航切换、默认／选中／悬停／聚焦／禁用文字，最低实测对比度 5.91:1。页面错误和焦点警告均为 0。见[截图索引](../contracts/evidence/plugin-publisher-review-status-20261112/README.md)及[独立验证记录](../contracts/evidence/plugin-publisher-review-status-validation-20261112.json)。本轮凭据已撤销、系统凭据条目已删除，临时服务及子进程、schema/bucket 和临时目录均已清理；受控包与原生包、公开下载、宿主安装的验收边界继续保留。

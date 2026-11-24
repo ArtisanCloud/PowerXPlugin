@@ -651,7 +651,8 @@
     "plugin-publisher-p07-alignment-20261111.json",
     "plugin-publisher-m1-validation-20261110.json"
   ],
-  "artifacts": "../../../artifacts/plugin-publisher-m2-real-page-20261111/",
+  "artifacts": "plugin-publisher-m2-real-page-20261111/",
+  "committed_evidence_manifest": "plugin-publisher-m2-real-page-20261111/SHA256SUMS",
   "joint_record": "../../marketplace/plugin-publisher-framework-m2-joint-record.md",
   "harness_adjustments": [
     "cross-realm JSON comparator normalized serialized protocol values",
@@ -668,6 +669,6 @@
   },
   "artifact_integrity": {
     "verified_files": 20,
-    "manifest": "../../../artifacts/plugin-publisher-m2-real-page-20261111/sha256.json"
+    "archived_manifest_path": "artifacts/plugin-publisher-m2-real-page-20261111/sha256.json"
   }
 }

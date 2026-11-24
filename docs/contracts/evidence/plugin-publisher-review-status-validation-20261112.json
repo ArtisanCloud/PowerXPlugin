@@ -32,7 +32,7 @@
       "size": 4415873,
       "framework_native_build_or_upload": false
     },
-    "consumer_provenance": "../../../artifacts/plugin-publisher-review-status-20261112/consumer-provenance.json",
+    "consumer_provenance": "plugin-publisher-review-status-20261112/consumer-provenance.json",
     "current_state": "closed_and_cleaned"
   },
   "tests": {
@@ -48,7 +48,7 @@
       "typescript": "5.9.3",
       "vue_tsc": "3.3.14",
       "scope": "all publisher TS and Vue files; actual Nuxt imports and generated i18n augmentation; strict true",
-      "config": "../../../artifacts/plugin-publisher-review-status-20261112/typecheck-config.json"
+      "archived_config_path": "artifacts/plugin-publisher-review-status-20261112/typecheck-config.json"
     },
     "template_sync": {
       "command": "node scripts/sync-templates.mjs --check",
@@ -143,7 +143,7 @@
     "five_navigation_tabs_visible": true,
     "page_errors": [],
     "focus_warnings": [],
-    "screenshot_index": "../../../artifacts/plugin-publisher-review-status-20261112/README.md"
+    "screenshot_index": "plugin-publisher-review-status-20261112/README.md"
   },
   "privacy": {
     "checked_mutable_files": 1139,
@@ -160,7 +160,7 @@
     "system_keychain_find_exit_codes": [
       44
     ],
-    "record": "../../../artifacts/plugin-publisher-review-status-20261112/cleanup.json"
+    "archived_record_path": "artifacts/plugin-publisher-review-status-20261112/cleanup.json"
   },
   "remaining_acceptance": [
     "complete native Linux/amd64 generated plugin build and start",

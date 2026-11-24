@@ -1,0 +1,44 @@
+{
+  "cli_version": "px-plugin version dev (commit 5683e42-dirty)",
+  "cli_sha256": "9ee49dae84203cb0ebccd06b2e40b64f9a1da50787f889953b7c1eb7e529af51",
+  "sdk_tarballs": [
+    {
+      "name": "@artisan-cloud/plugin-framework-client",
+      "version": "0.0.15",
+      "sha256": "423d02223ec0b6a41b725e3c88ca96d4f0892c0502968cfac7a0ff6c1e208e6f",
+      "filename": "423d02223ec0b6a4-artisan-cloud-plugin-framework-client-0.0.15.tgz"
+    },
+    {
+      "name": "@artisan-cloud/plugin-framework-admin",
+      "version": "0.0.14",
+      "sha256": "e9ea74dd54f7bc9afc0b0cdb334236bf02c6e7e7f1caa6942ed1a8c341f55b7a",
+      "filename": "e9ea74dd54f7bc9a-artisan-cloud-plugin-framework-admin-0.0.14.tgz"
+    }
+  ],
+  "generated_manifest_sha256": "31b89a9658a5ed925ccb04f0af66d28077252205ec198ac04f89c901e638cecf",
+  "source_workspace_links": false,
+  "installed_publisher_files": 14,
+  "installed_exact_source_bytes": true,
+  "pinned_dependency_lock": true,
+  "registry_release": false,
+  "native_package_build": false,
+  "source_hashes": {
+    "framework/frontend/nuxt/framework-admin/publisher/workspace.ts": "09a9b59d679db2f1c0faac3eaf3a65454278b29dd43eeb801f3399f59d6ba327",
+    "framework/frontend/nuxt/framework-admin/publisher/module.ts": "774c9854fb07ffaa64eedd2b33de6a9a546dc6d3cb14db7dbae30445dadcf8f1",
+    "framework/frontend/nuxt/framework-admin/publisher/review-workspace.ts": "a6924b60d61b685328c870dc68e601bc21d7a166485798052a147bb123009b40",
+    "framework/frontend/nuxt/framework-admin/publisher/types.ts": "14ebea78f22b77871757cace8af63fcb5644de1e2fe20d05d156f62c8a6b1be0",
+    "framework/frontend/nuxt/framework-admin/publisher/client.ts": "73e52a39792f061adc8ce6b6efab3a1ea47ebeced3e6881474c6ca141b1fa4e9",
+    "framework/frontend/nuxt/framework-admin/publisher/proxy.ts": "cc0381603ddabd88d2e4e8216cad547913e79d93ff8dcf018f8d8ebfce56b8dd",
+    "framework/frontend/nuxt/framework-admin/publisher/market-workspace.ts": "ca035f7939ace39e9cf6339fe14772662bd7bb57c5382e2c1137eb652f37f707",
+    "framework/frontend/nuxt/framework-admin/publisher/locales/zh.json": "673326655fdfe95f010ddd624b5aab66fc7388bffcbbd639ceb05d1b80559060",
+    "framework/frontend/nuxt/framework-admin/publisher/locales/en.json": "8f3ea0fdd09b157563b2bb7191d4b2f4833c2eb759dfd886c475292276a3ce6b",
+    "framework/frontend/nuxt/framework-admin/publisher/runtime/MarketPanel.vue": "a8e2c9876dadce744f3e5adfc85c52df9a24c93d6378e644f43d6b1d735b14d6",
+    "framework/frontend/nuxt/framework-admin/publisher/runtime/PublisherPage.vue": "d434aec9712b4d31d9af126564e0be2e046d44e1d43ebd661cfa46c4ae174ded",
+    "framework/frontend/nuxt/framework-admin/publisher/runtime/RequestHistory.vue": "1fcd4c589b4e0b68683a0b6aaa92f43e4fda0528b837c1ac8c22567207d435ef",
+    "framework/frontend/nuxt/framework-admin/publisher/runtime/handler.ts": "941f019be6bf9f3968fc9a8314dfa9f2a1e55c9297baa1823742e04b2fa56ecf",
+    "framework/frontend/nuxt/framework-admin/publisher/runtime/ReviewPanel.vue": "005021f6de4190a28969c58d2f0b362d46a678aebac3e99df0000f8177a804eb"
+  },
+  "tools": {
+    "node": "v22.23.2"
+  }
+}

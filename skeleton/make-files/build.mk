@@ -253,10 +253,7 @@ dist: dist-target-check plugin-yaml-check plugin-permission-declaration-check di
 	    cp "config/$$file" "$(DIST_DIR)/config/$$file"; \
 	  fi; \
 	done
-	@if [ -d "contracts/storage-datasets" ]; then \
-	  mkdir -p "$(DIST_DIR)/contracts/storage-datasets"; \
-	  cp -R contracts/storage-datasets/. "$(DIST_DIR)/contracts/storage-datasets/"; \
-	fi
+	@node "$(DIST_TARGET_SCRIPT)" stage-datasets --source "$(PLUGIN_MANIFEST)" --dist-dir "$(DIST_DIR)" --frontend-dir "$(FRONTEND_DIR)"
 	@if [ -d "skills" ]; then \
 	  mkdir -p $(DIST_DIR)/skills; \
 	  cp -R skills/. $(DIST_DIR)/skills/; \
@@ -343,10 +340,7 @@ release: build frontend-build
 	    cp "config/$$file" "$(RELEASE_DIR)/config/$$file"; \
 	  fi; \
 	done
-	@if [ -d "contracts/storage-datasets" ]; then \
-	  mkdir -p "$(RELEASE_DIR)/contracts/storage-datasets"; \
-	  cp -R contracts/storage-datasets/. "$(RELEASE_DIR)/contracts/storage-datasets/"; \
-	fi
+	@node "$(DIST_TARGET_SCRIPT)" stage-datasets --source "$(PLUGIN_MANIFEST)" --dist-dir "$(RELEASE_DIR)" --frontend-dir "$(FRONTEND_DIR)"
 	@if [ -d "skills" ]; then \
 	  mkdir -p $(RELEASE_DIR)/skills; \
 	  cp -R skills/. $(RELEASE_DIR)/skills/; \

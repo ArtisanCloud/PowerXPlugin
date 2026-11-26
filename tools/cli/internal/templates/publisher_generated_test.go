@@ -97,11 +97,24 @@ func TestPublisherPackagedFrameworkConsumer(t *testing.T) {
 	if json.Unmarshal([]byte(output), &preview) != nil || preview.Data.Input.Metadata.Description != "generated consumer description" || len(preview.Data.SHA256) != 64 {
 		t.Fatal("independent_submission_preview", output)
 	}
-	for _, file := range []string{"web-admin/app/components/AppSidebar.vue", "web-admin/app/middleware/layout.global.ts", "web-admin/i18n/locales/en.json", "web-admin/.env.example"} {
+	if _, err := os.ReadFile(filepath.Join(plugin, "web-admin/.env.example")); err != nil {
+		t.Fatal("publisher_template_missing", "web-admin/.env.example", err)
+	}
+	for _, file := range []string{"web-admin/app/components/AppSidebar.vue", "web-admin/app/middleware/layout.global.ts", "web-admin/i18n/locales/en.json"} {
 		b, err := os.ReadFile(filepath.Join(plugin, file))
-		if err != nil || !strings.Contains(string(b), "publisher") && !strings.Contains(string(b), "PUBLISHER") {
+		if err != nil {
 			t.Fatal("publisher_template_missing", file, err)
 		}
+		if !strings.Contains(string(b), "publisher") && !strings.Contains(string(b), "PUBLISHER") {
+			t.Fatal("publisher_template_marker_missing", file)
+		}
+	}
+	nuxtConfig, err := os.ReadFile(filepath.Join(plugin, "web-admin/nuxt.config.ts"))
+	if err != nil {
+		t.Fatal("publisher_template_missing", "web-admin/nuxt.config.ts", err)
+	}
+	if !strings.Contains(string(nuxtConfig), "definePowerXAdminConfig(") {
+		t.Fatal("publisher_framework_admin_config_missing")
 	}
 	run(filepath.Join(plugin, "backend"), "go", "mod", "edit", "-require="+frameworkModule+"@"+version)
 	run(filepath.Join(plugin, "backend"), "go", "test", "-mod=mod", "./cmd/plugin")

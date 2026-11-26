@@ -25,7 +25,7 @@ jobs:
           python-version: '3.11'
       - name: Install frontend tooling
         run: |
-          npm install --ignore-scripts
+          npm ci --ignore-scripts
           npm --prefix skeleton/web-admin/nuxt install --ignore-scripts
       - name: Verify session contract and template synchronization
         run: |
@@ -169,7 +169,7 @@ jobs:
         with:
           go-version: '1.24'
       - name: Install dependencies
-        run: npm install
+        run: npm ci --ignore-scripts
       - name: Verify SDK archive inputs and Go checksums
         run: python3 -m unittest discover -s scripts/release -p 'test_framework_archive.py'
       - name: Verify template sync
@@ -226,10 +226,8 @@ jobs:
           node-version: '22.23.2'
       - name: Install dependencies
         run: |
-          npm install
-          (cd skeleton/web-admin/nuxt && npm install)
-          # workaround: npm optionalDependencies 有概率漏装平台原生包（rollup/oxc/lightningcss/tailwind oxide），导致构建阶段找不到 native binding
-          (cd skeleton/web-admin/nuxt && ARCH=$(node -p "process.arch") && ROLLUP_VERSION=$(node -p "require('./node_modules/rollup/package.json').version") && OXC_VERSION=$(node -p "require('./node_modules/oxc-parser/package.json').version") && npm install --no-save "@rollup/rollup-linux-${ARCH}-gnu@${ROLLUP_VERSION}" "@oxc-parser/binding-linux-${ARCH}-gnu@${OXC_VERSION}" "@oxc-transform/binding-linux-${ARCH}-gnu@${OXC_VERSION}" "@oxc-minify/binding-linux-${ARCH}-gnu@${OXC_VERSION}" "lightningcss-linux-${ARCH}-gnu@1.30.2" "@tailwindcss/oxide-linux-${ARCH}-gnu")
+          npm ci --ignore-scripts
+          npm --prefix skeleton/web-admin/nuxt ci --include=optional
       - name: Lint
         run: cd skeleton/web-admin/nuxt && npm run lint
       - name: Session termination contract provenance
@@ -379,10 +377,8 @@ jobs:
           node-version: '22.23.2'
       - name: Install dependencies
         run: |
-          npm install
-          (cd skeleton/web-admin/nuxt && npm install)
-          # workaround: npm optionalDependencies 有概率漏装平台原生包（rollup/oxc/lightningcss/tailwind oxide），导致构建阶段找不到 native binding
-          (cd skeleton/web-admin/nuxt && ARCH=$(node -p "process.arch") && ROLLUP_VERSION=$(node -p "require('./node_modules/rollup/package.json').version") && OXC_VERSION=$(node -p "require('./node_modules/oxc-parser/package.json').version") && npm install --no-save "@rollup/rollup-linux-${ARCH}-gnu@${ROLLUP_VERSION}" "@oxc-parser/binding-linux-${ARCH}-gnu@${OXC_VERSION}" "@oxc-transform/binding-linux-${ARCH}-gnu@${OXC_VERSION}" "@oxc-minify/binding-linux-${ARCH}-gnu@${OXC_VERSION}" "lightningcss-linux-${ARCH}-gnu@1.30.2" "@tailwindcss/oxide-linux-${ARCH}-gnu")
+          npm ci --ignore-scripts
+          npm --prefix skeleton/web-admin/nuxt ci --include=optional
       - name: Run regression workflow
         env:
           PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000

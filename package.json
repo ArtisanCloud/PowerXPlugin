@@ -31,5 +31,8 @@
     "fast-glob": "^3.3.3",
     "micromatch": "^4.0.8",
     "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@nuxtjs/i18n": "10.2.3"
   }
 }

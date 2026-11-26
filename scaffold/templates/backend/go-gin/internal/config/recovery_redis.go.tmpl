@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"os"
 	"strings"
+
+	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 )
 
 // Recovery Redis bindings are explicit and only supplied by the owned host.
@@ -20,8 +22,18 @@ func applyRecoveryRedisBindings(c *Config) error {
 	if c.WSBus != nil && c.WSBus.Provider == "redis" {
 		fields = append(fields, &c.WSBus.RedisURL)
 	}
-	if c.EventBridge != nil && c.EventBridge.TaskBusProvider == "redis" {
-		fields = append(fields, &c.EventBridge.RedisURL)
+	if c.EventBridge != nil && c.EventBridge.Enabled {
+		input := fwprovider.ResolveInput{EnvMode: os.Getenv("POWERX_PROVIDER_MODE"), PowerXProxy: os.Getenv("POWERX_PROXY")}
+		if c.Context != nil {
+			input.ConfigMode = c.Context.ProviderMode
+		}
+		mode, _, err := fwprovider.ResolveRuntimeMode(input)
+		if err != nil {
+			return err
+		}
+		if mode.TaskBusProvider() == "redis" {
+			fields = append(fields, &c.EventBridge.RedisURL)
+		}
 	}
 	if c.Integration != nil && c.Integration.Idempotency.Provider == "redis" {
 		fields = append(fields, &c.Integration.Idempotency.RedisURL)

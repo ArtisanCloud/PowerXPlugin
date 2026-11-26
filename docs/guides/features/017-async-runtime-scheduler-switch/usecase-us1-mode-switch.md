@@ -1,5 +1,7 @@
 # Use Case：US1 模式识别与冲突阻断（版本：v1.0）
 
+> 本页保留旧 Scheduler 诊断接口的 proxy 配对说明，不作为当前 EventBridge 启动规则。事件装配消费[统一模式快照](../../develop/standalone/mode-resolution.md)：local 始终 Redis、delegated 始终 Host；`taskbus_provider` 请求字段不修改启动配置，YAML mode/provider/fallback 已移除。
+
 ## 1. 功能背景与目标
 
 - 目标结论：在启动期识别 `standalone_local/delegated_proxy`，并在冲突配置时立即失败。
@@ -50,7 +52,7 @@ flowchart LR
 
 ## 6. 前置条件与依赖
 
-- `POWERX_PROXY` 与 `taskbus_provider` 已配置。
+- 已设置 `POWERX_PROVIDER_MODE` 与 `POWERX_PROXY`；诊断请求携带实际观测到的 provider。
 - 拥有 admin token。
 - 可访问 `:8078`。
 
@@ -103,7 +105,7 @@ cd skeleton/backend/go-gin && go test ./internal/services/admin/runtime_ops ./in
 | 路由 | `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/routes.go` | `/scheduler/mode/validate` |
 | Handler | `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/scheduler_mode_handler.go` | 参数与冲突响应 |
 | Service | `skeleton/backend/go-gin/internal/services/admin/runtime_ops/scheduler_mode_service.go` | 模式判定规则 |
-| 启动冲突校验 | `skeleton/backend/go-gin/cmd/plugin/taskbus_provider.go` | `validateTaskBusProviderConflict` |
+| 启动模式解析 | `skeleton/backend/go-gin/internal/bootstrap/provider_resolver.go` | `ProviderResolver.RuntimeMode()` |
 | 测试 | `skeleton/backend/go-gin/internal/services/admin/runtime_ops/scheduler_mode_service_test.go` | 单测 |
 
 ## 10. 常见问题与排障

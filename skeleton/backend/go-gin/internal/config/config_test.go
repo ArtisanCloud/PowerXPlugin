@@ -346,7 +346,7 @@ func TestLoadSupportsRuntimeNamespacedLogging(t *testing.T) {
 
 func TestLoadSupportsRuntimeNamespacedEventBridge(t *testing.T) {
 	tempDir := t.TempDir()
-	configContent := "runtime:\n  event_bridge:\n    enabled: true\n    mode: taskbus\n    taskbus_provider: redis\n    redis_url: redis://127.0.0.1:6379\n    redis_stream: px.test.stream\n"
+	configContent := "runtime:\n  event_bridge:\n    enabled: true\n    redis_url: redis://127.0.0.1:6379\n    redis_stream: px.test.stream\n"
 	configFile := filepath.Join(tempDir, "config.yaml")
 	if err := os.WriteFile(configFile, []byte(configContent), 0o644); err != nil {
 		t.Fatalf("写入测试配置失败: %v", err)
@@ -362,9 +362,6 @@ func TestLoadSupportsRuntimeNamespacedEventBridge(t *testing.T) {
 	}
 	if cfg.EventBridge == nil || cfg.Runtime == nil || cfg.Runtime.EventBridge == nil {
 		t.Fatal("runtime.event_bridge 映射失败")
-	}
-	if cfg.EventBridge.TaskBusProvider != "redis" {
-		t.Fatalf("runtime.event_bridge.taskbus_provider 未生效: %q", cfg.EventBridge.TaskBusProvider)
 	}
 	if cfg.EventBridge.RedisStream != "px.test.stream" {
 		t.Fatalf("runtime.event_bridge.redis_stream 未生效: %q", cfg.EventBridge.RedisStream)

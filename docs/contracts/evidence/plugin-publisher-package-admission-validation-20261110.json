@@ -1,0 +1,161 @@
+{
+  "schema": "powerx.plugin-publisher-package-admission-validation/v1",
+  "validated_at": "2026-11-10T02:08:05.446725+00:00",
+  "source_commit": "5683e4293d89b276ee3669448ceefd9de06a75a7",
+  "branch": "025-framework-business-regression",
+  "worktree_uncommitted": true,
+  "published": false,
+  "global_cli_updated": false,
+  "scope": "framework-frozen-package-admission",
+  "contract_basis": {
+    "source": "Marketplace P01 Review confirmed package constraints",
+    "rc2_bundle_consumed": false,
+    "market_server_validation_replaced": false
+  },
+  "limits": {
+    "max_package_bytes": 2147483648,
+    "max_manifest_bytes": 262144,
+    "max_archive_entries": 50000,
+    "max_archive_path_bytes": 1024,
+    "max_uncompressed_bytes": 8589934592,
+    "max_compression_ratio": 200,
+    "compression_ratio_denominator": "actual_complete_zip_bytes",
+    "source_copy_limits_unchanged": true
+  },
+  "validation_environment": {
+    "go_version": "go version go1.26.7 darwin/arm64",
+    "go_work": "go.work",
+    "node_version": "v22.13.0",
+    "mode": "repository_go_work"
+  },
+  "checks": {
+    "publisher_race": {
+      "passed": true,
+      "command": "go test -race -json ./tools/cli/internal/publisher -count=1 -timeout=180s",
+      "top_level_tests": 32,
+      "pass_records": 143,
+      "failed_records": 0,
+      "elapsed_seconds": 12.7
+    },
+    "cmd_tests": {
+      "passed": true,
+      "command": [
+        "go",
+        "test",
+        "./tools/cli/cmd",
+        "-run",
+        "Publisher|PluginID",
+        "-count=1",
+        "-timeout=120s"
+      ],
+      "exit_code": 0,
+      "output": "ok  \tgithub.com/powerx-plugin/cli/cmd\t0.559s\n"
+    },
+    "vet": {
+      "passed": true,
+      "command": [
+        "go",
+        "vet",
+        "./tools/cli/internal/publisher",
+        "./tools/cli/cmd"
+      ],
+      "exit_code": 0
+    },
+    "diff_check": {
+      "passed": true,
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0
+    },
+    "cli": {
+      "native": {
+        "passed": true,
+        "exit_code": 0,
+        "command": "go build -o <temporary-binary> ./tools/cli/cmd/px-plugin",
+        "sha256": "c77da630996ae8248c01c3a4b1d38bb9f2da6bf31812d3afeea2d7b5a3f85bed"
+      },
+      "publisher_help": {
+        "passed": true,
+        "exit_code": 0,
+        "arguments": [
+          "publisher",
+          "--help"
+        ]
+      },
+      "build_run_help": {
+        "passed": true,
+        "exit_code": 0,
+        "arguments": [
+          "publisher",
+          "build",
+          "run",
+          "--help"
+        ]
+      },
+      "linux-amd64": {
+        "passed": true,
+        "exit_code": 0,
+        "command": "go build -o <temporary-binary> ./tools/cli/cmd/px-plugin",
+        "sha256": "1f61f1b9f39022fd71089f0fd11007f82b5cd83db54d8a212c2b85d687c23555"
+      },
+      "temporary_binaries_removed": true
+    }
+  },
+  "coverage": [
+    "manifest_utf8_byte_boundary",
+    "manifest_duplicate_keys_nested_and_root",
+    "manifest_alias_custom_tags_and_multiple_documents",
+    "archive_50000_entries_including_directory_boundary",
+    "archive_1024_utf8_path_boundary",
+    "duplicate_and_unicode_casefold_paths",
+    "implicit_parent_collisions_and_interleaved_names",
+    "file_directory_collision_both_orders",
+    "links_devices_special_permissions_and_encryption_flags",
+    "empty_directory_metadata",
+    "crc_mismatch",
+    "forged_size_and_uint64_overflow",
+    "compression_ratio_200_boundary",
+    "bounded_compressed_output",
+    "failed_build_has_no_artifact",
+    "rejected_new_zip_removed",
+    "matching_stored_digest_still_requires_admission",
+    "verification_does_not_rebuild_or_mutate_file",
+    "source_copy_budget_preserved"
+  ],
+  "known_validation_limitations": {
+    "standalone_module_probe": {
+      "passed": false,
+      "command": ["go", "test", "./internal/publisher", "-run", "TestPackage|TestPacking", "-count=1", "-timeout=120s"],
+      "environment": {"GOWORK": "off"},
+      "working_directory": "tools/cli",
+      "existing_dependency_gap": "published Framework v0.0.28 lacks manifest.ValidatePluginDocument used by the existing publisher engine",
+      "dependency_version_changed": false
+    },
+    "real_linux_nuxt_runtime_accepted": false,
+    "market_upload_or_recovery_accepted": false,
+    "host_install_or_enable_accepted": false,
+    "linux_cli_binary_runtime_executed": false
+  },
+  "cleanup": {
+    "manual_services_started": [],
+    "temporary_binaries_removed": true,
+    "controlled_fixture_cleanup_assertions_passed": [
+      "TestBuildCancellationOwnProcessGroupAndWorkspaceLock",
+      "TestBuildServerShutdownCancelsOwnedChildProcesses",
+      "TestServiceShutdownReleasesPortSessionAndWorkspaceLease"
+    ],
+    "diagnostic_logs_retained": false
+  },
+  "source_sha256": {
+    "tools/cli/internal/publisher/admission.go": "1751b6961c5e8f0e1a8e3d4d1f78c6549728d9867dc157a43d7e7e01d5553792",
+    "tools/cli/internal/publisher/admission_test.go": "5b7ebd5993641f0fec44c6f9d65acabf821ae22a0431a8beba62109c3736549d",
+    "tools/cli/internal/publisher/artifact.go": "aed93a1e1aec39decb6cc7f500eec36773a3563f6b5928fd6b0707721ce2ae30",
+    "tools/cli/internal/publisher/build.go": "eaa1dc3fb0e0b24c8f52d7d048a994a908a72325d6ecc62ec533bca3b89d32f7",
+    "tools/cli/internal/publisher/build_test.go": "b9d50969ab845292f9831003eda404522a30a2ed7339d9026aaf5bf04036fff6",
+    "tools/cli/go.mod": "1419ab0274ca4226ac96f32a48e6f4335b9705185fd80fb5d8a724b7093839df",
+    "docs/contracts/plugin-publisher-build-v1.md": "4b7d5420fb8266cd6644aa4e963992528eb7a6bd5ff8edd7f66c9634f410ccf6"
+  }
+}

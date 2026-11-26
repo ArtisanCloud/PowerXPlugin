@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/hostapi"
 	knowledgeprovider "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/knowledge"
 	Regression "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/regression"
@@ -95,9 +96,6 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/utils"
 	skeletonskills "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/skills"
 	"golang.org/x/sync/errgroup"
-
-	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
-	fweventfabric "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/eventfabric"
 )
 
 type bridgeRecorder struct{}
@@ -152,10 +150,19 @@ func main() {
 		fmt.Printf("Failed to load config: %v\n", err)
 		os.Exit(1)
 	}
-	if err := validateTaskBusProviderConflict(cfg, os.Getenv("POWERX_PROXY")); err != nil {
-		fmt.Printf("Failed preflight mode check: %v\n", err)
-		os.Exit(1)
+	providerResolver := pluginbootstrap.NewProviderResolver(cfg)
+	if err := providerResolver.Err(); err != nil {
+		logger.WithFields(logger.Fields{
+			"provider_mode":   providerResolver.Mode(),
+			"provider_source": providerResolver.Source(),
+			"conflict":        providerResolver.Record().ConflictDetected,
+			"decision":        providerResolver.Record().DecisionReason,
+			"config_mode":     providerResolver.Record().ConfigMode,
+			"env_mode":        providerResolver.Record().EnvMode,
+			"effective_mode":  providerResolver.Record().EffectiveMode,
+		}).WithError(err).Fatal("Provider mode resolution failed")
 	}
+	runtimeMode := providerResolver.RuntimeMode()
 	if err := pluginbootstrap.EnsureLocalIAMSecret(cfg); err != nil {
 		logger.WithError(err).Fatal("Failed to ensure local IAM secret")
 	}
@@ -170,7 +177,7 @@ func main() {
 	// ★ 在这里把 HTTP/GRPC 的占位符先解析掉（一定要在起服务之前）
 	//   - 宿主模式（POWERX_PROXY=1）：优先 POWERX_HTTP_ADDR，缺失则回退 config/PORT（并告警）
 	//   - 本地模式：允许 PORT/配置回退
-	hostMode := strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1"
+	hostMode := runtimeMode.ProxyEnabled
 	pendingStartupLogs := make([]startupLog, 0, 2)
 	if hostMode {
 		httpBindAddr := strings.TrimSpace(os.Getenv("POWERX_HTTP_ADDR"))
@@ -232,18 +239,6 @@ func main() {
 		}
 	}
 
-	providerResolver := pluginbootstrap.NewProviderResolver(cfg)
-	if err := providerResolver.Err(); err != nil {
-		logger.WithFields(logger.Fields{
-			"provider_mode":   providerResolver.Mode(),
-			"provider_source": providerResolver.Source(),
-			"conflict":        providerResolver.Record().ConflictDetected,
-			"decision":        providerResolver.Record().DecisionReason,
-			"config_mode":     providerResolver.Record().ConfigMode,
-			"env_mode":        providerResolver.Record().EnvMode,
-			"effective_mode":  providerResolver.Record().EffectiveMode,
-		}).WithError(err).Fatal("Provider mode resolution failed")
-	}
 	mode := strings.ToLower(strings.TrimSpace(providerResolver.Mode().String()))
 	if mode == "" {
 		mode = "unknown"
@@ -795,47 +790,13 @@ func main() {
 	if eventCfg != nil && strings.TrimSpace(eventCfg.SourcePlugin) == "" {
 		eventCfg.SourcePlugin = app.PluginID
 	}
-	taskBusRuntime := resolveTaskBusRuntime(cfg, wsHub, eventLogger, pxc, realtimeDescriptors)
+	taskBusRuntime := resolveTaskBusRuntime(cfg, runtimeMode, wsHub, eventLogger, pxc, realtimeDescriptors)
 
-	var bridgeEmitter fweventbridge.Emitter
-	var reliableEvents *fweventfabric.Runtime
-	if eventCfg != nil && eventCfg.Enabled && resolveTaskBusProviderMode(cfg) == "host" {
-		if eventCfg.Mode != "taskbus" || eventCfg.FallbackToLocal {
-			eventLogger.Fatal("EVENT_FABRIC_RUNTIME_CONFIG_INVALID")
-		}
-		selected, err := taskBusRuntime.Provider.NewEmitter()
-		if err != nil {
-			eventLogger.WithError(err).Fatal("EVENT_FABRIC_RUNTIME_INITIALIZATION_FAILED")
-		}
-		var ok bool
-		reliableEvents, ok = selected.(*fweventfabric.Runtime)
-		if !ok {
-			eventLogger.Fatal("EVENT_FABRIC_RUNTIME_ADAPTER_REQUIRED")
-		}
-		defer reliableEvents.Close()
-		bridgeEmitter = selected
-	} else if eventCfg == nil {
-		bridgeEmitter = fweventbridge.NewLocalEmitter(1024)
-	} else {
-		factory, err := fweventbridge.NewFactory(fweventbridge.Config{
-			Enabled:         eventCfg.Enabled,
-			Mode:            eventCfg.Mode,
-			FallbackToLocal: eventCfg.FallbackToLocal,
-			LocalQueueSize:  eventCfg.LocalQueueSize,
-		})
-		if err != nil {
-			eventLogger.WithError(err).Warn("Invalid event bridge config; falling back to local emitter")
-			bridgeEmitter = fweventbridge.NewLocalEmitter(1024)
-		} else {
-			factory.WithMetrics(bridgeRecorder{})
-			factory.WithTaskBusProvider(fweventbridge.NewTaskBusEmitterAdapter(taskBusRuntime.Provider))
-			bridgeEmitter, err = factory.NewEmitter()
-			if err != nil {
-				eventLogger.WithError(err).Warn("Failed to initialize event bridge emitter; falling back to local emitter")
-				bridgeEmitter = fweventbridge.NewLocalEmitter(1024)
-			}
-		}
+	bridgeEmitter, reliableEvents, err := newEventBridgeEmitter(cfg, runtimeMode, taskBusRuntime)
+	if err != nil {
+		eventLogger.WithError(err).Fatal("EVENT_FABRIC_RUNTIME_INITIALIZATION_FAILED")
 	}
+	defer fweventbridge.Close(bridgeEmitter)
 
 	// 运行时事件权限：从 plugin.yaml 解析 publish/subscribe（若未声明则默认不强制）
 	perms, err := security.LoadEventPermissionsFromManifest("", eventLogger)

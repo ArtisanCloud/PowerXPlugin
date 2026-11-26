@@ -40,9 +40,8 @@ logs
 .DS_Store
 Thumbs.db
 
-# Testing artifacts (coverage reports, playwright output, temp CLI scaffolds)
-/artifacts/regression/
-/artifacts/framework-release-*/
+# Generated local artifacts. Retained verification evidence lives in docs/contracts/evidence/.
+/artifacts/
 tmp/
 !tmp/README.md
 .cache/

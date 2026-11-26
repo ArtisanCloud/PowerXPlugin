@@ -1,0 +1,581 @@
+{
+  "notice": "Reference client recovery decisions only; no network request or business operation is executed.",
+  "cases": [
+    {
+      "name": "lost response is queried before resend",
+      "context": {
+        "credential_status": "active",
+        "identity_matches": true,
+        "plugin_allowed": true,
+        "scope_allowed": true,
+        "request_matches": true,
+        "operation_status": "unknown",
+        "retention_expired": false,
+        "feature_available": true,
+        "attempts": 1,
+        "elapsed_seconds": 30,
+        "poll_elapsed_seconds": 0,
+        "retry_after_seconds": 0
+      },
+      "action": "query_operation"
+    },
+    {
+      "name": "valid 404 still uses original operation",
+      "context": {
+        "credential_status": "active",
+        "identity_matches": true,
+        "plugin_allowed": true,
+        "scope_allowed": true,
+        "request_matches": true,
+        "operation_status": "not_found",
+        "retention_expired": false,
+        "feature_available": true,
+        "attempts": 1,
+        "elapsed_seconds": 30,
+        "poll_elapsed_seconds": 0,
+        "retry_after_seconds": 0
+      },
+      "action": "retry_same_operation"
+    },
+    {
+      "name": "recoverable failure keeps original operation",
+      "context": {
+        "credential_status": "active",
+        "identity_matches": true,
+        "plugin_allowed": true,
+        "scope_allowed": true,
+        "request_matches": true,
+        "operation_status": "failed_retryable",
+        "retention_expired": false,
+        "feature_available": true,
+        "attempts": 1,
+        "elapsed_seconds": 30,
+        "poll_elapsed_seconds": 0,
+        "retry_after_seconds": 0
+      },
+      "action": "retry_same_operation"
+    },
+    {
+      "name": "same operation succeeded reads current version",
+      "context": {
+        "credential_status": "active",
+        "identity_matches": true,
+        "plugin_allowed": true,
+        "scope_allowed": true,
+        "request_matches": true,
+        "operation_status": "succeeded",
+        "retention_expired": false,
+        "feature_available": true,
+        "attempts": 1,
+        "elapsed_seconds": 30,
+        "poll_elapsed_seconds": 0,
+        "retry_after_seconds": 0
+      },
+      "action": "read_current_state"
+    },
+    {
+      "name": "original receipt still usable after feature off",
+      "context": {
+        "credential_status": "active",
+        "identity_matches": true,
+        "plugin_allowed": true,
+        "scope_allowed": true,
+        "request_matches": true,
+        "operation_status": "succeeded",
+        "retention_expired": false,
+        "feature_available": false,
+        "attempts": 1,
+        "elapsed_seconds": 30,
+        "poll_elapsed_seconds": 0,
+        "retry_after_seconds": 0
+      },
+      "action": "read_current_state"
+    },
+    {
+      "name": "permanent failure cannot be replayed",
+      "context": {
+        "credential_status": "active",
+        "identity_matches": true,
+        "plugin_allowed": true,
+        "scope_allowed": true,
+        "request_matches": true,
+        "operation_status": "failed_permanent",
+        "retention_expired": false,
+        "feature_available": true,
+        "attempts": 1,
+        "elapsed_seconds": 30,
+        "poll_elapsed_seconds": 0,
+        "retry_after_seconds": 0
+      },
+      "action": "stop_permanent"
+    },
+    {
+      "name": "expiry requests explicit authorization",
+      "context": {
+        "credential_status": "expired",
+        "identity_matches": true,
+        "plugin_allowed": true,
+        "scope_allowed": true,
+        "request_matches": true,
+        "operation_status": "not_found",
+        "retention_expired": false,
+        "feature_available": true,
+        "attempts": 1,
+        "elapsed_seconds": 30,
+        "poll_elapsed_seconds": 0,
+        "retry_after_seconds": 0
+      },
+      "action": "reauthorize"
+    },
+    {
+      "name": "revocation cannot query with old credential",
+      "context": {
+        "credential_status": "revoked",
+        "identity_matches": true,
+        "plugin_allowed": true,
+        "scope_allowed": true,
+        "request_matches": true,
+        "operation_status": "succeeded",
+        "retention_expired": false,
+        "feature_available": true,
+        "attempts": 1,
+        "elapsed_seconds": 30,
+        "poll_elapsed_seconds": 0,
+        "retry_after_seconds": 0
+      },
+      "action": "reauthorize"
+    },
+    {
+      "name": "replacement with another user is denied",
+      "context": {
+        "credential_status": "active",
+        "identity_matches": false,
+        "plugin_allowed": true,
+        "scope_allowed": true,
+        "request_matches": true,
+        "operation_status": "not_found",
+        "retention_expired": false,
+        "feature_available": true,
+        "attempts": 1,
+        "elapsed_seconds": 30,
+        "poll_elapsed_seconds": 0,
+        "retry_after_seconds": 0
+      },
+      "action": "deny"
+    },
+    {
+      "name": "replacement without plugin grant is denied",
+      "context": {
+        "credential_status": "active",
+        "identity_matches": true,
+        "plugin_allowed": false,
+        "scope_allowed": true,
+        "request_matches": true,
+        "operation_status": "not_found",
+        "retention_expired": false,
+        "feature_available": true,
+        "attempts": 1,
+        "elapsed_seconds": 30,
+        "poll_elapsed_seconds": 0,
+        "retry_after_seconds": 0
+      },
+      "action": "deny"
+    },
+    {
+      "name": "replacement without operation scope is denied",
+      "context": {
+        "credential_status": "active",
+        "identity_matches": true,
+        "plugin_allowed": true,
+        "scope_allowed": false,
+        "request_matches": true,
+        "operation_status": "not_found",
+        "retention_expired": false,
+        "feature_available": true,
+        "attempts": 1,
+        "elapsed_seconds": 30,
+        "poll_elapsed_seconds": 0,
+        "retry_after_seconds": 0
+      },
+      "action": "deny"
+    },
+    {
+      "name": "changed normalized intent conflicts",
+      "context": {
+        "credential_status": "active",
+        "identity_matches": true,
+        "plugin_allowed": true,
+        "scope_allowed": true,
+        "request_matches": false,
+        "operation_status": "not_found",
+        "retention_expired": false,
+        "feature_available": true,
+        "attempts": 1,
+        "elapsed_seconds": 30,
+        "poll_elapsed_seconds": 0,
+        "retry_after_seconds": 0
+      },
+      "action": "conflict"
+    },
+    {
+      "name": "processing polls original operation",
+      "context": {
+        "credential_status": "active",
+        "identity_matches": true,
+        "plugin_allowed": true,
+        "scope_allowed": true,
+        "request_matches": true,
+        "operation_status": "processing",
+        "retention_expired": false,
+        "feature_available": true,
+        "attempts": 1,
+        "elapsed_seconds": 30,
+        "poll_elapsed_seconds": 0,
+        "retry_after_seconds": 2
+      },
+      "action": "poll_operation"
+    },
+    {
+      "name": "processing query survives capability off",
+      "context": {
+        "credential_status": "active",
+        "identity_matches": true,
+        "plugin_allowed": true,
+        "scope_allowed": true,
+        "request_matches": true,
+        "operation_status": "processing",
+        "retention_expired": false,
+        "feature_available": false,
+        "attempts": 1,
+        "elapsed_seconds": 30,
+        "poll_elapsed_seconds": 0,
+        "retry_after_seconds": 0
+      },
+      "action": "poll_operation"
+    },
+    {
+      "name": "bounded processing poll stays pending",
+      "context": {
+        "credential_status": "active",
+        "identity_matches": true,
+        "plugin_allowed": true,
+        "scope_allowed": true,
+        "request_matches": true,
+        "operation_status": "processing",
+        "retention_expired": false,
+        "feature_available": true,
+        "attempts": 1,
+        "elapsed_seconds": 30,
+        "poll_elapsed_seconds": 120,
+        "retry_after_seconds": 0
+      },
+      "action": "keep_pending"
+    },
+    {
+      "name": "expired retention reconciles version instead of resend",
+      "context": {
+        "credential_status": "active",
+        "identity_matches": true,
+        "plugin_allowed": true,
+        "scope_allowed": true,
+        "request_matches": true,
+        "operation_status": "not_found",
+        "retention_expired": true,
+        "feature_available": true,
+        "attempts": 1,
+        "elapsed_seconds": 30,
+        "poll_elapsed_seconds": 0,
+        "retry_after_seconds": 0
+      },
+      "action": "reconcile_version"
+    },
+    {
+      "name": "disabled write capability is respected",
+      "context": {
+        "credential_status": "active",
+        "identity_matches": true,
+        "plugin_allowed": true,
+        "scope_allowed": true,
+        "request_matches": true,
+        "operation_status": "not_found",
+        "retention_expired": false,
+        "feature_available": false,
+        "attempts": 1,
+        "elapsed_seconds": 30,
+        "poll_elapsed_seconds": 0,
+        "retry_after_seconds": 0
+      },
+      "action": "wait_capability"
+    },
+    {
+      "name": "query remains possible after disabling writes",
+      "context": {
+        "credential_status": "active",
+        "identity_matches": true,
+        "plugin_allowed": true,
+        "scope_allowed": true,
+        "request_matches": true,
+        "operation_status": "unknown",
+        "retention_expired": false,
+        "feature_available": false,
+        "attempts": 1,
+        "elapsed_seconds": 30,
+        "poll_elapsed_seconds": 0,
+        "retry_after_seconds": 0
+      },
+      "action": "query_operation"
+    },
+    {
+      "name": "three total attempts stop automatic resend",
+      "context": {
+        "credential_status": "active",
+        "identity_matches": true,
+        "plugin_allowed": true,
+        "scope_allowed": true,
+        "request_matches": true,
+        "operation_status": "not_found",
+        "retention_expired": false,
+        "feature_available": true,
+        "attempts": 3,
+        "elapsed_seconds": 30,
+        "poll_elapsed_seconds": 0,
+        "retry_after_seconds": 0
+      },
+      "action": "manual_review"
+    },
+    {
+      "name": "last permitted retry keeps identity",
+      "context": {
+        "credential_status": "active",
+        "identity_matches": true,
+        "plugin_allowed": true,
+        "scope_allowed": true,
+        "request_matches": true,
+        "operation_status": "not_found",
+        "retention_expired": false,
+        "feature_available": true,
+        "attempts": 2,
+        "elapsed_seconds": 30,
+        "poll_elapsed_seconds": 0,
+        "retry_after_seconds": 0
+      },
+      "action": "retry_same_operation"
+    },
+    {
+      "name": "overall recovery budget exhausted",
+      "context": {
+        "credential_status": "active",
+        "identity_matches": true,
+        "plugin_allowed": true,
+        "scope_allowed": true,
+        "request_matches": true,
+        "operation_status": "not_found",
+        "retention_expired": false,
+        "feature_available": true,
+        "attempts": 1,
+        "elapsed_seconds": 7200,
+        "poll_elapsed_seconds": 0,
+        "retry_after_seconds": 0
+      },
+      "action": "manual_review"
+    },
+    {
+      "name": "oversized server Retry-After is not truncated",
+      "context": {
+        "credential_status": "active",
+        "identity_matches": true,
+        "plugin_allowed": true,
+        "scope_allowed": true,
+        "request_matches": true,
+        "operation_status": "not_found",
+        "retention_expired": false,
+        "feature_available": true,
+        "attempts": 1,
+        "elapsed_seconds": 30,
+        "poll_elapsed_seconds": 0,
+        "retry_after_seconds": 301
+      },
+      "action": "manual_review"
+    },
+    {
+      "name": "server delay does not fit remaining budget",
+      "context": {
+        "credential_status": "active",
+        "identity_matches": true,
+        "plugin_allowed": true,
+        "scope_allowed": true,
+        "request_matches": true,
+        "operation_status": "not_found",
+        "retention_expired": false,
+        "feature_available": true,
+        "attempts": 1,
+        "elapsed_seconds": 7199,
+        "poll_elapsed_seconds": 0,
+        "retry_after_seconds": 2
+      },
+      "action": "manual_review"
+    },
+    {
+      "name": "server maximum retry delay respected",
+      "context": {
+        "credential_status": "active",
+        "identity_matches": true,
+        "plugin_allowed": true,
+        "scope_allowed": true,
+        "request_matches": true,
+        "operation_status": "not_found",
+        "retention_expired": false,
+        "feature_available": true,
+        "attempts": 1,
+        "elapsed_seconds": 30,
+        "poll_elapsed_seconds": 0,
+        "retry_after_seconds": 300
+      },
+      "action": "retry_same_operation"
+    },
+    {
+      "name": "processing wait exceeds overall budget",
+      "context": {
+        "credential_status": "active",
+        "identity_matches": true,
+        "plugin_allowed": true,
+        "scope_allowed": true,
+        "request_matches": true,
+        "operation_status": "processing",
+        "retention_expired": false,
+        "feature_available": true,
+        "attempts": 1,
+        "elapsed_seconds": 7199,
+        "poll_elapsed_seconds": 0,
+        "retry_after_seconds": 2
+      },
+      "action": "manual_review"
+    },
+    {
+      "name": "processing wait equals overall deadline",
+      "context": {
+        "credential_status": "active",
+        "identity_matches": true,
+        "plugin_allowed": true,
+        "scope_allowed": true,
+        "request_matches": true,
+        "operation_status": "processing",
+        "retention_expired": false,
+        "feature_available": true,
+        "attempts": 1,
+        "elapsed_seconds": 7198,
+        "poll_elapsed_seconds": 0,
+        "retry_after_seconds": 2
+      },
+      "action": "manual_review"
+    },
+    {
+      "name": "processing Retry-After exceeds contract",
+      "context": {
+        "credential_status": "active",
+        "identity_matches": true,
+        "plugin_allowed": true,
+        "scope_allowed": true,
+        "request_matches": true,
+        "operation_status": "processing",
+        "retention_expired": false,
+        "feature_available": true,
+        "attempts": 1,
+        "elapsed_seconds": 30,
+        "poll_elapsed_seconds": 0,
+        "retry_after_seconds": 301
+      },
+      "action": "manual_review"
+    },
+    {
+      "name": "processing poll wait exceeds poll budget",
+      "context": {
+        "credential_status": "active",
+        "identity_matches": true,
+        "plugin_allowed": true,
+        "scope_allowed": true,
+        "request_matches": true,
+        "operation_status": "processing",
+        "retention_expired": false,
+        "feature_available": true,
+        "attempts": 1,
+        "elapsed_seconds": 30,
+        "poll_elapsed_seconds": 119,
+        "retry_after_seconds": 2
+      },
+      "action": "keep_pending"
+    },
+    {
+      "name": "processing poll wait equals poll deadline",
+      "context": {
+        "credential_status": "active",
+        "identity_matches": true,
+        "plugin_allowed": true,
+        "scope_allowed": true,
+        "request_matches": true,
+        "operation_status": "processing",
+        "retention_expired": false,
+        "feature_available": true,
+        "attempts": 1,
+        "elapsed_seconds": 30,
+        "poll_elapsed_seconds": 118,
+        "retry_after_seconds": 2
+      },
+      "action": "keep_pending"
+    },
+    {
+      "name": "processing zero Retry-After still uses minimum poll delay",
+      "context": {
+        "credential_status": "active",
+        "identity_matches": true,
+        "plugin_allowed": true,
+        "scope_allowed": true,
+        "request_matches": true,
+        "operation_status": "processing",
+        "retention_expired": false,
+        "feature_available": true,
+        "attempts": 1,
+        "elapsed_seconds": 30,
+        "poll_elapsed_seconds": 119,
+        "retry_after_seconds": 0
+      },
+      "action": "keep_pending"
+    },
+    {
+      "name": "processing poll still fits both budgets",
+      "context": {
+        "credential_status": "active",
+        "identity_matches": true,
+        "plugin_allowed": true,
+        "scope_allowed": true,
+        "request_matches": true,
+        "operation_status": "processing",
+        "retention_expired": false,
+        "feature_available": true,
+        "attempts": 1,
+        "elapsed_seconds": 7197,
+        "poll_elapsed_seconds": 117,
+        "retry_after_seconds": 2
+      },
+      "action": "poll_operation"
+    },
+    {
+      "name": "unknown operation respects excessive Retry-After",
+      "context": {
+        "credential_status": "active",
+        "identity_matches": true,
+        "plugin_allowed": true,
+        "scope_allowed": true,
+        "request_matches": true,
+        "operation_status": "unknown",
+        "retention_expired": false,
+        "feature_available": true,
+        "attempts": 1,
+        "elapsed_seconds": 30,
+        "poll_elapsed_seconds": 0,
+        "retry_after_seconds": 301
+      },
+      "action": "manual_review"
+    }
+  ]
+}

@@ -78,6 +78,46 @@ func requireReady(t *testing.T, e *Engine, b Build) {
 		t.Fatalf("stage=%s error=%v log=%s", b.Stage, b.Error, log)
 	}
 }
+func TestBuildIncludesEventFabricDeclarationsOnly(t *testing.T) {
+	root, e, p := buildFixture(t)
+	files := map[string]string{
+		"config/event_fabric_service.yaml": "version: v1\ntopics: []\n",
+		"config/values.example.yaml":       "runtime:\n  event_bridge:\n    topic_manifest: config/event_fabric_service.yaml\n",
+		"config/private.yaml":              "API_KEY: fixture-private\n",
+	}
+	for rel, data := range files {
+		file := filepath.Join(root, rel)
+		if err := os.MkdirAll(filepath.Dir(file), 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(file, []byte(data), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	b := runFixture(t, e, p)
+	requireReady(t, e, b)
+	a, err := e.VerifyArtifact(b.BuildID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := zip.OpenReader(filepath.Join(e.state.path, a.Path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	seen := map[string]bool{}
+	for _, file := range r.File {
+		seen[file.Name] = true
+	}
+	for _, rel := range []string{"config/event_fabric_service.yaml", "config/values.example.yaml"} {
+		if !seen[p.Version+"/"+rel] {
+			t.Fatal("EVENT_FABRIC_DECLARATION_NOT_PACKAGED", rel)
+		}
+	}
+	if seen[p.Version+"/config/private.yaml"] {
+		t.Fatal("PRIVATE_CONFIG_PACKAGED")
+	}
+}
 func TestBuildIsolationFreezingIntegrityAndRedaction(t *testing.T) {
 	root, e, p := buildFixture(t)
 	before, err := sourceDigest(context.Background(), root, "")
@@ -188,7 +228,7 @@ func TestBuildAdmissionAndNoLegacyDependencyFallback(t *testing.T) {
 	}
 }
 func TestBuildRejectsNativeRuntimeAndMissingReferences(t *testing.T) {
-	for _, kind := range []string{"native", "missing_ref", "version", "linked_version", "stripped", "secret"} {
+	for _, kind := range []string{"native", "missing_ref", "version", "linked_version", "stripped", "secret", "manifest_budget", "manifest_alias", "archive_path"} {
 		t.Run(kind, func(t *testing.T) {
 			root, e, p := buildFixture(t)
 			file := filepath.Join(root, "scripts/dist.mjs")
@@ -215,6 +255,12 @@ func TestBuildRejectsNativeRuntimeAndMissingReferences(t *testing.T) {
 				}
 			case "native":
 				data = append(data, []byte("\nfs.writeFileSync(path.join(dist,'web-admin/.output/server/addon.node'),'native-fixture');\n")...)
+			case "manifest_budget":
+				data = append(data, []byte("\nfs.appendFileSync(path.join(dist,'plugin.yaml'),'\\n#'+'a'.repeat(262144));\n")...)
+			case "manifest_alias":
+				data = append(data, []byte("\nfs.appendFileSync(path.join(dist,'plugin.yaml'),'\\nfirst: &value example\\nsecond: *value\\n');\n")...)
+			case "archive_path":
+				data = append(data, []byte("\nfs.writeFileSync(path.join(dist,'web-admin/.output/public/asset%20.js'),'export default {}');\n")...)
 			case "missing_ref":
 				if err := os.Remove(filepath.Join(root, "contracts/schema/input.json")); err != nil {
 					t.Fatal(err)
@@ -232,6 +278,9 @@ func TestBuildRejectsNativeRuntimeAndMissingReferences(t *testing.T) {
 			want := ArtifactInvalid
 			if kind == "native" {
 				want = NativeUnsupported
+			}
+			if kind == "manifest_budget" {
+				want = TooLarge
 			}
 			if b.Error.Code != want {
 				log, _ := e.BuildLog(b.BuildID)

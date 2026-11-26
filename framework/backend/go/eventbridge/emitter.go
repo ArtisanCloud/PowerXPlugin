@@ -3,10 +3,7 @@ package eventbridge
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
-	"os"
-	"strings"
 	"time"
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/event"
@@ -45,124 +42,34 @@ func (f *Factory) NewEmitter() (Emitter, error) {
 	if f == nil {
 		return nil, ErrNotConfigured
 	}
-
-	opts := make([]LocalEmitterOption, 0, 1)
-	metrics := f.metrics
-	if dropRecorder, ok := metrics.(DropRecorder); ok && dropRecorder != nil {
-		opts = append(opts, WithDropRecorder(dropRecorder))
-	}
-
-	local := NewLocalEmitter(f.cfg.LocalQueueSize, opts...)
-	hostManaged := strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1"
-	slog.Info("eventbridge factory decide",
-		"enabled", f.cfg.Enabled,
-		"mode", f.cfg.Mode,
-		"fallback_to_local", f.cfg.FallbackToLocal,
-		"has_taskbus_provider", f.taskBusProvider != nil,
-		"local_queue_size", f.cfg.LocalQueueSize,
-		"host_managed", hostManaged,
-	)
-
-	// 宿主模式硬约束：禁止 local/fallback，必须 taskbus。
-	if hostManaged {
-		if !f.cfg.Enabled || f.cfg.Mode == "local" {
-			slog.Error("eventbridge host-mode guard failed",
-				"reason", "host_mode_requires_taskbus_mode",
-				"enabled", f.cfg.Enabled,
-				"mode", f.cfg.Mode,
-			)
-			return nil, ErrTaskBusRequired
+	if !f.cfg.Enabled {
+		var opts []LocalEmitterOption
+		if recorder, ok := f.metrics.(DropRecorder); ok && recorder != nil {
+			opts = append(opts, WithDropRecorder(recorder))
 		}
-		if f.taskBusProvider == nil {
-			slog.Error("eventbridge host-mode guard failed",
-				"reason", "host_mode_requires_taskbus_provider",
-			)
-			return nil, ErrTaskBusRequired
-		}
+		return newInstrumentedEmitter(NewLocalEmitter(f.cfg.LocalQueueSize, opts...), f.metrics), nil
 	}
-
-	if !f.cfg.Enabled || f.cfg.Mode == "local" {
-		slog.Info("eventbridge factory chose local",
-			"reason", "disabled_or_local_mode",
-		)
-		return newInstrumentedEmitter(local, metrics), nil
-	}
-
 	if f.taskBusProvider == nil {
-		if f.cfg.FallbackToLocal {
-			slog.Warn("eventbridge factory fallback local",
-				"reason", "taskbus_provider_missing",
-			)
-			return newInstrumentedEmitter(local, metrics), nil
-		}
-		slog.Error("eventbridge factory failed",
-			"reason", "taskbus_provider_missing",
-		)
 		return nil, ErrTaskBusRequired
 	}
-
-	taskbus, err := f.taskBusProvider()
+	selected, err := f.taskBusProvider()
 	if err != nil {
-		if hostManaged || errors.Is(err, ErrReliableHostRequired) {
-			return nil, err
-		}
-		if f.cfg.FallbackToLocal {
-			slog.Warn("eventbridge factory fallback local",
-				"reason", "taskbus_provider_error",
-				"error", err.Error(),
-			)
-			return newInstrumentedEmitter(local, metrics), nil
-		}
-		slog.Error("eventbridge factory failed",
-			"reason", "taskbus_provider_error",
-			"error", err.Error(),
-		)
 		return nil, err
 	}
-
-	if host, ok := taskbus.(interface{ ReliableHost() bool }); ok && host.ReliableHost() && (f.cfg.Mode != "taskbus" || f.cfg.FallbackToLocal) {
-		return nil, ErrReliableHostRequired
+	if selected == nil {
+		return nil, ErrTaskBusRequired
 	}
-	if f.cfg.Mode == "dual" {
-		slog.Info("eventbridge factory chose dual",
-			"taskbus_type", typeName(taskbus),
-		)
-		return newInstrumentedEmitter(&dualEmitter{primary: taskbus, secondary: local}, metrics), nil
+	reliable, ok := selected.(interface{ ReliableHost() bool })
+	isHost := ok && reliable.ReliableHost()
+	if isHost != (f.cfg.RuntimeMode.TaskBusProvider() == "host") {
+		return nil, errors.Join(ErrReliableHostRequired, Close(selected))
 	}
-	slog.Info("eventbridge factory chose taskbus",
-		"taskbus_type", typeName(taskbus),
-	)
-	return newInstrumentedEmitter(taskbus, metrics), nil
-}
-
-func typeName(v any) string {
-	if v == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("%T", v)
-}
-
-type dualEmitter struct {
-	primary   Emitter
-	secondary Emitter
-}
-
-func (d *dualEmitter) Emit(ctx context.Context, e event.Event) error {
-	if d == nil || d.primary == nil {
-		return ErrNotConfigured
-	}
-	if err := d.primary.Emit(ctx, e); err != nil {
-		return err
-	}
-	if d.secondary == nil {
-		return nil
-	}
-	_ = d.secondary.Emit(ctx, e)
-	return nil
+	slog.Info("EVENT_BRIDGE_RUNTIME_SELECTED", "provider_mode", f.cfg.RuntimeMode.ProviderMode, "taskbus_provider", f.cfg.RuntimeMode.TaskBusProvider())
+	return newInstrumentedEmitter(selected, f.metrics), nil
 }
 
 // Drain proxies LocalEmitter.Drain when the underlying emitter supports it.
-// This is primarily used by tests to assert fallback behavior without relying on concrete types.
+// This is primarily used to inspect an explicitly selected local emitter.
 func Drain(e Emitter) []event.Event {
 	if e == nil {
 		return nil
@@ -174,6 +81,17 @@ func Drain(e Emitter) []event.Event {
 		if innerDrain, ok := d.inner.(interface{ Drain() []event.Event }); ok {
 			return innerDrain.Drain()
 		}
+	}
+	return nil
+}
+
+// Close releases the selected transport even when metrics wrap the emitter.
+func Close(e Emitter) error {
+	if wrapped, ok := e.(*instrumentedEmitter); ok && wrapped != nil {
+		return Close(wrapped.inner)
+	}
+	if closer, ok := e.(interface{ Close() error }); ok {
+		return closer.Close()
 	}
 	return nil
 }

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	"strings"
 	"testing"
 
@@ -20,6 +21,7 @@ func TestEventBridge_Emitter_RecordsMetricsOnSuccessAndFailure(t *testing.T) {
 	ebmetrics.Reset()
 
 	factory, err := fweventbridge.NewFactory(fweventbridge.Config{
+		RuntimeMode:    fwprovider.RuntimeMode{ProviderMode: fwprovider.ModeLocal},
 		Enabled:        false,
 		LocalQueueSize: 10,
 	})

@@ -43,14 +43,14 @@ docs/plan/014-framework-scheduler.md
 ### 3.1 识别信号
 
 1. 主信号：`POWERX_PROVIDER_MODE` + `POWERX_PROXY`
-2. 执行提供者：`runtime.event_bridge.taskbus_provider`
+2. 执行提供者由统一模式快照派生；`runtime.event_bridge` 不再独立配置 mode/provider/fallback。
 3. 网关鉴权：`delegated` 使用 STS/Bearer；`local + proxy` 使用 ApiKey
 
 ### 3.2 推荐决策表
 
 1. `POWERX_PROVIDER_MODE=local` 且 `POWERX_PROXY!=1`：
    - 运行模式：`standalone local`
-   - 推荐 `taskbus_provider=redis`
+   - `POWERX_PROVIDER_MODE=local` 使用本地 Redis TaskBus
    - 说明：事件在插件本地闭环，WS 走 `:8078/api/ws`
 2. `POWERX_PROVIDER_MODE=local` 且 `POWERX_PROXY=1`：
    - 运行模式：`local + proxy`
@@ -58,7 +58,7 @@ docs/plan/014-framework-scheduler.md
    - 说明：本地启动插件，但 Scheduler/WS/能力出站走 PowerX 底座网关
 3. `POWERX_PROVIDER_MODE=delegated` 且 `POWERX_PROXY=1`：
    - 运行模式：`host delegated`
-   - 推荐 `taskbus_provider=host`
+   - `POWERX_PROVIDER_MODE=delegated` 选择 Host Event Fabric；proxy 不改变事件归属
    - 说明：宿主委派模式，出站由 framework gateway 代理到底座并使用 STS/Bearer
 4. `POWERX_PROVIDER_MODE=delegated` 且 `POWERX_PROXY!=1`：
    - 运行模式：`standalone delegated`
@@ -105,16 +105,15 @@ POST /api/v1/admin/scheduler/jobs/{job_id}/resume
 
 ## 4. 配置建议（最小可用）
 
-1. `standalone local`：
+1. `standalone local`：设置 `POWERX_PROVIDER_MODE=local`、`POWERX_PROXY=0`。
 
 ```yaml
 runtime:
   event_bridge:
-    mode: "taskbus"
-    taskbus_provider: "redis"
+    enabled: true
 ```
 
-2. `local + proxy`：
+2. `local + proxy`：设置 `POWERX_PROVIDER_MODE=local`、`POWERX_PROXY=1`。
 
 ```yaml
 context:
@@ -126,26 +125,25 @@ gateway:
   api_key: "<PowerX API Key>"
 runtime:
   event_bridge:
-    mode: "taskbus"
-    taskbus_provider: "host"
+    enabled: true
 ```
 
 环境变量等价写法：
 
 ```bash
+POWERX_PROVIDER_MODE=local
 POWERX_PROXY=1
 PX_GATEWAY_BASE_URL=http://127.0.0.1:8077
 PX_GATEWAY_AUTH_SCHEME=apikey
 PX_GATEWAY_API_KEY=<PowerX API Key>
 ```
 
-3. `delegated proxy`：
+3. `delegated proxy`：设置 `POWERX_PROVIDER_MODE=delegated`、`POWERX_PROXY=1`。
 
 ```yaml
 runtime:
   event_bridge:
-    mode: "taskbus"
-    taskbus_provider: "host"
+    enabled: true
 gateway:
   auth_scheme: "bearer"
 ```
@@ -180,7 +178,7 @@ operations:
 
 ### Step 2：准备 WS 订阅
 
-1. `standalone local`：`ws://127.0.0.1:8078/api/ws`
+1. `standalone local`：设置 `POWERX_PROVIDER_MODE=local`、`POWERX_PROXY=0`。`ws://127.0.0.1:8078/api/ws`
 2. `local + proxy` / `delegated proxy`：同样连插件 `:8078/api/ws`，由插件后端完成 host 链路调用；按 `websocket/debug_playbook.md` 完成 topic/create/grant。
 3. 标准 topic：`powerx.runtime.scheduler.triggered.v1`。
 
@@ -303,7 +301,7 @@ await scheduler.createJob({
 1. 有调度日志但无 WS 事件：检查 topic ACL / grant / subscribe 是否完整。
 2. proxy 下 `403 topic not allowed`：检查 topic 是否已创建、profile 权限是否覆盖、API Key 是否已轮换。
 3. `401`：`gateway.auth_scheme` 与实际凭证不匹配（Bearer/ApiKey 混用）。
-4. 两种模式行为不一致：优先检查 `POWERX_PROXY` 与 `taskbus_provider` 是否按决策表配对。
+4. 两种模式行为不一致：检查 `POWERX_PROVIDER_MODE` 与 `POWERX_PROXY` 的统一解析结果，不再修改事件 YAML 选路字段。
 5. API Key 权限页看不到 Scheduler：检查 PowerX `backend/config/platform_capabilities/*.yaml` 是否已为 `com.corex.scheduler.jobs` 注册 REST protocols，并重新 seed/刷新权限目录。
 6. `sts token not allowed for this route`：检查 PowerX Core 的 STS direct route policy 是否显式允许 `GET/POST /api/v1/admin/scheduler/jobs`、`GET/PATCH /api/v1/admin/scheduler/jobs/{job_id}`、`POST /trigger|pause|resume`、`GET /runs`。这不是插件 page/api RBAC，也不是 topic ACL。
 7. `SCHEDULER_TENANT_MISMATCH`：host 调用不应传 `tenant_uuid`，检查插件是否已使用 framework host client，且 PowerX API key 解析出的租户是否正确。

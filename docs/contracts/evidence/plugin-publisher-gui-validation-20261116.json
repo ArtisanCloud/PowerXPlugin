@@ -1,0 +1,729 @@
+{
+  "recorded_at": "2026-11-15T17:17:27.035788+00:00",
+  "stage": "Base development publisher GUI",
+  "status": "framework_gui_validated_market_admission_fix_pending",
+  "source_branch": "025-framework-business-regression",
+  "head": "5683e4293d89b276ee3669448ceefd9de06a75a7",
+  "uncommitted_source_validation": true,
+  "source_plugin_version": "0.1.4",
+  "candidate_version": "0.1.5",
+  "contract_version": "1.0.0-rc.2",
+  "local_openapi_version": "1.1.0",
+  "build": {
+    "schema": "powerx.plugin-publisher-build/v1",
+    "build_id": "7352fbba-b6ca-481d-9699-8650f5e4a52b",
+    "release_plan_id": "d50567be-0371-4b55-a57f-becf9e4f1957",
+    "plugin_id": "com.powerx.plugins.base",
+    "version": "0.1.5",
+    "target": {
+      "os": "linux",
+      "arch": "amd64"
+    },
+    "stage": "ready",
+    "executor": "container",
+    "container_image": "sha256:6766f77c7a98591a83f39d1a23b3e0f684ea3798cfcc00305857405c6eabecc7",
+    "source": {
+      "sha256": "82d8ac4c0b67b52ef991212f8a09ae731bc92947e7203a2be2cf559b60f264ec",
+      "commit": "5683e4293d89b276ee3669448ceefd9de06a75a7",
+      "dirty": true,
+      "vcs": "git",
+      "dependency_sha256": {
+        "admin": "c13740e3f9a435451e9d5114e7bd4fc1cc51c0e1f23cbe432deca231f1737e19",
+        "client": "57ce09c653ce6cd3ac00537e1cc300c61352921dfa46d7400a63dc30bb30bb51",
+        "go": "0a2d879935d3f6489827b0daf399f3c24d2553ce6341a4c96dd43c920c15925d"
+      }
+    },
+    "tools": {
+      "go": "go1.26.11",
+      "node": "v22.23.5",
+      "node_os": "linux",
+      "node_arch": "x64",
+      "cli_sha256": "70dbef13e3572c209b4fdc7e63ba6ccfbea50d24959c0844ade23d8f6bc65183"
+    },
+    "artifact": {
+      "path": "work/7352fbba-b6ca-481d-9699-8650f5e4a52b/artifact.zip",
+      "sha256": "e7a9f5ef7d883633d2826011946c5f4201a2ef7ba77cc6ba1be5d08190c342f3",
+      "size": 60868645,
+      "file_count": 544
+    },
+    "process": {
+      "parent_pid": 55807,
+      "leader_pid": 57063,
+      "group_id": 57063,
+      "working_directory": "work/7352fbba-b6ca-481d-9699-8650f5e4a52b/run",
+      "started_at": "2026-11-15T16:39:47.664622Z",
+      "exited_at": "2026-11-15T16:49:34.013114Z"
+    },
+    "created_at": "2026-11-15T16:39:26.385235Z",
+    "updated_at": "2026-11-15T16:49:39.675794Z"
+  },
+  "build_gui": {
+    "errors": [],
+    "checks": [
+      "base_automatically_connected",
+      "candidate_plan_created_or_restored_in_ui",
+      "real_make_dist_linux_container_package_ready"
+    ],
+    "phase": "ready",
+    "url": "http://127.0.0.1:53779/powerx/publisher?section=build&plan=d50567be-0371-4b55-a57f-becf9e4f1957&build=7352fbba-b6ca-481d-9699-8650f5e4a52b",
+    "stage": "发布包就绪",
+    "result": "passed"
+  },
+  "linux_packaged_nuxt": {
+    "checks": [
+      "actual_frozen_zip_extracted",
+      "linux_amd64_node22_started_packaged_nitro_read_only",
+      "packaged_html_and_referenced_js_served"
+    ],
+    "container_id": "5dd418474042c21c94e46e88dc54f8841b53ac68eab8f506bf407b4762520dd2",
+    "command": [
+      "docker",
+      "--context",
+      "orbstack",
+      "run",
+      "-d",
+      "--name",
+      "powerx-publisher-smoke-7352fbba-b6ca-481d-9699-8650f5e4a52b",
+      "--label",
+      "com.powerx.publisher.smoke=7352fbba-b6ca-481d-9699-8650f5e4a52b",
+      "--platform=linux/amd64",
+      "--read-only",
+      "--tmpfs",
+      "/tmp",
+      "-e",
+      "HOST=0.0.0.0",
+      "-e",
+      "PORT=3000",
+      "-p",
+      "127.0.0.1::3000",
+      "--mount",
+      "type=bind,source=/var/folders/zh/215y91n14h36h244d2c9tbv40000gn/T/powerx-publisher-gui-mr419n22/actual-package/0.1.5,target=/package,readonly",
+      "node:22-bookworm-slim",
+      "node",
+      "/package/web-admin/.output/server/index.mjs"
+    ],
+    "port": 32768,
+    "result": "passed",
+    "sha256": "e7a9f5ef7d883633d2826011946c5f4201a2ef7ba77cc6ba1be5d08190c342f3",
+    "bytes": 60868645,
+    "js_asset_bytes": 831155,
+    "container_removed": true
+  },
+  "current_cli_final_verify": {
+    "data": {
+      "path": "work/7352fbba-b6ca-481d-9699-8650f5e4a52b/artifact.zip",
+      "sha256": "e7a9f5ef7d883633d2826011946c5f4201a2ef7ba77cc6ba1be5d08190c342f3",
+      "size": 60868645,
+      "file_count": 544
+    }
+  },
+  "binding_gui": {
+    "checks": [
+      "actual_base_registered_in_isolated_market_via_existing_api",
+      "market_scope_selection_and_token_issuance_in_ui",
+      "publisher_gui_token_binding_real_system_keychain_without_cli",
+      "secret_cleared_after_binding"
+    ],
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/markets/{connection_uuid}/bind",
+        "status": 200
+      }
+    ],
+    "token_id": "afb8224e-c80a-4857-80f7-49e27eeea0e0",
+    "connection_id": "7c286ee8-4113-4196-9b6c-3627fda823ab",
+    "result": "passed"
+  },
+  "upload_gui": {
+    "checks": [
+      "same_frozen_base_zip_reverified_from_ui"
+    ],
+    "requests": [
+      {
+        "path": "/connect",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/plans/d50567be-0371-4b55-a57f-becf9e4f1957",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/uploads",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/markets",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/submissions",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/builds/7352fbba-b6ca-481d-9699-8650f5e4a52b",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/plans/d50567be-0371-4b55-a57f-becf9e4f1957",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/plans",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/builds",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/plans/d50567be-0371-4b55-a57f-becf9e4f1957",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/builds/7352fbba-b6ca-481d-9699-8650f5e4a52b",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "path": "/builds/7352fbba-b6ca-481d-9699-8650f5e4a52b/verify",
+        "method": "POST",
+        "status": 200
+      },
+      {
+        "path": "/uploads",
+        "method": "POST",
+        "status": 202
+      },
+      {
+        "path": "/uploads/5278f126-cbc3-4ae6-830c-660239466cfc",
+        "method": "GET",
+        "status": 200
+      }
+    ],
+    "result": "failed",
+    "error": "locator.waitFor: Target page, context or browser has been closed\nCall log:\n\u001b[2m  - waiting for getByTestId('publisher-upload-task').filter({ hasText: '上传完成' }) to be visible\u001b[22m\n"
+  },
+  "review_gui": null,
+  "upload_records": [
+    {
+      "contract_version": "1.0.0-rc.2",
+      "bundle_sha256": "89141c00e0b99b6a803312119e4cbcb3e64224bf458e234e35fc5ffbdeacd8fa",
+      "schema": "powerx.plugin-publisher-upload/v1",
+      "upload_id": "5278f126-cbc3-4ae6-830c-660239466cfc",
+      "operation_id": "d1405a57-d0ca-4274-bc26-87a2739584d2",
+      "connection_id": "7c286ee8-4113-4196-9b6c-3627fda823ab",
+      "build_id": "7352fbba-b6ca-481d-9699-8650f5e4a52b",
+      "user_id": "fcf4856d-9c40-4b08-86bf-8af313b36d82",
+      "developer_id": "301c96f3-cfe8-47ca-8917-890caef9ada4",
+      "plugin_id": "com.powerx.plugins.base",
+      "release_plan_id": "d50567be-0371-4b55-a57f-becf9e4f1957",
+      "version": "0.1.5",
+      "artifact": {
+        "path": "work/7352fbba-b6ca-481d-9699-8650f5e4a52b/artifact.zip",
+        "sha256": "e7a9f5ef7d883633d2826011946c5f4201a2ef7ba77cc6ba1be5d08190c342f3",
+        "size": 60868645,
+        "file_count": 544
+      },
+      "request_sha256": "01db1f07ee929f10de19e768bbed2b182b247c5ce1baa77aba204a1b2fd8f72c",
+      "stage": "failed",
+      "attempts": 1,
+      "bytes_sent": 60868645,
+      "created_at": "2026-11-15T16:52:16.422717Z",
+      "updated_at": "2026-11-15T16:52:17.632814Z",
+      "error": {
+        "code": "PUBLISHER_MARKET_REJECTED",
+        "message_key": "PUBLISHER_MARKET_REJECTED",
+        "params": {
+          "reason": "package_invalid",
+          "request_id": "2211121f-0f3e-4aaa-859f-22986b52aa47"
+        }
+      }
+    }
+  ],
+  "validation_build_attempts": [
+    {
+      "build_id": "7352fbba-b6ca-481d-9699-8650f5e4a52b",
+      "release_plan_id": "d50567be-0371-4b55-a57f-becf9e4f1957",
+      "stage": "ready",
+      "error": null,
+      "created_at": "2026-11-15T16:39:26.385235Z",
+      "updated_at": "2026-11-15T16:49:39.675794Z"
+    },
+    {
+      "build_id": "d2ae777d-00e2-4796-be66-ad118e19617f",
+      "release_plan_id": "d50567be-0371-4b55-a57f-becf9e4f1957",
+      "stage": "failed",
+      "error": {
+        "code": "PUBLISHER_CONTAINER_BUILD_FAILED",
+        "message_key": "PUBLISHER_CONTAINER_BUILD_FAILED"
+      },
+      "created_at": "2026-11-15T16:12:56.747676Z",
+      "updated_at": "2026-11-15T16:19:54.903776Z"
+    },
+    {
+      "build_id": "fe851b39-da7e-4ba7-bcc9-2a11a8c97818",
+      "release_plan_id": "d50567be-0371-4b55-a57f-becf9e4f1957",
+      "stage": "failed",
+      "error": {
+        "code": "PUBLISHER_CONTAINER_BUILD_FAILED",
+        "message_key": "PUBLISHER_CONTAINER_BUILD_FAILED"
+      },
+      "created_at": "2026-11-15T15:10:18.781601Z",
+      "updated_at": "2026-11-15T15:16:31.603369Z"
+    },
+    {
+      "build_id": "52e835cb-92b6-4c2e-b9d5-fbead412575e",
+      "release_plan_id": "d50567be-0371-4b55-a57f-becf9e4f1957",
+      "stage": "cancelled",
+      "error": {
+        "code": "PUBLISHER_BUILD_CANCELLED",
+        "message_key": "PUBLISHER_BUILD_CANCELLED"
+      },
+      "created_at": "2026-11-15T15:02:59.408957Z",
+      "updated_at": "2026-11-15T15:07:18.631989Z"
+    },
+    {
+      "build_id": "82e4c12c-a1ce-4789-87dd-a4e48a6afa18",
+      "release_plan_id": "d50567be-0371-4b55-a57f-becf9e4f1957",
+      "stage": "failed",
+      "error": {
+        "code": "PUBLISHER_CONTAINER_BUILD_FAILED",
+        "message_key": "PUBLISHER_CONTAINER_BUILD_FAILED"
+      },
+      "created_at": "2026-11-15T14:53:29.160068Z",
+      "updated_at": "2026-11-15T14:53:34.764451Z"
+    },
+    {
+      "build_id": "66e3cf3d-1c07-4cb8-8dd7-97761630ffef",
+      "release_plan_id": "d50567be-0371-4b55-a57f-becf9e4f1957",
+      "stage": "failed",
+      "error": {
+        "code": "PUBLISHER_BUILD_SOURCE_UNSAFE",
+        "message_key": "PUBLISHER_BUILD_SOURCE_UNSAFE"
+      },
+      "created_at": "2026-11-15T14:39:46.666716Z",
+      "updated_at": "2026-11-15T14:39:48.567505Z"
+    },
+    {
+      "build_id": "df303fc2-b36a-4063-9c69-7eadb8680691",
+      "release_plan_id": "d50567be-0371-4b55-a57f-becf9e4f1957",
+      "stage": "failed",
+      "error": {
+        "code": "PUBLISHER_CONTAINER_BUILD_FAILED",
+        "message_key": "PUBLISHER_CONTAINER_BUILD_FAILED"
+      },
+      "created_at": "2026-11-15T14:55:08.514901Z",
+      "updated_at": "2026-11-15T14:56:43.774751Z"
+    },
+    {
+      "build_id": "599d75fd-5bc1-4c78-a9b1-1900fd6b2545",
+      "release_plan_id": "d50567be-0371-4b55-a57f-becf9e4f1957",
+      "stage": "failed",
+      "error": {
+        "code": "PUBLISHER_CONTAINER_BUILD_FAILED",
+        "message_key": "PUBLISHER_CONTAINER_BUILD_FAILED"
+      },
+      "created_at": "2026-11-15T16:09:20.051804Z",
+      "updated_at": "2026-11-15T16:11:43.733397Z"
+    },
+    {
+      "build_id": "14a40c26-0495-4163-9b60-e6dcf10fc9ef",
+      "release_plan_id": "d50567be-0371-4b55-a57f-becf9e4f1957",
+      "stage": "failed",
+      "error": {
+        "code": "PUBLISHER_CONTAINER_BUILD_FAILED",
+        "message_key": "PUBLISHER_CONTAINER_BUILD_FAILED"
+      },
+      "created_at": "2026-11-15T14:42:36.479929Z",
+      "updated_at": "2026-11-15T14:42:45.924212Z"
+    },
+    {
+      "build_id": "659a7ddf-cacb-4a4b-972d-fc4394d2390d",
+      "release_plan_id": "d50567be-0371-4b55-a57f-becf9e4f1957",
+      "stage": "failed",
+      "error": {
+        "code": "PUBLISHER_ARTIFACT_INVALID",
+        "message_key": "PUBLISHER_ARTIFACT_INVALID"
+      },
+      "created_at": "2026-11-15T16:22:07.34706Z",
+      "updated_at": "2026-11-15T16:30:52.434554Z"
+    },
+    {
+      "build_id": "81ac25ca-9283-48ba-b9e1-348e6ce740c6",
+      "release_plan_id": "d50567be-0371-4b55-a57f-becf9e4f1957",
+      "stage": "failed",
+      "error": {
+        "code": "PUBLISHER_CONTAINER_BUILD_FAILED",
+        "message_key": "PUBLISHER_CONTAINER_BUILD_FAILED"
+      },
+      "created_at": "2026-11-15T15:40:02.641175Z",
+      "updated_at": "2026-11-15T15:43:15.655585Z"
+    }
+  ],
+  "submission_snapshots": [],
+  "visual_matrix": {
+    "checks": [
+      {
+        "id": "1440-light-system-light",
+        "theme": "light",
+        "system": "light",
+        "width": 1440,
+        "navigation": "vertical",
+        "token_blank_masked": true,
+        "token_focus": true,
+        "submit_disabled": true,
+        "build_preserved_across_tabs_and_reload": true,
+        "no_horizontal_overflow": true
+      },
+      {
+        "id": "1440-dark-system-light",
+        "theme": "dark",
+        "system": "light",
+        "width": 1440,
+        "navigation": "vertical",
+        "token_blank_masked": true,
+        "token_focus": true,
+        "submit_disabled": true,
+        "build_preserved_across_tabs_and_reload": true,
+        "no_horizontal_overflow": true
+      },
+      {
+        "id": "1440-light-system-dark",
+        "theme": "light",
+        "system": "dark",
+        "width": 1440,
+        "navigation": "vertical",
+        "token_blank_masked": true,
+        "token_focus": true,
+        "submit_disabled": true,
+        "build_preserved_across_tabs_and_reload": true,
+        "no_horizontal_overflow": true
+      },
+      {
+        "id": "1440-dark-system-dark",
+        "theme": "dark",
+        "system": "dark",
+        "width": 1440,
+        "navigation": "vertical",
+        "token_blank_masked": true,
+        "token_focus": true,
+        "submit_disabled": true,
+        "build_preserved_across_tabs_and_reload": true,
+        "no_horizontal_overflow": true
+      },
+      {
+        "id": "390-light-system-light",
+        "theme": "light",
+        "system": "light",
+        "width": 390,
+        "navigation": "horizontal",
+        "token_blank_masked": true,
+        "token_focus": true,
+        "submit_disabled": true,
+        "build_preserved_across_tabs_and_reload": true,
+        "no_horizontal_overflow": true
+      },
+      {
+        "id": "390-dark-system-light",
+        "theme": "dark",
+        "system": "light",
+        "width": 390,
+        "navigation": "horizontal",
+        "token_blank_masked": true,
+        "token_focus": true,
+        "submit_disabled": true,
+        "build_preserved_across_tabs_and_reload": true,
+        "no_horizontal_overflow": true
+      },
+      {
+        "id": "390-light-system-dark",
+        "theme": "light",
+        "system": "dark",
+        "width": 390,
+        "navigation": "horizontal",
+        "token_blank_masked": true,
+        "token_focus": true,
+        "submit_disabled": true,
+        "build_preserved_across_tabs_and_reload": true,
+        "no_horizontal_overflow": true
+      },
+      {
+        "id": "390-dark-system-dark",
+        "theme": "dark",
+        "system": "dark",
+        "width": 390,
+        "navigation": "horizontal",
+        "token_blank_masked": true,
+        "token_focus": true,
+        "submit_disabled": true,
+        "build_preserved_across_tabs_and_reload": true,
+        "no_horizontal_overflow": true
+      }
+    ],
+    "screens": [
+      "1440-dark-system-light-bind.png",
+      "1440-dark-system-light-build.png",
+      "1440-light-system-dark-bind.png",
+      "1440-light-system-dark-build.png",
+      "390-dark-system-light-bind.png",
+      "390-dark-system-light-build.png",
+      "390-light-system-dark-bind.png",
+      "390-light-system-dark-build.png"
+    ],
+    "result": "passed"
+  },
+  "contrast": [
+    {
+      "width": 1440,
+      "theme": "light",
+      "measured": 40,
+      "minimum": 6.92,
+      "failures": []
+    },
+    {
+      "width": 1440,
+      "theme": "dark",
+      "measured": 74,
+      "minimum": 9.83,
+      "failures": []
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "measured": 74,
+      "minimum": 6.92,
+      "failures": []
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "measured": 74,
+      "minimum": 9.83,
+      "failures": []
+    }
+  ],
+  "narrow_navigation": {
+    "result": "passed",
+    "checks": [
+      "narrow_primary_navigation_opens",
+      "theme_selected_in_narrow_drawer_opposite_system",
+      "publisher_link_closes_drawer",
+      "same_build_preserved"
+    ]
+  },
+  "session_parent_lifetime": {
+    "owned_parent_pid": 8463,
+    "owned_child_pid": 9306,
+    "child_remaining_after_parent_exit": []
+  },
+  "daily_service_read_only_probe": {
+    "http_status": 503,
+    "body": {
+      "error": {
+        "code": "PUBLISHER_PROXY_NOT_CONFIGURED",
+        "message_key": "PUBLISHER_PROXY_NOT_CONFIGURED"
+      }
+    }
+  },
+  "private_configuration": [
+    {
+      "file": "skeleton/web-admin/nuxt/.env",
+      "unchanged": true
+    },
+    {
+      "file": "skeleton/backend/.env",
+      "unchanged": true
+    }
+  ],
+  "tests": {
+    "publisher_ui_files": 8,
+    "publisher_ui_tests": 70,
+    "publisher_ui": "passed",
+    "scoped_vue_tsc": "passed",
+    "go_race_publisher_and_cmd": "passed",
+    "go_vet_publisher_and_cmd": "passed",
+    "nuxt_layout_resource_and_schema_id_regressions": "passed",
+    "template_sync_check": "passed",
+    "market_contract_bundle_files": 24,
+    "market_contract_bundle_check": "passed",
+    "locale_keys": 352,
+    "locale_key_parity": "passed"
+  },
+  "market_admission_review": {
+    "existing_market_admission_suite_private_copy_race": "passed",
+    "actual_upload_rejected_reason": "package_invalid",
+    "cause": "schema/input/...v1 identity interpreted as resource path",
+    "original_private_copy_actual_zip": "rejected",
+    "proposed_private_copy_same_zip": "accepted",
+    "proposed_private_copy_race": "passed",
+    "zip_sha256": "e7a9f5ef7d883633d2826011946c5f4201a2ef7ba77cc6ba1be5d08190c342f3",
+    "proposal": "plugin-publisher-market-schema-reference-fix.patch",
+    "original_market_functional_source_modified": false,
+    "proposal_hashes": {
+      "original_sha256": "a692a9a4ead0e7cd90d9cd0ec8e3a4461e3145483a005ce6e7e9ac27ef4370ad",
+      "private_proposed_sha256": "572dd3b71097d1ddad2469924f9f1a896d789c5334cb0f7b8df65114e4562b13",
+      "original_repository_source_written": false
+    },
+    "original_source_unchanged_at_completion": true
+  },
+  "screenshots": [
+    "plugin-publisher-gui-20261116/build-ready.png",
+    "plugin-publisher-gui-20261116/market-bound.png",
+    "plugin-publisher-gui-20261116/desktop-light-bind.png",
+    "plugin-publisher-gui-20261116/desktop-dark-bind.png",
+    "plugin-publisher-gui-20261116/narrow-light-bind.png",
+    "plugin-publisher-gui-20261116/narrow-dark-bind.png"
+  ],
+  "cleanup": {
+    "complete": true,
+    "owned_ports_checked": [
+      32768,
+      50136,
+      50137,
+      51332,
+      51333,
+      52345,
+      52346,
+      52347,
+      52348,
+      52349,
+      52388,
+      53512,
+      53513,
+      53779,
+      53780,
+      54310,
+      54311,
+      56797,
+      56798,
+      56799,
+      56800,
+      56801,
+      57083,
+      58892,
+      58893,
+      60626,
+      60627,
+      60628,
+      60629,
+      60630,
+      60681,
+      60682,
+      60959,
+      62117,
+      62118,
+      64384,
+      64385
+    ],
+    "ports_remaining_bound": [],
+    "managed_executors_remaining": [],
+    "system_credential": {
+      "connection_id": "7c286ee8-4113-4196-9b6c-3627fda823ab",
+      "system_keyring_entry_absent": true
+    },
+    "market_labs": [
+      {
+        "cleanup": {
+          "backend_schema_bucket_cleanup_confirmed": true,
+          "ports_checked": [
+            56797,
+            56798,
+            56799,
+            56800,
+            56801,
+            57083
+          ],
+          "failures": [],
+          "complete": true,
+          "temporary_root_removed": true
+        },
+        "checks": [
+          "controlled private draft uploaded through real API; one-use upload credential revoked",
+          "actual three-feature discovery, trusted console and authorization page ready"
+        ]
+      },
+      {
+        "cleanup": {
+          "backend_schema_bucket_cleanup_confirmed": true,
+          "ports_checked": [
+            52345,
+            52346,
+            52347,
+            52348,
+            52349,
+            52388
+          ],
+          "failures": [],
+          "complete": true,
+          "temporary_root_removed": true
+        },
+        "checks": [
+          "controlled private draft uploaded through real API; one-use upload credential revoked",
+          "actual three-feature discovery, trusted console and authorization page ready"
+        ]
+      }
+    ],
+    "failed_parallel_market_start": {
+      "cleanup_complete": true,
+      "ports_checked": [
+        60626,
+        60627,
+        60628,
+        60629,
+        60630,
+        60959
+      ]
+    },
+    "orbstack_initially_stopped": true,
+    "orbstack_restored_stopped": true,
+    "reusable_final_builder_cache_retained": true,
+    "scratch": {
+      "owned_failed_builds_removed": [
+        "d2ae777d-00e2-4796-be66-ad118e19617f",
+        "fe851b39-da7e-4ba7-bcc9-2a11a8c97818",
+        "52e835cb-92b6-4c2e-b9d5-fbead412575e",
+        "82e4c12c-a1ce-4789-87dd-a4e48a6afa18",
+        "66e3cf3d-1c07-4cb8-8dd7-97761630ffef",
+        "df303fc2-b36a-4063-9c69-7eadb8680691",
+        "599d75fd-5bc1-4c78-a9b1-1900fd6b2545",
+        "14a40c26-0495-4163-9b60-e6dcf10fc9ef",
+        "659a7ddf-cacb-4a4b-972d-fc4394d2390d",
+        "81ac25ca-9283-48ba-b9e1-348e6ce740c6"
+      ],
+      "successful_build_retained": "7352fbba-b6ca-481d-9699-8650f5e4a52b",
+      "candidate_plan_retained": "d50567be-0371-4b55-a57f-becf9e4f1957",
+      "successful_zip_and_log_and_source_retained": false,
+      "build_dependency_scratch_removed": true,
+      "temporary_market_metadata_removed_after_evidence_snapshot": true,
+      "successful_zip_and_log_retained": true,
+      "validation_source_snapshot_removed_after_provenance_recorded": true
+    },
+    "temporary_diagnostic_sources_removed": true,
+    "private_validation_root_removed": true,
+    "active_marker_removed": true
+  },
+  "remaining_acceptance": [
+    "PowerX installation and enablement",
+    "production marketplace opening and real public download",
+    "Linux Secret Service",
+    "published independent SDK/CLI consumption"
+  ],
+  "boundaries": [
+    "Base source checkout; no SDK/CLI version publication",
+    "Linux/amd64 container on this macOS host; not physical native Linux acceptance",
+    "packaged Nuxt HTTP and JS startup verified; plugin backend startup/Core installation not executed",
+    "owned isolated marketplace uses real Gin/PostgreSQL/MinIO and production Nuxt; controlled healthy scan worker and explicit 1.0.0 compatibility snapshot",
+    "market approval/listing actions, if recorded, use isolated admin HTTP API; Framework upload/submission/state reading use UI"
+  ]
+}

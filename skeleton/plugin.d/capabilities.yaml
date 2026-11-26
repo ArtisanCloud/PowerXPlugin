@@ -122,6 +122,7 @@ capabilities:
     - com.corex.capabilities.grant_status.read
     - com.corex.customer.memberships.delegated_read
     - com.corex.eventfabric.publish
+    - com.corex.eventfabric.service_publish
     - com.corex.iam.authorization.check
     - com.corex.iam.directory.read
     - com.corex.iam.identity_context.service_read

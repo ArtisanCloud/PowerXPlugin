@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	"testing"
 	"time"
 
@@ -18,10 +19,9 @@ func TestLocalEmitter_QueueFull_RecordsDropMetric(t *testing.T) {
 	ebmetrics.Reset()
 
 	factory, err := fweventbridge.NewFactory(fweventbridge.Config{
-		Enabled:         false,
-		Mode:            "local",
-		FallbackToLocal: true,
-		LocalQueueSize:  1,
+		RuntimeMode:    fwprovider.RuntimeMode{ProviderMode: fwprovider.ModeLocal},
+		Enabled:        false,
+		LocalQueueSize: 1,
 	})
 	require.NoError(t, err)
 	factory.WithMetrics(bridgeRecorder{})

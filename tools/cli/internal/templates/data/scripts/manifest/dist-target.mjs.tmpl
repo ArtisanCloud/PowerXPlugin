@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import fs from 'node:fs'
+import { createHash } from 'node:crypto'
 import path from 'node:path'
 import { createRequire } from 'node:module'
 import { execFileSync } from 'node:child_process'
@@ -59,6 +60,57 @@ function readManifest(manifest, frontendDir) {
     fail('DIST_TARGET_INVALID_MANIFEST', { path: manifest })
   return document
 }
+const datasetDirectory = path.join('contracts', 'storage-datasets')
+const maxDatasetBytes = 16 * 1024
+
+function readDatasetAsset(file, relativePath) {
+  let descriptor
+  try {
+    if (fs.realpathSync(file) !== file) fail('DATASET_ASSET_INVALID', { path: relativePath })
+    descriptor = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK)
+    if (!fs.fstatSync(descriptor).isFile()) fail('DATASET_ASSET_INVALID', { path: relativePath })
+    const bytes = Buffer.alloc(maxDatasetBytes + 1)
+    const count = fs.readSync(descriptor, bytes, 0, bytes.length, 0)
+    if (count === 0 || count > maxDatasetBytes) fail('DATASET_ASSET_INVALID', { path: relativePath })
+    return bytes.subarray(0, count)
+  } catch {
+    fail('DATASET_ASSET_INVALID', { path: relativePath })
+  } finally {
+    if (descriptor !== undefined) fs.closeSync(descriptor)
+  }
+}
+
+function stageDatasetAssets({ source, destination, frontendDir }) {
+  protectSource(source, destination, true)
+  const index = readManifest(source, frontendDir).toJS({ mapAsMap: true }).get('data_lifecycle')
+  if (index == null) return
+  if (!(index instanceof Map)) fail('DATASET_ASSET_INDEX_INVALID', { path: source })
+  const sourceRoot = canonicalPath(path.dirname(source))
+  const files = []
+  for (const [key, entry] of index) {
+    if (typeof key !== 'string' || !/^[a-z][a-z0-9_.-]{0,63}$/.test(key))
+      fail('DATASET_ASSET_KEY_INVALID', { path: String(key) })
+    const relativePath = path.join(datasetDirectory, key + '.json')
+    if (!(entry instanceof Map)) fail('DATASET_ASSET_INDEX_INVALID', { path: relativePath })
+    const bytes = readDatasetAsset(path.join(sourceRoot, relativePath), relativePath)
+    if (createHash('sha256').update(bytes).digest('hex') !== entry.get('sha256'))
+      fail('DATASET_ASSET_DIGEST_MISMATCH', { path: relativePath })
+    files.push({ relativePath, bytes })
+  }
+  if (files.length === 0) return
+  const outputRoot = canonicalPath(destination)
+  const outputDirectory = path.join(outputRoot, datasetDirectory)
+  try {
+    if (canonicalPath(outputDirectory) !== outputDirectory)
+      fail('DIST_TARGET_IO_ERROR', { path: outputDirectory })
+    fs.mkdirSync(outputDirectory, { recursive: true })
+    for (const file of files)
+      fs.writeFileSync(path.join(outputRoot, file.relativePath), file.bytes, { flag: 'wx' })
+  } catch {
+    fail('DIST_TARGET_IO_ERROR', { path: outputDirectory })
+  }
+}
+
 export function writeDistTarget({ manifest, source, os, arch, frontendDir }) {
   const target = validateTarget(os, arch)
   protectSource(source, manifest)
@@ -141,7 +193,7 @@ function parseArguments(args) {
       '--dist-dir'
     ])
   const command = args.shift()
-  if (!['validate', 'write', 'verify'].includes(command)) fail('DIST_TARGET_INVALID_ARGUMENT')
+  if (!['validate', 'write', 'verify', 'stage-datasets'].includes(command)) fail('DIST_TARGET_INVALID_ARGUMENT')
   for (let index = 0; index < args.length; index += 2) {
     const key = args[index],
       value = args[index + 1]
@@ -177,6 +229,12 @@ function run() {
       frontendDir: options['frontend-dir'],
       binaries: options.binaries,
       backend: options.backend || 'go'
+    }
+    if (command === 'stage-datasets') {
+      if (!config.source || !config.frontendDir || !options['dist-dir'])
+        fail('DIST_TARGET_INVALID_ARGUMENT')
+      stageDatasetAssets({ ...config, destination: options['dist-dir'] })
+      return
     }
     const target = validateTarget(config.os, config.arch)
     if (!['go', 'non-go'].includes(config.backend)) fail('DIST_TARGET_INVALID_ARGUMENT')

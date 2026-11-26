@@ -15,10 +15,10 @@ public sealed class NotificationRuntimeTests
         await client.CreateAsync(new NotificationScope(Tenant), new CreateNotificationRequest("Title", "Body"));
         Assert.Equal("/api/v1/notifications", seen!.RequestUri!.AbsolutePath); Assert.Equal("Bearer sts", seen.Headers.Authorization!.ToString()); Assert.DoesNotContain("tenant", body, StringComparison.OrdinalIgnoreCase);
     }
-    [Fact] public async Task Delegated_rejects_unsupported_idempotency_and_cross_tenant_before_delivery()
+    [Fact] public async Task Delegated_rejects_invalid_key_and_cross_tenant_before_delivery()
     {
         var client = new PowerXNotificationClient("https://core.example", Tenant, new StaticServiceCredentialProvider(new ServiceCredential("sts")), new HttpClient(new Handler(_ => throw new Xunit.Sdk.XunitException("must not deliver"))));
-        var key = await Assert.ThrowsAsync<NotificationException>(() => client.CreateAsync(new NotificationScope(Tenant), new CreateNotificationRequest("Title", "Body", IdempotencyKey: "one"))); Assert.Equal(NotificationErrors.IdempotencyUnsupported, key.Code);
+        var key = await Assert.ThrowsAsync<NotificationException>(() => client.CreateAsync(new NotificationScope(Tenant), new CreateNotificationRequest("fixture_title", "fixture_content", IdempotencyKey: " "))); Assert.Equal(NotificationErrors.InvalidArgument, key.Code);
         var tenant = await Assert.ThrowsAsync<NotificationException>(() => client.CreateAsync(new NotificationScope("00000000-0000-4000-8000-000000000002"), new CreateNotificationRequest("Title", "Body"))); Assert.Equal(NotificationErrors.TenantMismatch, tenant.Code);
     }
     [Fact] public async Task Delegated_preserves_optional_navigation_and_response_actions()

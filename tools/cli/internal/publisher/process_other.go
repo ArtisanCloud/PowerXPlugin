@@ -12,7 +12,7 @@ type buildLog struct{}
 func buildEnv() []string { return nil }
 
 func probeTools() (BuildTools, error) { return BuildTools{}, failure(Unsupported, nil) }
-func runBuildCommand(context.Context, string, []string, io.Writer, func(int) error) error {
+func runOwnedCommand(context.Context, string, string, []string, io.Reader, io.Writer, func(int) error) error {
 	return failure(Unsupported, nil)
 }
 func newBuildLog(string, ...string) (*buildLog, error) { return nil, failure(Unsupported, nil) }

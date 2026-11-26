@@ -1,7 +1,9 @@
 package taskbus
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -9,6 +11,57 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/eventfabric"
 	"github.com/stretchr/testify/require"
 )
+
+func TestHostProviderCredentialTenantResolutionFailureIsFinal(t *testing.T) {
+	for _, resolved := range []bool{false, true} {
+		t.Run(map[bool]string{false: "static", true: "resolved"}[resolved], func(t *testing.T) {
+			cfg := fixtureHostConfig("http://core.invalid")
+			cfg.TenantUUID = ""
+			if resolved {
+				cfg.TopicBindings = nil
+				cfg.PublishTopicKeys = []string{"fixture.event.v1"}
+			}
+			calls := 0
+			denied := errors.New("CREDENTIAL_TENANT_DENIED")
+			cfg.ResolveTenant = func(context.Context) (string, error) {
+				calls++
+				return "", denied
+			}
+			emitter, err := NewHostProvider(cfg).NewEmitter()
+			require.Nil(t, emitter)
+			require.ErrorIs(t, err, denied)
+			require.Equal(t, 1, calls)
+			// An empty identity is not replaced with a System/default tenant.
+			cfg.ResolveTenant = func(context.Context) (string, error) { calls++; return "", nil }
+			_, err = NewHostProvider(cfg).NewEmitter()
+			require.Error(t, err)
+			require.Equal(t, 2, calls)
+		})
+	}
+}
+
+func TestHostProviderCredentialTenantResolverUsesContextAndPreservesExplicitTenant(t *testing.T) {
+	cfg := fixtureHostConfig("http://core.invalid")
+	cfg.AuthScheme = "apikey"
+	cfg.APIKey = "fixture-key"
+	called := false
+	cfg.ResolveTenant = func(context.Context) (string, error) { called = true; return "", errors.New("UNEXPECTED_TENANT_QUERY") }
+	emitter, err := NewHostProvider(cfg).NewEmitter()
+	require.NoError(t, err)
+	require.NoError(t, emitter.(*eventfabric.Runtime).Close())
+	require.False(t, called)
+	cfg.TenantUUID = ""
+	cfg.TopicBindings = nil
+	cfg.PublishTopicKeys = []string{"fixture.event.v1"}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	cfg.ResolveTenant = func(actual context.Context) (string, error) {
+		require.Same(t, ctx, actual)
+		return "", actual.Err()
+	}
+	_, err = NewHostProvider(cfg).NewResolvedRuntime(ctx)
+	require.ErrorIs(t, err, context.Canceled)
+}
 
 func TestHostProviderResolvedTenantTopicsAndNoStaticMixing(t *testing.T) {
 	calls := 0

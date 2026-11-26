@@ -1,0 +1,2422 @@
+{
+  "cases": [
+    {
+      "name": "DiscoveryResponse",
+      "definition": "DiscoveryResponse",
+      "data": {
+        "code": 0,
+        "message": "success",
+        "data": {
+          "service": "powerx-marketplace",
+          "protocol": "powerx.plugin-publisher/v1",
+          "contract_version": "1.0.0-rc.2",
+          "features": [
+            "package-upload",
+            "idempotent-writes"
+          ],
+          "package_formats": [
+            "zip"
+          ],
+          "channels": [
+            "stable"
+          ],
+          "targets": [
+            {
+              "os": "linux",
+              "arch": "amd64"
+            }
+          ],
+          "supported_scopes": [
+            "plugins:read",
+            "packages:write"
+          ],
+          "console_base_url": "https://market.example",
+          "limits": {
+            "max_package_bytes": 2147483648,
+            "max_multipart_overhead_bytes": 1048576,
+            "max_request_bytes": 2148532224,
+            "max_multipart_parts": 8,
+            "max_part_header_bytes": 8192,
+            "max_json_bytes": 65536,
+            "max_manifest_bytes": 262144,
+            "max_uncompressed_bytes": 8589934592,
+            "max_archive_entries": 50000,
+            "max_archive_path_bytes": 1024,
+            "max_compression_ratio": 200,
+            "max_release_notes_bytes": 10000,
+            "max_metadata_text_bytes": 10000,
+            "max_url_bytes": 2000,
+            "max_expected_artifacts": 6,
+            "max_response_bytes": 8388608,
+            "max_json_depth": 64,
+            "max_name_bytes": 200,
+            "max_summary_bytes": 2000,
+            "max_reason_bytes": 1000,
+            "max_review_reason_bytes": 4000,
+            "max_version_chars": 50,
+            "max_core_version_chars": 20,
+            "min_metadata_text_scalars": 10
+          },
+          "token_policy": {
+            "default_ttl_seconds": 604800,
+            "min_ttl_seconds": 300,
+            "max_ttl_seconds": 2592000,
+            "max_plugin_ids": 50,
+            "max_active_per_user": 20
+          },
+          "timeouts": {
+            "connect_seconds": 10,
+            "response_header_seconds": 30,
+            "read_request_seconds": 30,
+            "json_write_seconds": 60,
+            "upload_idle_seconds": 60,
+            "upload_total_seconds": 1800,
+            "upload_client_seconds": 1860,
+            "upload_response_header_seconds": 1800
+          },
+          "recovery": {
+            "idempotency_retention_seconds": 604800,
+            "lease_seconds": 60,
+            "lease_renew_seconds": 15,
+            "processing_retry_after_seconds": 2,
+            "max_attempts": 3,
+            "backoff_base_seconds": 1,
+            "backoff_cap_seconds": 30,
+            "max_retry_after_seconds": 300,
+            "max_recovery_elapsed_seconds": 7200,
+            "operation_poll_seconds": 2,
+            "max_operation_poll_seconds": 120
+          },
+          "pagination": {
+            "default_size": 20,
+            "max_size": 100
+          },
+          "server_time": "2026-11-09T00:00:00Z"
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "MeResponse",
+      "definition": "MeResponse",
+      "data": {
+        "code": 0,
+        "message": "success",
+        "data": {
+          "user": {
+            "user_id": "00000000-0000-4000-8000-000000000010",
+            "name": "Example developer"
+          },
+          "developer": {
+            "developer_id": "00000000-0000-4000-8000-000000000011",
+            "name": "Example studio"
+          },
+          "credential": {
+            "token_id": "00000000-0000-4000-8000-000000000007",
+            "plugin_ids": [
+              "com.example.promo"
+            ],
+            "scopes": [
+              "plugins:read",
+              "packages:write"
+            ],
+            "expires_at": "2026-11-16T00:00:00Z"
+          },
+          "server_time": "2026-11-09T00:00:00Z"
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "PluginResponse",
+      "definition": "PluginResponse",
+      "data": {
+        "code": 0,
+        "message": "success",
+        "data": {
+          "plugin_id": "com.example.promo",
+          "name": "Example promo",
+          "summary": "Example plugin",
+          "visibility": "draft"
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "MarketVersionResponse",
+      "definition": "MarketVersionResponse",
+      "data": {
+        "code": 0,
+        "message": "success",
+        "data": {
+          "version_id": "00000000-0000-4000-8000-000000000003",
+          "plugin_id": "com.example.promo",
+          "version": "1.2.0",
+          "channel": "stable",
+          "availability_status": "draft",
+          "release_notes": "修复上传恢复；保留 <tag> & 原文。 第二行\n",
+          "min_core": "1.0.0",
+          "created_at": "2026-11-09T00:00:00Z",
+          "published_at": null,
+          "artifacts": [
+            {
+              "artifact_id": "00000000-0000-4000-8000-000000000004",
+              "os": "linux",
+              "arch": "amd64",
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "size": 12345678
+            }
+          ],
+          "market_version_url": "https://market.example/developer/plugins/com.example.promo?view=versions"
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "UploadReceiptResponse",
+      "definition": "UploadReceiptResponse",
+      "data": {
+        "code": 0,
+        "message": "success",
+        "data": {
+          "operation_id": "00000000-0000-4000-8000-000000000001",
+          "plugin_id": "com.example.promo",
+          "version_id": "00000000-0000-4000-8000-000000000003",
+          "version": "1.2.0",
+          "artifact": {
+            "artifact_id": "00000000-0000-4000-8000-000000000004",
+            "os": "linux",
+            "arch": "amd64",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size": 12345678
+          },
+          "market_version_url": "https://market.example/developer/plugins/com.example.promo?view=versions"
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "SubmissionReceiptResponse",
+      "definition": "SubmissionReceiptResponse",
+      "data": {
+        "code": 0,
+        "message": "success",
+        "data": {
+          "operation_id": "00000000-0000-4000-8000-000000000002",
+          "publication_id": "00000000-0000-4000-8000-000000000006",
+          "version_id": "00000000-0000-4000-8000-000000000003",
+          "status": "submitted",
+          "submitted_at": "2026-11-09T00:00:00Z",
+          "market_publication_url": "https://market.example/developer/plugins/com.example.promo?view=history"
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "OperationProcessingResponse",
+      "definition": "OperationProcessingResponse",
+      "data": {
+        "code": 0,
+        "message": "success",
+        "data": {
+          "operation_id": "00000000-0000-4000-8000-000000000001",
+          "type": "package-upload",
+          "plugin_id": "com.example.promo",
+          "request_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "created_at": "2026-11-09T00:00:00Z",
+          "updated_at": "2026-11-09T00:00:00Z",
+          "status": "processing",
+          "retain_until": null,
+          "retry_after_seconds": 2
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "OperationResponse",
+      "definition": "OperationResponse",
+      "data": {
+        "code": 0,
+        "message": "success",
+        "data": {
+          "operation_id": "00000000-0000-4000-8000-000000000001",
+          "type": "package-upload",
+          "plugin_id": "com.example.promo",
+          "request_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "created_at": "2026-11-09T00:00:00Z",
+          "updated_at": "2026-11-09T00:00:00Z",
+          "status": "succeeded",
+          "retain_until": "2026-11-16T00:00:00Z",
+          "result": {
+            "operation_id": "00000000-0000-4000-8000-000000000001",
+            "plugin_id": "com.example.promo",
+            "version_id": "00000000-0000-4000-8000-000000000003",
+            "version": "1.2.0",
+            "artifact": {
+              "artifact_id": "00000000-0000-4000-8000-000000000004",
+              "os": "linux",
+              "arch": "amd64",
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "size": 12345678
+            },
+            "market_version_url": "https://market.example/developer/plugins/com.example.promo?view=versions"
+          }
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "CreatedTokenResponse",
+      "definition": "CreatedTokenResponse",
+      "data": {
+        "code": 0,
+        "message": "success",
+        "data": {
+          "token": "pxpub_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "credential": {
+            "token_id": "00000000-0000-4000-8000-000000000007",
+            "name": "本地开发上传",
+            "plugin_ids": [
+              "com.example.promo"
+            ],
+            "scopes": [
+              "plugins:read",
+              "packages:write"
+            ],
+            "created_at": "2026-11-09T00:00:00Z",
+            "expires_at": "2026-11-16T00:00:00Z",
+            "last_used_at": null,
+            "revoked_at": null,
+            "status": "active"
+          }
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "PublishTokenResponse",
+      "definition": "PublishTokenResponse",
+      "data": {
+        "code": 0,
+        "message": "success",
+        "data": {
+          "token_id": "00000000-0000-4000-8000-000000000007",
+          "name": "本地开发上传",
+          "plugin_ids": [
+            "com.example.promo"
+          ],
+          "scopes": [
+            "plugins:read",
+            "packages:write"
+          ],
+          "created_at": "2026-11-09T00:00:00Z",
+          "expires_at": "2026-11-16T00:00:00Z",
+          "last_used_at": null,
+          "revoked_at": null,
+          "status": "active"
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "VersionsPageResponse",
+      "definition": "VersionsPageResponse",
+      "data": {
+        "code": 0,
+        "message": "success",
+        "data": {
+          "items": [
+            {
+              "version_id": "00000000-0000-4000-8000-000000000003",
+              "plugin_id": "com.example.promo",
+              "version": "1.2.0",
+              "channel": "stable",
+              "availability_status": "draft",
+              "release_notes": "修复上传恢复；保留 <tag> & 原文。 第二行\n",
+              "min_core": "1.0.0",
+              "created_at": "2026-11-09T00:00:00Z",
+              "published_at": null,
+              "artifacts": [
+                {
+                  "artifact_id": "00000000-0000-4000-8000-000000000004",
+                  "os": "linux",
+                  "arch": "amd64",
+                  "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "size": 12345678
+                }
+              ],
+              "market_version_url": "https://market.example/developer/plugins/com.example.promo?view=versions"
+            }
+          ],
+          "total": 1,
+          "page": 1,
+          "size": 20
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "TokensPageResponse",
+      "definition": "TokensPageResponse",
+      "data": {
+        "code": 0,
+        "message": "success",
+        "data": {
+          "items": [
+            {
+              "token_id": "00000000-0000-4000-8000-000000000007",
+              "name": "本地开发上传",
+              "plugin_ids": [
+                "com.example.promo"
+              ],
+              "scopes": [
+                "plugins:read",
+                "packages:write"
+              ],
+              "created_at": "2026-11-09T00:00:00Z",
+              "expires_at": "2026-11-16T00:00:00Z",
+              "last_used_at": null,
+              "revoked_at": null,
+              "status": "active"
+            }
+          ],
+          "total": 1,
+          "page": 1,
+          "size": 20
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "PublicationsPageResponse",
+      "definition": "PublicationsPageResponse",
+      "data": {
+        "code": 0,
+        "message": "success",
+        "data": {
+          "items": [
+            {
+              "publication_id": "00000000-0000-4000-8000-000000000006",
+              "plugin_id": "com.example.promo",
+              "version_id": "00000000-0000-4000-8000-000000000003",
+              "version": "1.2.0",
+              "status": "submitted",
+              "metadata": {
+                "description": "这是插件的完整功能说明文本。",
+                "license": "MIT",
+                "min_core": "1.0.0",
+                "support_url": "https://support.example/help",
+                "security_statement": "这是安全权限和资源使用的说明。",
+                "privacy_statement": "这是个人数据处理和隐私的说明。",
+                "icon_url": ""
+              },
+              "artifacts": [
+                {
+                  "artifact_id": "00000000-0000-4000-8000-000000000004",
+                  "os": "linux",
+                  "arch": "amd64",
+                  "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "size": 12345678
+                }
+              ],
+              "submitted_at": "2026-11-09T00:00:00Z",
+              "reviewed_at": null,
+              "review_reason": "",
+              "published_at": null,
+              "publish_reason": "",
+              "market_publication_url": "https://market.example/developer/plugins/com.example.promo?view=history"
+            }
+          ],
+          "total": 1,
+          "page": 1,
+          "size": 20
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "PublicationOptionsResponse",
+      "definition": "PublicationOptionsResponse",
+      "data": {
+        "code": 0,
+        "message": "success",
+        "data": {
+          "versions": [
+            "1.0.0"
+          ],
+          "licenses": [
+            "MIT"
+          ],
+          "source": "https://github.com/ArtisanCloud/PowerX/releases",
+          "version_source": "verified_snapshot"
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "OperationFailedResponse",
+      "definition": "OperationResponse",
+      "data": {
+        "code": 0,
+        "message": "success",
+        "data": {
+          "operation_id": "00000000-0000-4000-8000-000000000001",
+          "type": "package-upload",
+          "plugin_id": "com.example.promo",
+          "request_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "created_at": "2026-11-09T00:00:00Z",
+          "updated_at": "2026-11-09T00:00:00Z",
+          "status": "failed",
+          "retain_until": "2026-11-16T00:00:00Z",
+          "error": {
+            "code": 503,
+            "error": "storage_unavailable",
+            "message": "制品存储暂不可用，请核对原操作。",
+            "retryable": true
+          }
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "valid upload fields",
+      "definition": "UploadFields",
+      "data": {
+        "version": "1.2.0",
+        "channel": "stable",
+        "os": "linux",
+        "arch": "amd64",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "size": 12345678,
+        "release_notes": "修复上传恢复；保留 <tag> & 原文。 第二行\n"
+      },
+      "valid": true
+    },
+    {
+      "name": "valid multipart shape only, not bytes",
+      "definition": "UploadRequest",
+      "data": {
+        "file": "SYNTHETIC, NOT AN INSTALLATION PACKAGE",
+        "version": "1.2.0",
+        "channel": "stable",
+        "os": "linux",
+        "arch": "amd64",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "size": 12345678,
+        "release_notes": "修复上传恢复；保留 <tag> & 原文。 第二行\n"
+      },
+      "valid": true
+    },
+    {
+      "name": "credential default TTL",
+      "definition": "CreateTokenRequest",
+      "data": {
+        "name": "Local release",
+        "plugin_ids": [
+          "com.example.promo"
+        ],
+        "scopes": [
+          "plugins:read",
+          "packages:write"
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "credential minimum TTL",
+      "definition": "CreateTokenRequest",
+      "data": {
+        "name": "Local release",
+        "plugin_ids": [
+          "com.example.promo"
+        ],
+        "scopes": [
+          "plugins:read",
+          "packages:write"
+        ],
+        "ttl_seconds": 300
+      },
+      "valid": true
+    },
+    {
+      "name": "credential maximum TTL",
+      "definition": "CreateTokenRequest",
+      "data": {
+        "name": "Local release",
+        "plugin_ids": [
+          "com.example.promo"
+        ],
+        "scopes": [
+          "plugins:read",
+          "packages:write"
+        ],
+        "ttl_seconds": 2592000
+      },
+      "valid": true
+    },
+    {
+      "name": "revoke credential",
+      "definition": "RevokeTokenRequest",
+      "data": {
+        "reason": "Replace local development binding"
+      },
+      "valid": true
+    },
+    {
+      "name": "future submit request",
+      "definition": "SubmitRequest",
+      "data": {
+        "metadata": {
+          "description": "这是插件的完整功能说明文本。",
+          "license": "MIT",
+          "min_core": "1.0.0",
+          "support_url": "https://support.example/help",
+          "security_statement": "这是安全权限和资源使用的说明。",
+          "privacy_statement": "这是个人数据处理和隐私的说明。"
+        },
+        "expected_artifacts": [
+          {
+            "artifact_id": "00000000-0000-4000-8000-000000000005",
+            "os": "linux",
+            "arch": "arm64",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "size": 8765432
+          },
+          {
+            "artifact_id": "00000000-0000-4000-8000-000000000004",
+            "os": "linux",
+            "arch": "amd64",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size": 12345678
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "token unknown actor",
+      "definition": "CreateTokenRequest",
+      "data": {
+        "name": "Local release",
+        "plugin_ids": [
+          "com.example.promo"
+        ],
+        "scopes": [
+          "plugins:read",
+          "packages:write"
+        ],
+        "user_id": "00000000-0000-4000-8000-000000000012"
+      },
+      "valid": false
+    },
+    {
+      "name": "token too short TTL",
+      "definition": "CreateTokenRequest",
+      "data": {
+        "name": "Local release",
+        "plugin_ids": [
+          "com.example.promo"
+        ],
+        "scopes": [
+          "plugins:read",
+          "packages:write"
+        ],
+        "ttl_seconds": 299
+      },
+      "valid": false
+    },
+    {
+      "name": "token too long TTL",
+      "definition": "CreateTokenRequest",
+      "data": {
+        "name": "Local release",
+        "plugin_ids": [
+          "com.example.promo"
+        ],
+        "scopes": [
+          "plugins:read",
+          "packages:write"
+        ],
+        "ttl_seconds": 2592001
+      },
+      "valid": false
+    },
+    {
+      "name": "scope dependency",
+      "definition": "CreateTokenRequest",
+      "data": {
+        "name": "Local release",
+        "plugin_ids": [
+          "com.example.promo"
+        ],
+        "scopes": [
+          "packages:write"
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "submit scope dependency",
+      "definition": "CreateTokenRequest",
+      "data": {
+        "name": "Local release",
+        "plugin_ids": [
+          "com.example.promo"
+        ],
+        "scopes": [
+          "plugins:read",
+          "publications:submit"
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "duplicate scopes",
+      "definition": "CreateTokenRequest",
+      "data": {
+        "name": "Local release",
+        "plugin_ids": [
+          "com.example.promo"
+        ],
+        "scopes": [
+          "plugins:read",
+          "plugins:read"
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "foreign scope name",
+      "definition": "CreateTokenRequest",
+      "data": {
+        "name": "Local release",
+        "plugin_ids": [
+          "com.example.promo"
+        ],
+        "scopes": [
+          "plugins:read",
+          "publications:approve"
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "duplicate plugin scopes",
+      "definition": "CreateTokenRequest",
+      "data": {
+        "name": "Local release",
+        "plugin_ids": [
+          "com.example.promo",
+          "com.example.promo"
+        ],
+        "scopes": [
+          "plugins:read",
+          "packages:write"
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "empty plugin binding",
+      "definition": "CreateTokenRequest",
+      "data": {
+        "name": "Local release",
+        "plugin_ids": [],
+        "scopes": [
+          "plugins:read",
+          "packages:write"
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "too many plugin scopes",
+      "definition": "CreateTokenRequest",
+      "data": {
+        "name": "Local release",
+        "plugin_ids": [
+          "com.example.plugin-0",
+          "com.example.plugin-1",
+          "com.example.plugin-2",
+          "com.example.plugin-3",
+          "com.example.plugin-4",
+          "com.example.plugin-5",
+          "com.example.plugin-6",
+          "com.example.plugin-7",
+          "com.example.plugin-8",
+          "com.example.plugin-9",
+          "com.example.plugin-10",
+          "com.example.plugin-11",
+          "com.example.plugin-12",
+          "com.example.plugin-13",
+          "com.example.plugin-14",
+          "com.example.plugin-15",
+          "com.example.plugin-16",
+          "com.example.plugin-17",
+          "com.example.plugin-18",
+          "com.example.plugin-19",
+          "com.example.plugin-20",
+          "com.example.plugin-21",
+          "com.example.plugin-22",
+          "com.example.plugin-23",
+          "com.example.plugin-24",
+          "com.example.plugin-25",
+          "com.example.plugin-26",
+          "com.example.plugin-27",
+          "com.example.plugin-28",
+          "com.example.plugin-29",
+          "com.example.plugin-30",
+          "com.example.plugin-31",
+          "com.example.plugin-32",
+          "com.example.plugin-33",
+          "com.example.plugin-34",
+          "com.example.plugin-35",
+          "com.example.plugin-36",
+          "com.example.plugin-37",
+          "com.example.plugin-38",
+          "com.example.plugin-39",
+          "com.example.plugin-40",
+          "com.example.plugin-41",
+          "com.example.plugin-42",
+          "com.example.plugin-43",
+          "com.example.plugin-44",
+          "com.example.plugin-45",
+          "com.example.plugin-46",
+          "com.example.plugin-47",
+          "com.example.plugin-48",
+          "com.example.plugin-49",
+          "com.example.plugin-50"
+        ],
+        "scopes": [
+          "plugins:read",
+          "packages:write"
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "invalid upload version '1.2.0-beta.1'",
+      "definition": "UploadFields",
+      "data": {
+        "version": "1.2.0-beta.1",
+        "channel": "stable",
+        "os": "linux",
+        "arch": "amd64",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "size": 12345678,
+        "release_notes": "修复上传恢复；保留 <tag> & 原文。 第二行\n"
+      },
+      "valid": false
+    },
+    {
+      "name": "invalid upload version 'v1.2.0'",
+      "definition": "UploadFields",
+      "data": {
+        "version": "v1.2.0",
+        "channel": "stable",
+        "os": "linux",
+        "arch": "amd64",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "size": 12345678,
+        "release_notes": "修复上传恢复；保留 <tag> & 原文。 第二行\n"
+      },
+      "valid": false
+    },
+    {
+      "name": "invalid upload version '01.2.0'",
+      "definition": "UploadFields",
+      "data": {
+        "version": "01.2.0",
+        "channel": "stable",
+        "os": "linux",
+        "arch": "amd64",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "size": 12345678,
+        "release_notes": "修复上传恢复；保留 <tag> & 原文。 第二行\n"
+      },
+      "valid": false
+    },
+    {
+      "name": "invalid upload version '1.2'",
+      "definition": "UploadFields",
+      "data": {
+        "version": "1.2",
+        "channel": "stable",
+        "os": "linux",
+        "arch": "amd64",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "size": 12345678,
+        "release_notes": "修复上传恢复；保留 <tag> & 原文。 第二行\n"
+      },
+      "valid": false
+    },
+    {
+      "name": "invalid upload version '1.2.0\\n'",
+      "definition": "UploadFields",
+      "data": {
+        "version": "1.2.0\n",
+        "channel": "stable",
+        "os": "linux",
+        "arch": "amd64",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "size": 12345678,
+        "release_notes": "修复上传恢复；保留 <tag> & 原文。 第二行\n"
+      },
+      "valid": false
+    },
+    {
+      "name": "stable build metadata",
+      "definition": "UploadFields",
+      "data": {
+        "version": "1.2.0+build.5",
+        "channel": "stable",
+        "os": "linux",
+        "arch": "amd64",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "size": 12345678,
+        "release_notes": "修复上传恢复；保留 <tag> & 原文。 第二行\n"
+      },
+      "valid": true
+    },
+    {
+      "name": "future channel cannot silently become stable",
+      "definition": "UploadFields",
+      "data": {
+        "version": "1.2.0",
+        "channel": "beta",
+        "os": "linux",
+        "arch": "amd64",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "size": 12345678,
+        "release_notes": "修复上传恢复；保留 <tag> & 原文。 第二行\n"
+      },
+      "valid": false
+    },
+    {
+      "name": "unsupported upload target",
+      "definition": "UploadFields",
+      "data": {
+        "version": "1.2.0",
+        "channel": "stable",
+        "os": "linux",
+        "arch": "arm64",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "size": 12345678,
+        "release_notes": "修复上传恢复；保留 <tag> & 原文。 第二行\n"
+      },
+      "valid": false
+    },
+    {
+      "name": "uppercase digest",
+      "definition": "UploadFields",
+      "data": {
+        "version": "1.2.0",
+        "channel": "stable",
+        "os": "linux",
+        "arch": "amd64",
+        "sha256": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "size": 12345678,
+        "release_notes": "修复上传恢复；保留 <tag> & 原文。 第二行\n"
+      },
+      "valid": false
+    },
+    {
+      "name": "zero package size",
+      "definition": "UploadFields",
+      "data": {
+        "version": "1.2.0",
+        "channel": "stable",
+        "os": "linux",
+        "arch": "amd64",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "size": 0,
+        "release_notes": "修复上传恢复；保留 <tag> & 原文。 第二行\n"
+      },
+      "valid": false
+    },
+    {
+      "name": "oversized package",
+      "definition": "UploadFields",
+      "data": {
+        "version": "1.2.0",
+        "channel": "stable",
+        "os": "linux",
+        "arch": "amd64",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "size": 2147483649,
+        "release_notes": "修复上传恢复；保留 <tag> & 原文。 第二行\n"
+      },
+      "valid": false
+    },
+    {
+      "name": "package size upper boundary",
+      "definition": "UploadFields",
+      "data": {
+        "version": "1.2.0",
+        "channel": "stable",
+        "os": "linux",
+        "arch": "amd64",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "size": 2147483648,
+        "release_notes": "修复上传恢复；保留 <tag> & 原文。 第二行\n"
+      },
+      "valid": true
+    },
+    {
+      "name": "notes exact UTF-8 boundary",
+      "definition": "UploadFields",
+      "data": {
+        "version": "1.2.0",
+        "channel": "stable",
+        "os": "linux",
+        "arch": "amd64",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "size": 12345678,
+        "release_notes": "中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中a"
+      },
+      "valid": true
+    },
+    {
+      "name": "notes UTF-8 exceeds bytes but not codepoints",
+      "definition": "UploadFields",
+      "data": {
+        "version": "1.2.0",
+        "channel": "stable",
+        "os": "linux",
+        "arch": "amd64",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "size": 12345678,
+        "release_notes": "中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中"
+      },
+      "valid": false
+    },
+    {
+      "name": "unknown storage field",
+      "definition": "UploadFields",
+      "data": {
+        "version": "1.2.0",
+        "channel": "stable",
+        "os": "linux",
+        "arch": "amd64",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "size": 12345678,
+        "release_notes": "修复上传恢复；保留 <tag> & 原文。 第二行\n",
+        "storage_key": "private/not-a-client-field"
+      },
+      "valid": false
+    },
+    {
+      "name": "metadata UTF-8 budget",
+      "definition": "SubmitRequest",
+      "data": {
+        "metadata": {
+          "description": "中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中",
+          "license": "MIT",
+          "min_core": "1.0.0",
+          "support_url": "https://support.example/help",
+          "security_statement": "这是安全权限和资源使用的说明。",
+          "privacy_statement": "这是个人数据处理和隐私的说明。"
+        },
+        "expected_artifacts": [
+          {
+            "artifact_id": "00000000-0000-4000-8000-000000000004",
+            "os": "linux",
+            "arch": "amd64",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size": 12345678
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "metadata whitespace cannot satisfy minimum",
+      "definition": "SubmitRequest",
+      "data": {
+        "metadata": {
+          "description": "          x",
+          "license": "MIT",
+          "min_core": "1.0.0",
+          "support_url": "https://support.example/help",
+          "security_statement": "这是安全权限和资源使用的说明。",
+          "privacy_statement": "这是个人数据处理和隐私的说明。"
+        },
+        "expected_artifacts": [
+          {
+            "artifact_id": "00000000-0000-4000-8000-000000000004",
+            "os": "linux",
+            "arch": "amd64",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size": 12345678
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "metadata invalid Core range",
+      "definition": "SubmitRequest",
+      "data": {
+        "metadata": {
+          "description": "这是插件的完整功能说明文本。",
+          "license": "MIT",
+          "min_core": ">=1.0.0",
+          "support_url": "https://support.example/help",
+          "security_statement": "这是安全权限和资源使用的说明。",
+          "privacy_statement": "这是个人数据处理和隐私的说明。"
+        },
+        "expected_artifacts": [
+          {
+            "artifact_id": "00000000-0000-4000-8000-000000000004",
+            "os": "linux",
+            "arch": "amd64",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size": 12345678
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "metadata URL userinfo",
+      "definition": "SubmitRequest",
+      "data": {
+        "metadata": {
+          "description": "这是插件的完整功能说明文本。",
+          "license": "MIT",
+          "min_core": "1.0.0",
+          "support_url": "https://user:password@support.example/",
+          "security_statement": "这是安全权限和资源使用的说明。",
+          "privacy_statement": "这是个人数据处理和隐私的说明。"
+        },
+        "expected_artifacts": [
+          {
+            "artifact_id": "00000000-0000-4000-8000-000000000004",
+            "os": "linux",
+            "arch": "amd64",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size": 12345678
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "duplicate artifact UUID",
+      "definition": "SubmitRequest",
+      "data": {
+        "metadata": {
+          "description": "这是插件的完整功能说明文本。",
+          "license": "MIT",
+          "min_core": "1.0.0",
+          "support_url": "https://support.example/help",
+          "security_statement": "这是安全权限和资源使用的说明。",
+          "privacy_statement": "这是个人数据处理和隐私的说明。"
+        },
+        "expected_artifacts": [
+          {
+            "artifact_id": "00000000-0000-4000-8000-000000000004",
+            "os": "linux",
+            "arch": "amd64",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size": 12345678
+          },
+          {
+            "artifact_id": "00000000-0000-4000-8000-000000000004",
+            "os": "linux",
+            "arch": "arm64",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "size": 8765432
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "duplicate artifact target",
+      "definition": "SubmitRequest",
+      "data": {
+        "metadata": {
+          "description": "这是插件的完整功能说明文本。",
+          "license": "MIT",
+          "min_core": "1.0.0",
+          "support_url": "https://support.example/help",
+          "security_statement": "这是安全权限和资源使用的说明。",
+          "privacy_statement": "这是个人数据处理和隐私的说明。"
+        },
+        "expected_artifacts": [
+          {
+            "artifact_id": "00000000-0000-4000-8000-000000000004",
+            "os": "linux",
+            "arch": "amd64",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size": 12345678
+          },
+          {
+            "artifact_id": "00000000-0000-4000-8000-000000000005",
+            "os": "linux",
+            "arch": "amd64",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "size": 8765432
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "artifact missing UUID",
+      "definition": "SubmitRequest",
+      "data": {
+        "metadata": {
+          "description": "这是插件的完整功能说明文本。",
+          "license": "MIT",
+          "min_core": "1.0.0",
+          "support_url": "https://support.example/help",
+          "security_statement": "这是安全权限和资源使用的说明。",
+          "privacy_statement": "这是个人数据处理和隐私的说明。"
+        },
+        "expected_artifacts": [
+          {
+            "os": "linux",
+            "arch": "amd64",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size": 12345678
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "inconsistent error status",
+      "definition": "Error",
+      "data": {
+        "code": 409,
+        "error": "storage_unavailable",
+        "message": "制品存储暂不可用，请核对原操作。",
+        "retryable": true
+      },
+      "valid": false
+    },
+    {
+      "name": "inconsistent error retryability",
+      "definition": "Error",
+      "data": {
+        "code": 503,
+        "error": "storage_unavailable",
+        "message": "制品存储暂不可用，请核对原操作。",
+        "retryable": false
+      },
+      "valid": false
+    },
+    {
+      "name": "operation receipt ID differs",
+      "definition": "OperationSucceeded",
+      "data": {
+        "operation_id": "00000000-0000-4000-8000-000000000001",
+        "type": "package-upload",
+        "plugin_id": "com.example.promo",
+        "request_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "created_at": "2026-11-09T00:00:00Z",
+        "updated_at": "2026-11-09T00:00:00Z",
+        "status": "succeeded",
+        "retain_until": "2026-11-16T00:00:00Z",
+        "result": {
+          "operation_id": "00000000-0000-4000-8000-000000000099",
+          "plugin_id": "com.example.promo",
+          "version_id": "00000000-0000-4000-8000-000000000003",
+          "version": "1.2.0",
+          "artifact": {
+            "artifact_id": "00000000-0000-4000-8000-000000000004",
+            "os": "linux",
+            "arch": "amd64",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size": 12345678
+          },
+          "market_version_url": "https://market.example/developer/plugins/com.example.promo?view=versions"
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "operation receipt type differs",
+      "definition": "OperationSucceeded",
+      "data": {
+        "operation_id": "00000000-0000-4000-8000-000000000001",
+        "type": "publication-submit",
+        "plugin_id": "com.example.promo",
+        "request_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "created_at": "2026-11-09T00:00:00Z",
+        "updated_at": "2026-11-09T00:00:00Z",
+        "status": "succeeded",
+        "retain_until": "2026-11-16T00:00:00Z",
+        "result": {
+          "operation_id": "00000000-0000-4000-8000-000000000001",
+          "plugin_id": "com.example.promo",
+          "version_id": "00000000-0000-4000-8000-000000000003",
+          "version": "1.2.0",
+          "artifact": {
+            "artifact_id": "00000000-0000-4000-8000-000000000004",
+            "os": "linux",
+            "arch": "amd64",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size": 12345678
+          },
+          "market_version_url": "https://market.example/developer/plugins/com.example.promo?view=versions"
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "operation receipt plugin differs",
+      "definition": "OperationSucceeded",
+      "data": {
+        "operation_id": "00000000-0000-4000-8000-000000000001",
+        "type": "package-upload",
+        "plugin_id": "com.example.promo",
+        "request_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "created_at": "2026-11-09T00:00:00Z",
+        "updated_at": "2026-11-09T00:00:00Z",
+        "status": "succeeded",
+        "retain_until": "2026-11-16T00:00:00Z",
+        "result": {
+          "operation_id": "00000000-0000-4000-8000-000000000001",
+          "plugin_id": "com.other.plugin",
+          "version_id": "00000000-0000-4000-8000-000000000003",
+          "version": "1.2.0",
+          "artifact": {
+            "artifact_id": "00000000-0000-4000-8000-000000000004",
+            "os": "linux",
+            "arch": "amd64",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size": 12345678
+          },
+          "market_version_url": "https://market.example/developer/plugins/com.example.promo?view=versions"
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "operation short retention",
+      "definition": "OperationSucceeded",
+      "data": {
+        "operation_id": "00000000-0000-4000-8000-000000000001",
+        "type": "package-upload",
+        "plugin_id": "com.example.promo",
+        "request_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "created_at": "2026-11-09T00:00:00Z",
+        "updated_at": "2026-11-09T00:00:00Z",
+        "status": "succeeded",
+        "retain_until": "2026-11-15T23:59:59Z",
+        "result": {
+          "operation_id": "00000000-0000-4000-8000-000000000001",
+          "plugin_id": "com.example.promo",
+          "version_id": "00000000-0000-4000-8000-000000000003",
+          "version": "1.2.0",
+          "artifact": {
+            "artifact_id": "00000000-0000-4000-8000-000000000004",
+            "os": "linux",
+            "arch": "amd64",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size": 12345678
+          },
+          "market_version_url": "https://market.example/developer/plugins/com.example.promo?view=versions"
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "operation moved backwards",
+      "definition": "OperationSucceeded",
+      "data": {
+        "operation_id": "00000000-0000-4000-8000-000000000001",
+        "type": "package-upload",
+        "plugin_id": "com.example.promo",
+        "request_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "created_at": "2026-11-09T00:00:00Z",
+        "updated_at": "2026-11-08T23:59:59Z",
+        "status": "succeeded",
+        "retain_until": "2026-11-16T00:00:00Z",
+        "result": {
+          "operation_id": "00000000-0000-4000-8000-000000000001",
+          "plugin_id": "com.example.promo",
+          "version_id": "00000000-0000-4000-8000-000000000003",
+          "version": "1.2.0",
+          "artifact": {
+            "artifact_id": "00000000-0000-4000-8000-000000000004",
+            "os": "linux",
+            "arch": "amd64",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size": 12345678
+          },
+          "market_version_url": "https://market.example/developer/plugins/com.example.promo?view=versions"
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "processing cannot have result",
+      "definition": "OperationProcessing",
+      "data": {
+        "operation_id": "00000000-0000-4000-8000-000000000001",
+        "type": "package-upload",
+        "plugin_id": "com.example.promo",
+        "request_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "created_at": "2026-11-09T00:00:00Z",
+        "updated_at": "2026-11-09T00:00:00Z",
+        "status": "processing",
+        "retain_until": null,
+        "retry_after_seconds": 2,
+        "result": {
+          "operation_id": "00000000-0000-4000-8000-000000000001",
+          "plugin_id": "com.example.promo",
+          "version_id": "00000000-0000-4000-8000-000000000003",
+          "version": "1.2.0",
+          "artifact": {
+            "artifact_id": "00000000-0000-4000-8000-000000000004",
+            "os": "linux",
+            "arch": "amd64",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size": 12345678
+          },
+          "market_version_url": "https://market.example/developer/plugins/com.example.promo?view=versions"
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "failed cannot hide error",
+      "definition": "OperationFailed",
+      "data": {
+        "operation_id": "00000000-0000-4000-8000-000000000001",
+        "type": "package-upload",
+        "plugin_id": "com.example.promo",
+        "request_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "created_at": "2026-11-09T00:00:00Z",
+        "updated_at": "2026-11-09T00:00:00Z",
+        "status": "failed",
+        "retain_until": "2026-11-16T00:00:00Z",
+        "error": null
+      },
+      "valid": false
+    },
+    {
+      "name": "token impossible lifetime",
+      "definition": "PublishToken",
+      "data": {
+        "token_id": "00000000-0000-4000-8000-000000000007",
+        "name": "本地开发上传",
+        "plugin_ids": [
+          "com.example.promo"
+        ],
+        "scopes": [
+          "plugins:read",
+          "packages:write"
+        ],
+        "created_at": "2026-11-09T00:00:00Z",
+        "expires_at": "2027-11-09T00:00:00Z",
+        "last_used_at": null,
+        "revoked_at": null,
+        "status": "active"
+      },
+      "valid": false
+    },
+    {
+      "name": "revoked token needs timestamp",
+      "definition": "PublishToken",
+      "data": {
+        "token_id": "00000000-0000-4000-8000-000000000007",
+        "name": "本地开发上传",
+        "plugin_ids": [
+          "com.example.promo"
+        ],
+        "scopes": [
+          "plugins:read",
+          "packages:write"
+        ],
+        "created_at": "2026-11-09T00:00:00Z",
+        "expires_at": "2026-11-16T00:00:00Z",
+        "last_used_at": null,
+        "revoked_at": null,
+        "status": "revoked"
+      },
+      "valid": false
+    },
+    {
+      "name": "revoked token metadata",
+      "definition": "PublishToken",
+      "data": {
+        "token_id": "00000000-0000-4000-8000-000000000007",
+        "name": "本地开发上传",
+        "plugin_ids": [
+          "com.example.promo"
+        ],
+        "scopes": [
+          "plugins:read",
+          "packages:write"
+        ],
+        "created_at": "2026-11-09T00:00:00Z",
+        "expires_at": "2026-11-16T00:00:00Z",
+        "last_used_at": null,
+        "revoked_at": "2026-11-10T00:00:00Z",
+        "status": "revoked"
+      },
+      "valid": true
+    },
+    {
+      "name": "token list cannot reveal secret",
+      "definition": "PublishToken",
+      "data": {
+        "token_id": "00000000-0000-4000-8000-000000000007",
+        "name": "本地开发上传",
+        "plugin_ids": [
+          "com.example.promo"
+        ],
+        "scopes": [
+          "plugins:read",
+          "packages:write"
+        ],
+        "created_at": "2026-11-09T00:00:00Z",
+        "expires_at": "2026-11-16T00:00:00Z",
+        "last_used_at": null,
+        "revoked_at": null,
+        "status": "active",
+        "token": "pxpub_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      },
+      "valid": false
+    },
+    {
+      "name": "page item count exceeds total",
+      "definition": "VersionsPage",
+      "data": {
+        "items": [
+          {
+            "version_id": "00000000-0000-4000-8000-000000000003",
+            "plugin_id": "com.example.promo",
+            "version": "1.2.0",
+            "channel": "stable",
+            "availability_status": "draft",
+            "release_notes": "修复上传恢复；保留 <tag> & 原文。 第二行\n",
+            "min_core": "1.0.0",
+            "created_at": "2026-11-09T00:00:00Z",
+            "published_at": null,
+            "artifacts": [
+              {
+                "artifact_id": "00000000-0000-4000-8000-000000000004",
+                "os": "linux",
+                "arch": "amd64",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "size": 12345678
+              }
+            ],
+            "market_version_url": "https://market.example/developer/plugins/com.example.promo?view=versions"
+          }
+        ],
+        "total": 0,
+        "page": 1,
+        "size": 20
+      },
+      "valid": false
+    },
+    {
+      "name": "future format not supported in rc1",
+      "definition": "Discovery",
+      "data": {
+        "service": "powerx-marketplace",
+        "protocol": "powerx.plugin-publisher/v1",
+        "contract_version": "1.0.0-rc.2",
+        "features": [
+          "package-upload",
+          "idempotent-writes"
+        ],
+        "package_formats": [
+          "zip",
+          "tar.gz"
+        ],
+        "channels": [
+          "stable"
+        ],
+        "targets": [
+          {
+            "os": "linux",
+            "arch": "amd64"
+          }
+        ],
+        "supported_scopes": [
+          "plugins:read",
+          "packages:write"
+        ],
+        "console_base_url": "https://market.example",
+        "limits": {
+          "max_package_bytes": 2147483648,
+          "max_multipart_overhead_bytes": 1048576,
+          "max_request_bytes": 2148532224,
+          "max_multipart_parts": 8,
+          "max_part_header_bytes": 8192,
+          "max_json_bytes": 65536,
+          "max_manifest_bytes": 262144,
+          "max_uncompressed_bytes": 8589934592,
+          "max_archive_entries": 50000,
+          "max_archive_path_bytes": 1024,
+          "max_compression_ratio": 200,
+          "max_release_notes_bytes": 10000,
+          "max_metadata_text_bytes": 10000,
+          "max_url_bytes": 2000,
+          "max_expected_artifacts": 6,
+          "max_response_bytes": 8388608,
+          "max_json_depth": 64,
+          "max_name_bytes": 200,
+          "max_summary_bytes": 2000,
+          "max_reason_bytes": 1000,
+          "max_review_reason_bytes": 4000,
+          "max_version_chars": 50,
+          "max_core_version_chars": 20,
+          "min_metadata_text_scalars": 10
+        },
+        "token_policy": {
+          "default_ttl_seconds": 604800,
+          "min_ttl_seconds": 300,
+          "max_ttl_seconds": 2592000,
+          "max_plugin_ids": 50,
+          "max_active_per_user": 20
+        },
+        "timeouts": {
+          "connect_seconds": 10,
+          "response_header_seconds": 30,
+          "read_request_seconds": 30,
+          "json_write_seconds": 60,
+          "upload_idle_seconds": 60,
+          "upload_total_seconds": 1800,
+          "upload_client_seconds": 1860,
+          "upload_response_header_seconds": 1800
+        },
+        "recovery": {
+          "idempotency_retention_seconds": 604800,
+          "lease_seconds": 60,
+          "lease_renew_seconds": 15,
+          "processing_retry_after_seconds": 2,
+          "max_attempts": 3,
+          "backoff_base_seconds": 1,
+          "backoff_cap_seconds": 30,
+          "max_retry_after_seconds": 300,
+          "max_recovery_elapsed_seconds": 7200,
+          "operation_poll_seconds": 2,
+          "max_operation_poll_seconds": 120
+        },
+        "pagination": {
+          "default_size": 20,
+          "max_size": 100
+        },
+        "server_time": "2026-11-09T00:00:00Z"
+      },
+      "valid": false
+    },
+    {
+      "name": "upload needs idempotency capability",
+      "definition": "Discovery",
+      "data": {
+        "service": "powerx-marketplace",
+        "protocol": "powerx.plugin-publisher/v1",
+        "contract_version": "1.0.0-rc.2",
+        "features": [
+          "package-upload"
+        ],
+        "package_formats": [
+          "zip"
+        ],
+        "channels": [
+          "stable"
+        ],
+        "targets": [
+          {
+            "os": "linux",
+            "arch": "amd64"
+          }
+        ],
+        "supported_scopes": [
+          "plugins:read",
+          "packages:write"
+        ],
+        "console_base_url": "https://market.example",
+        "limits": {
+          "max_package_bytes": 2147483648,
+          "max_multipart_overhead_bytes": 1048576,
+          "max_request_bytes": 2148532224,
+          "max_multipart_parts": 8,
+          "max_part_header_bytes": 8192,
+          "max_json_bytes": 65536,
+          "max_manifest_bytes": 262144,
+          "max_uncompressed_bytes": 8589934592,
+          "max_archive_entries": 50000,
+          "max_archive_path_bytes": 1024,
+          "max_compression_ratio": 200,
+          "max_release_notes_bytes": 10000,
+          "max_metadata_text_bytes": 10000,
+          "max_url_bytes": 2000,
+          "max_expected_artifacts": 6,
+          "max_response_bytes": 8388608,
+          "max_json_depth": 64,
+          "max_name_bytes": 200,
+          "max_summary_bytes": 2000,
+          "max_reason_bytes": 1000,
+          "max_review_reason_bytes": 4000,
+          "max_version_chars": 50,
+          "max_core_version_chars": 20,
+          "min_metadata_text_scalars": 10
+        },
+        "token_policy": {
+          "default_ttl_seconds": 604800,
+          "min_ttl_seconds": 300,
+          "max_ttl_seconds": 2592000,
+          "max_plugin_ids": 50,
+          "max_active_per_user": 20
+        },
+        "timeouts": {
+          "connect_seconds": 10,
+          "response_header_seconds": 30,
+          "read_request_seconds": 30,
+          "json_write_seconds": 60,
+          "upload_idle_seconds": 60,
+          "upload_total_seconds": 1800,
+          "upload_client_seconds": 1860,
+          "upload_response_header_seconds": 1800
+        },
+        "recovery": {
+          "idempotency_retention_seconds": 604800,
+          "lease_seconds": 60,
+          "lease_renew_seconds": 15,
+          "processing_retry_after_seconds": 2,
+          "max_attempts": 3,
+          "backoff_base_seconds": 1,
+          "backoff_cap_seconds": 30,
+          "max_retry_after_seconds": 300,
+          "max_recovery_elapsed_seconds": 7200,
+          "operation_poll_seconds": 2,
+          "max_operation_poll_seconds": 120
+        },
+        "pagination": {
+          "default_size": 20,
+          "max_size": 100
+        },
+        "server_time": "2026-11-09T00:00:00Z"
+      },
+      "valid": false
+    },
+    {
+      "name": "discovery cannot lie about request budget",
+      "definition": "Discovery",
+      "data": {
+        "service": "powerx-marketplace",
+        "protocol": "powerx.plugin-publisher/v1",
+        "contract_version": "1.0.0-rc.2",
+        "features": [
+          "package-upload",
+          "idempotent-writes"
+        ],
+        "package_formats": [
+          "zip"
+        ],
+        "channels": [
+          "stable"
+        ],
+        "targets": [
+          {
+            "os": "linux",
+            "arch": "amd64"
+          }
+        ],
+        "supported_scopes": [
+          "plugins:read",
+          "packages:write"
+        ],
+        "console_base_url": "https://market.example",
+        "limits": {
+          "max_package_bytes": 2147483648,
+          "max_multipart_overhead_bytes": 1048576,
+          "max_request_bytes": 100,
+          "max_multipart_parts": 8,
+          "max_part_header_bytes": 8192,
+          "max_json_bytes": 65536,
+          "max_manifest_bytes": 262144,
+          "max_uncompressed_bytes": 8589934592,
+          "max_archive_entries": 50000,
+          "max_archive_path_bytes": 1024,
+          "max_compression_ratio": 200,
+          "max_release_notes_bytes": 10000,
+          "max_metadata_text_bytes": 10000,
+          "max_url_bytes": 2000,
+          "max_expected_artifacts": 6,
+          "max_response_bytes": 8388608,
+          "max_json_depth": 64,
+          "max_name_bytes": 200,
+          "max_summary_bytes": 2000,
+          "max_reason_bytes": 1000,
+          "max_review_reason_bytes": 4000,
+          "max_version_chars": 50,
+          "max_core_version_chars": 20,
+          "min_metadata_text_scalars": 10
+        },
+        "token_policy": {
+          "default_ttl_seconds": 604800,
+          "min_ttl_seconds": 300,
+          "max_ttl_seconds": 2592000,
+          "max_plugin_ids": 50,
+          "max_active_per_user": 20
+        },
+        "timeouts": {
+          "connect_seconds": 10,
+          "response_header_seconds": 30,
+          "read_request_seconds": 30,
+          "json_write_seconds": 60,
+          "upload_idle_seconds": 60,
+          "upload_total_seconds": 1800,
+          "upload_client_seconds": 1860,
+          "upload_response_header_seconds": 1800
+        },
+        "recovery": {
+          "idempotency_retention_seconds": 604800,
+          "lease_seconds": 60,
+          "lease_renew_seconds": 15,
+          "processing_retry_after_seconds": 2,
+          "max_attempts": 3,
+          "backoff_base_seconds": 1,
+          "backoff_cap_seconds": 30,
+          "max_retry_after_seconds": 300,
+          "max_recovery_elapsed_seconds": 7200,
+          "operation_poll_seconds": 2,
+          "max_operation_poll_seconds": 120
+        },
+        "pagination": {
+          "default_size": 20,
+          "max_size": 100
+        },
+        "server_time": "2026-11-09T00:00:00Z"
+      },
+      "valid": false
+    },
+    {
+      "name": "duplicate JSON members",
+      "definition": "UploadFields",
+      "raw": "{\"version\": \"1.2.0\", \"channel\": \"stable\", \"os\": \"linux\", \"arch\": \"amd64\", \"sha256\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"size\": 12345678, \"release_notes\": \"\\u4fee\\u590d\\u4e0a\\u4f20\\u6062\\u590d\\uff1b\\u4fdd\\u7559 <tag> & \\u539f\\u6587\\u3002\\u2028\\u7b2c\\u4e8c\\u884c\\n\",\"version\":\"1.2.0\"}",
+      "valid": false
+    },
+    {
+      "name": "lone surrogate",
+      "definition": "UploadFields",
+      "raw": "{\"version\": \"1.2.0\", \"channel\": \"stable\", \"os\": \"linux\", \"arch\": \"amd64\", \"sha256\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"size\": 12345678, \"release_notes\": \"\\ud800\"}",
+      "valid": false
+    },
+    {
+      "name": "trailing JSON",
+      "definition": "UploadFields",
+      "raw": "{\"version\": \"1.2.0\", \"channel\": \"stable\", \"os\": \"linux\", \"arch\": \"amd64\", \"sha256\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"size\": 12345678, \"release_notes\": \"\\u4fee\\u590d\\u4e0a\\u4f20\\u6062\\u590d\\uff1b\\u4fdd\\u7559 <tag> & \\u539f\\u6587\\u3002\\u2028\\u7b2c\\u4e8c\\u884c\\n\"} {}",
+      "valid": false
+    },
+    {
+      "name": "decimal numeric encoding",
+      "definition": "UploadFields",
+      "raw": "{\"version\": \"1.2.0\", \"channel\": \"stable\", \"os\": \"linux\", \"arch\": \"amd64\", \"sha256\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"size\": 1.0, \"release_notes\": \"\\u4fee\\u590d\\u4e0a\\u4f20\\u6062\\u590d\\uff1b\\u4fdd\\u7559 <tag> & \\u539f\\u6587\\u3002\\u2028\\u7b2c\\u4e8c\\u884c\\n\"}",
+      "valid": false
+    },
+    {
+      "name": "exponent numeric encoding",
+      "definition": "UploadFields",
+      "raw": "{\"version\": \"1.2.0\", \"channel\": \"stable\", \"os\": \"linux\", \"arch\": \"amd64\", \"sha256\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"size\": 1e3, \"release_notes\": \"\\u4fee\\u590d\\u4e0a\\u4f20\\u6062\\u590d\\uff1b\\u4fdd\\u7559 <tag> & \\u539f\\u6587\\u3002\\u2028\\u7b2c\\u4e8c\\u884c\\n\"}",
+      "valid": false
+    },
+    {
+      "name": "formal plugin ID com.powerx.plugins.demo",
+      "definition": "PluginID",
+      "data": "com.powerx.plugins.demo",
+      "valid": true
+    },
+    {
+      "name": "formal plugin ID com.powerx.plugins.ai-craft",
+      "definition": "PluginID",
+      "data": "com.powerx.plugins.ai-craft",
+      "valid": true
+    },
+    {
+      "name": "formal plugin ID com.example.demo",
+      "definition": "PluginID",
+      "data": "com.example.demo",
+      "valid": true
+    },
+    {
+      "name": "formal plugin ID org.acme.weather-v2",
+      "definition": "PluginID",
+      "data": "org.acme.weather-v2",
+      "valid": true
+    },
+    {
+      "name": "formal plugin ID my-plugin",
+      "definition": "PluginID",
+      "data": "my-plugin",
+      "valid": true
+    },
+    {
+      "name": "formal plugin ID demo",
+      "definition": "PluginID",
+      "data": "demo",
+      "valid": true
+    },
+    {
+      "name": "formal plugin ID 1",
+      "definition": "PluginID",
+      "data": "1",
+      "valid": true
+    },
+    {
+      "name": "formal plugin ID com.example.my--plugin",
+      "definition": "PluginID",
+      "data": "com.example.my--plugin",
+      "valid": true
+    },
+    {
+      "name": "rejected plugin ID ''",
+      "definition": "PluginID",
+      "data": "",
+      "valid": false
+    },
+    {
+      "name": "rejected plugin ID 'com.powerx.plugin.demo'",
+      "definition": "PluginID",
+      "data": "com.powerx.plugin.demo",
+      "valid": false
+    },
+    {
+      "name": "rejected plugin ID 'com.powerx.plugin'",
+      "definition": "PluginID",
+      "data": "com.powerx.plugin",
+      "valid": false
+    },
+    {
+      "name": "rejected plugin ID 'com.powerx.plugins'",
+      "definition": "PluginID",
+      "data": "com.powerx.plugins",
+      "valid": false
+    },
+    {
+      "name": "rejected plugin ID 'com.powerx.plugins.'",
+      "definition": "PluginID",
+      "data": "com.powerx.plugins.",
+      "valid": false
+    },
+    {
+      "name": "rejected plugin ID 'Com.example.demo'",
+      "definition": "PluginID",
+      "data": "Com.example.demo",
+      "valid": false
+    },
+    {
+      "name": "rejected plugin ID 'com.example.ai_craft'",
+      "definition": "PluginID",
+      "data": "com.example.ai_craft",
+      "valid": false
+    },
+    {
+      "name": "rejected plugin ID 'com..example'",
+      "definition": "PluginID",
+      "data": "com..example",
+      "valid": false
+    },
+    {
+      "name": "rejected plugin ID '.com.example'",
+      "definition": "PluginID",
+      "data": ".com.example",
+      "valid": false
+    },
+    {
+      "name": "rejected plugin ID 'com.example.'",
+      "definition": "PluginID",
+      "data": "com.example.",
+      "valid": false
+    },
+    {
+      "name": "rejected plugin ID 'com.-example'",
+      "definition": "PluginID",
+      "data": "com.-example",
+      "valid": false
+    },
+    {
+      "name": "rejected plugin ID 'com.example-'",
+      "definition": "PluginID",
+      "data": "com.example-",
+      "valid": false
+    },
+    {
+      "name": "rejected plugin ID 'com.example/demo'",
+      "definition": "PluginID",
+      "data": "com.example/demo",
+      "valid": false
+    },
+    {
+      "name": "rejected plugin ID ' com.example.demo'",
+      "definition": "PluginID",
+      "data": " com.example.demo",
+      "valid": false
+    },
+    {
+      "name": "rejected plugin ID 'com.example.demo\\n'",
+      "definition": "PluginID",
+      "data": "com.example.demo\n",
+      "valid": false
+    },
+    {
+      "name": "no additional plugin ID total length cap",
+      "definition": "PluginID",
+      "data": "com.example.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "valid": true
+    },
+    {
+      "name": "unsafe JSON integer",
+      "definition": "VersionsPage",
+      "data": {
+        "items": [],
+        "total": 9007199254740992,
+        "page": 1,
+        "size": 20
+      },
+      "valid": false
+    },
+    {
+      "name": "exact HTTP error mapping invalid_input",
+      "definition": "Error400",
+      "data": {
+        "code": 400,
+        "error": "invalid_input",
+        "message": "Synthetic contract error",
+        "retryable": false
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping package_plugin_id_mismatch",
+      "definition": "Error400",
+      "data": {
+        "code": 400,
+        "error": "package_plugin_id_mismatch",
+        "message": "Synthetic contract error",
+        "retryable": false
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping package_version_mismatch",
+      "definition": "Error400",
+      "data": {
+        "code": 400,
+        "error": "package_version_mismatch",
+        "message": "Synthetic contract error",
+        "retryable": false
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping package_target_mismatch",
+      "definition": "Error400",
+      "data": {
+        "code": 400,
+        "error": "package_target_mismatch",
+        "message": "Synthetic contract error",
+        "retryable": false
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping package_digest_mismatch",
+      "definition": "Error400",
+      "data": {
+        "code": 400,
+        "error": "package_digest_mismatch",
+        "message": "Synthetic contract error",
+        "retryable": false
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping package_invalid",
+      "definition": "Error400",
+      "data": {
+        "code": 400,
+        "error": "package_invalid",
+        "message": "Synthetic contract error",
+        "retryable": false
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping publisher_scope_unsupported",
+      "definition": "Error400",
+      "data": {
+        "code": 400,
+        "error": "publisher_scope_unsupported",
+        "message": "Synthetic contract error",
+        "retryable": false
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping publisher_unauthorized",
+      "definition": "Error401",
+      "data": {
+        "code": 401,
+        "error": "publisher_unauthorized",
+        "message": "Synthetic contract error",
+        "retryable": false
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping publisher_forbidden",
+      "definition": "Error403",
+      "data": {
+        "code": 403,
+        "error": "publisher_forbidden",
+        "message": "Synthetic contract error",
+        "retryable": false
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping not_found",
+      "definition": "Error404",
+      "data": {
+        "code": 404,
+        "error": "not_found",
+        "message": "Synthetic contract error",
+        "retryable": false
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping request_timeout",
+      "definition": "Error408",
+      "data": {
+        "code": 408,
+        "error": "request_timeout",
+        "message": "Synthetic contract error",
+        "retryable": true
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping artifact_conflict",
+      "definition": "Error409",
+      "data": {
+        "code": 409,
+        "error": "artifact_conflict",
+        "message": "Synthetic contract error",
+        "retryable": false
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping version_locked",
+      "definition": "Error409",
+      "data": {
+        "code": 409,
+        "error": "version_locked",
+        "message": "Synthetic contract error",
+        "retryable": false
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping idempotency_conflict",
+      "definition": "Error409",
+      "data": {
+        "code": 409,
+        "error": "idempotency_conflict",
+        "message": "Synthetic contract error",
+        "retryable": false
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping artifact_set_changed",
+      "definition": "Error409",
+      "data": {
+        "code": 409,
+        "error": "artifact_set_changed",
+        "message": "Synthetic contract error",
+        "retryable": false
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping artifact_changed",
+      "definition": "Error409",
+      "data": {
+        "code": 409,
+        "error": "artifact_changed",
+        "message": "Synthetic contract error",
+        "retryable": false
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping publication_state",
+      "definition": "Error409",
+      "data": {
+        "code": 409,
+        "error": "publication_state",
+        "message": "Synthetic contract error",
+        "retryable": false
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping license_blocked",
+      "definition": "Error409",
+      "data": {
+        "code": 409,
+        "error": "license_blocked",
+        "message": "Synthetic contract error",
+        "retryable": false
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping security_blocked",
+      "definition": "Error409",
+      "data": {
+        "code": 409,
+        "error": "security_blocked",
+        "message": "Synthetic contract error",
+        "retryable": false
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping channel_mismatch",
+      "definition": "Error409",
+      "data": {
+        "code": 409,
+        "error": "channel_mismatch",
+        "message": "Synthetic contract error",
+        "retryable": false
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping version_not_newer",
+      "definition": "Error409",
+      "data": {
+        "code": 409,
+        "error": "version_not_newer",
+        "message": "Synthetic contract error",
+        "retryable": false
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping feature_unavailable",
+      "definition": "Error409",
+      "data": {
+        "code": 409,
+        "error": "feature_unavailable",
+        "message": "Synthetic contract error",
+        "retryable": false
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping publisher_token_limit",
+      "definition": "Error409",
+      "data": {
+        "code": 409,
+        "error": "publisher_token_limit",
+        "message": "Synthetic contract error",
+        "retryable": false
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping package_too_large",
+      "definition": "Error413",
+      "data": {
+        "code": 413,
+        "error": "package_too_large",
+        "message": "Synthetic contract error",
+        "retryable": false
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping package_budget_exceeded",
+      "definition": "Error413",
+      "data": {
+        "code": 413,
+        "error": "package_budget_exceeded",
+        "message": "Synthetic contract error",
+        "retryable": false
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping unsupported_media_type",
+      "definition": "Error415",
+      "data": {
+        "code": 415,
+        "error": "unsupported_media_type",
+        "message": "Synthetic contract error",
+        "retryable": false
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping rate_limited",
+      "definition": "Error429",
+      "data": {
+        "code": 429,
+        "error": "rate_limited",
+        "message": "Synthetic contract error",
+        "retryable": true
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping internal_error",
+      "definition": "Error500",
+      "data": {
+        "code": 500,
+        "error": "internal_error",
+        "message": "Synthetic contract error",
+        "retryable": true
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping storage_unavailable",
+      "definition": "Error503",
+      "data": {
+        "code": 503,
+        "error": "storage_unavailable",
+        "message": "Synthetic contract error",
+        "retryable": true
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping publication_options_unavailable",
+      "definition": "Error503",
+      "data": {
+        "code": 503,
+        "error": "publication_options_unavailable",
+        "message": "Synthetic contract error",
+        "retryable": true
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping publisher_unavailable",
+      "definition": "Error503",
+      "data": {
+        "code": 503,
+        "error": "publisher_unavailable",
+        "message": "Synthetic contract error",
+        "retryable": true
+      },
+      "valid": true
+    },
+    {
+      "name": "exact HTTP error mapping request_too_large",
+      "definition": "Error413",
+      "data": {
+        "code": 413,
+        "error": "request_too_large",
+        "message": "Synthetic contract error",
+        "retryable": false
+      },
+      "valid": true
+    },
+    {
+      "name": "HTTP response cannot carry another self-consistent status",
+      "definition": "Error400",
+      "data": {
+        "code": 503,
+        "error": "storage_unavailable",
+        "message": "Synthetic error",
+        "retryable": true
+      },
+      "valid": false
+    },
+    {
+      "name": "noncanonical base64url token tail",
+      "definition": "CreatedToken",
+      "data": {
+        "token": "pxpub_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB",
+        "credential": {
+          "token_id": "00000000-0000-4000-8000-000000000007",
+          "name": "本地开发上传",
+          "plugin_ids": [
+            "com.example.promo"
+          ],
+          "scopes": [
+            "plugins:read",
+            "packages:write"
+          ],
+          "created_at": "2026-11-09T00:00:00Z",
+          "expires_at": "2026-11-16T00:00:00Z",
+          "last_used_at": null,
+          "revoked_at": null,
+          "status": "active"
+        }
+      },
+      "valid": false
+    },
+    {
+      "name": "NUL cannot reach PostgreSQL text",
+      "definition": "UploadFields",
+      "data": {
+        "version": "1.2.0",
+        "channel": "stable",
+        "os": "linux",
+        "arch": "amd64",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "size": 12345678,
+        "release_notes": "abc\u0000def"
+      },
+      "valid": false
+    },
+    {
+      "name": "credential name cannot be blank",
+      "definition": "CreateTokenRequest",
+      "data": {
+        "name": "  ",
+        "plugin_ids": [
+          "com.example.promo"
+        ],
+        "scopes": [
+          "plugins:read"
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "revoke reason cannot be blank",
+      "definition": "RevokeTokenRequest",
+      "data": {
+        "reason": "  "
+      },
+      "valid": false
+    },
+    {
+      "name": "field error reason is a code rather than human revoke text",
+      "definition": "Error400",
+      "data": {
+        "code": 400,
+        "error": "invalid_input",
+        "message": "Synthetic contract error",
+        "retryable": false,
+        "field_errors": [
+          {
+            "field": "version",
+            "reason": "a"
+          }
+        ]
+      },
+      "valid": true
+    }
+  ]
+}

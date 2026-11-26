@@ -1,14 +1,22 @@
 # 开发者发布中心实现设计与交付范围
 
-版本：0.4。日期：2026-11-09。状态：F02 与 F03 首个构建配置已实现并受控验证；实际 Linux/Nuxt 运行、市场接口、页面及真实发布未完成。
+版本：0.10（Framework 接续）。日期：2026-11-17。状态：Market 已交付 Base 原包准入修复；Framework 使用同一 0.1.5 Linux/amd64 包完成真实网页上传、送审和原操作恢复。该包的驳回重提、批准待上架及上架尚待双方继续；此前受控包 M2 结果单列。正式开放、Linux 系统凭据、公开下载和 PowerX 安装分别验收。
 
 本文与[开发者发布中心与市场对接方案](plugin-developer-publishing-center-plan.md)共同使用，并在 PowerXPlugin 与 PowerXPluginMarket 的 `docs/marketplace/` 下维护同一正文。本文落实架构、命令迁移、文件范围和分阶段依赖；机器路径、字段、状态及验收编号以主方案为统一索引，正式 OpenAPI 在 P01 冻结。
+
+F05 本地开发入口为 `/powerx/publisher`，沿用后台主布局，采用桌面纵向分区、窄屏紧凑导航和独立工具会话；使用方式见[页面操作指南](../guides/features/plugin-developer-publisher/guide.md)。生产不注册页面及代理。真实 Go 计划操作与受控构建页面样例分别记录，不将其等同市场上传或真实 Linux/Nuxt 运行验收。
+
+2026-11-16 GUI 更新：开发服务自动识别受信插件工作区、准备并清理同版执行器；页面自动连接，不再要求手工运行 CLI 或填写配对环境变量。构建分区明确选择本机 Linux／Linux 容器，macOS 可在页面启动已安装的本地容器引擎。市场连接增加私密令牌绑定弹窗，令牌经本地受保护接口验证后只保存于系统凭据库，不进入日志、任务、持久浏览器状态或容器。此调整属于 Framework 本地工具契约，市场 rc.2、插件归属、scopes、原 operation 恢复和审核／上架语义保持不变。具体运行证据与验收边界以 Framework GUI 发布验证记录为准。
+
+2026-11-17 Framework 接续：Market 已交付 Schema ID 准入修复（协议仍为 rc.2）；Framework 使用同一 Base 0.1.5 冻结 ZIP，在自己的发布页面完成真实上传、系统凭据绑定和送审，取得 Version、Artifact、Publication 回执。模拟浏览器丢失送审响应后恢复原任务与 operation，刷新页面及重启临时执行器后回执保持一致。修正了送审后刷新完整制品集合被草稿状态门禁阻挡的问题：资料读取允许查看审核中及已审核版本，stable/draft/rejected 检查仍在每次真正写入前执行。该包的驳回重提、批准待上架及上架须由市场维护者操作后继续验收，当前不宣称完成。见[本轮页面证据](../contracts/evidence/plugin-publisher-base-page-joint-validation-20261117.json)及[市场协作步骤](plugin-publisher-base-review-coordination-20261117.md)。
+
+本轮职责澄清只更新 Framework 仓库的文档副本；Market 功能源码、日常服务及对应文档由市场维护者处理。市场侧按协作交接同步自己的两份对接文档，双方以交付回执确认同步结果。
 
 ## 1 当前交付与后续执行边界
 
 首次文档对齐仅修改两仓库文档；随后按用户执行指令在 PowerXPlugin 当前分支实现 F02 本地工具及 F03 首个构建配置。市场功能代码、Core、数据库及日常服务未修改；用于受控验证的临时 CLI 服务和独立生成插件已清理。未提交、推送或切换分支。
 
-当前可用命令是 `px-plugin publisher plan create/list/get`、`px-plugin publisher serve` 和 `publisher build run/get/list/verify/logs`，正式本地契约见[本地工具 v1](../contracts/plugin-publisher-local-v1.md)；已注册本地计划、构建、日志、复核和取消接口。F03 配置为 make-dist-pure-go-js/v1，只接受原生 Linux/amd64、CGO_ENABLED=0 和纯 JS 前端；macOS 不开放构建。详见[构建契约](../contracts/plugin-publisher-build-v1.md)，真实 Linux/Nuxt 运行待验，不代表完整 M1。
+当前可用命令是 `px-plugin publisher plan create/list/get`、`px-plugin publisher serve` 和 `publisher build run/get/list/verify/logs`，正式本地契约见[本地工具 v1](../contracts/plugin-publisher-local-v1.md)；已注册本地计划、构建、日志、复核和取消接口。F03 配置为 make-dist-pure-go-js/v1，接受 Linux/amd64、CGO_ENABLED=0 和纯 JS 前端；本机执行验证原生平台，macOS 页面可明确使用本地 Linux 容器。详见[构建契约](../contracts/plugin-publisher-build-v1.md)，真实 Linux/Nuxt 运行待验，不代表完整 M1。
 
 本地构建、市场上传、送审、批准、上架、下载、宿主安装及启用分别记录证据。文档中的文件范围是后续实现清单，不表示已经修改或授予真实环境执行权限。
 
@@ -26,7 +34,7 @@
                                                                数据库 + 对象存储
 ```
 
-1. 用户在受信插件源码工作区显式启动工具；执行器固定该工作区、监听回环地址，建立短期本地工具会话。
+1. 用户打开受信插件源码工作区的开发页面，由 Nuxt 自动准备工具；执行器固定该工作区、监听回环地址，建立短期本地工具会话。
 2. 页面通过同源开发代理取得脱敏配置及任务 DTO；执行器检查 Host、Origin 和工具会话。F02 必须补齐握手、失效、代理边界及端口配置，不能只依赖 localhost。
 3. 创建计划时锁定 `plugin_id/version/channel/target/market_connection`，生成计划 UUID。构建、上传及送审分别记录稳定 UUID。
 4. “仅构建”执行本地预检查。“构建并上传”先验证 discovery、发布凭据及插件归属，再执行构建。
@@ -75,7 +83,7 @@
 
 首期同一工作区构建串行化，同时为每个任务分配独立 staging。共享的 backend/bin、Nuxt .output 和打包路径必须纳入锁及输出隔离设计，不能只设置 `DIST_DIR`。不创建或切换用户 Git 分支，不自动提交、暂存或清理改动。构建输入指纹应覆盖实际使用的受控源码、未提交内容和工具配置；只记录 HEAD 与 dirty 布尔值不足以证明输入未变。
 
-版本只写入产物 manifest 和对应运行元数据，源码 manifest 不改写。Linux 首期使用能构建完整 Linux 运行时的执行器；验证 Go plugin、migrate 与 Nuxt/Nitro 中原生 Node 依赖的目标。macOS 上 Go 跨编译成功不能使 Linux 完整包校验通过；远程执行器或容器编排不属于 M1 自动提供的能力。
+版本只写入产物 manifest 和对应运行元数据，源码 manifest 不改写。Linux 首期使用能构建完整 Linux 运行时的执行器；验证 Go plugin、migrate 与 Nuxt/Nitro 中原生 Node 依赖的目标。macOS 上 Go 跨编译成功不能使 Linux 完整包校验通过；当前开发页面新增本地 Linux 容器构建；容器引擎通过页面明确启动，不自动切换远程执行器。
 
 打包只接受受控文件清单，包含有效的唯一 manifest、plugin.d、被引用的契约/资源、后端及前端运行时。排除凭据、`.env`、数据库、上传文件、源码仓库和本地工具状态。链接、路径、重复条目与可执行权限按主方案 A09 及宿主解包规则验证。签名文件占位和哈希文件不能当作有效签名。
 
@@ -83,7 +91,7 @@
 
 市场发布令牌只由市场网页会话创建、列出、撤销，绑定真实用户、开发者、插件范围、scope 和有效期。执行器保存系统凭据引用；页面只收脱敏 DTO。CI secret 在 M4 接入。未实现系统凭据存储的环境明确报错，不自动改成明文文件。
 
-机器端统一使用 `<market_api_root>/publisher` 和 `powerx.plugin-publisher/v1`，新包采用正式 `id` 和显式 `target`，不添加旧字段解析或共享令牌回退。当前路径和 DTO 是文档草案，正式 schema、错误结构和共享 fixture 仍由 P01 交付。
+机器端统一使用 `<market_api_root>/publisher` 和 `powerx.plugin-publisher/v1`，新包采用正式 `id` 和显式 `target`，不添加旧字段解析或共享令牌回退。正式路径、DTO、错误结构和共享 fixture 以 P01 rc.2 契约为准，M2 送审消费 P07 交付。
 
 恢复顺序固定为：
 
@@ -110,7 +118,7 @@
 
 ## 7 两仓库拟变更范围
 
-以下是实现任务的目标区域。当前仅在 CLI 实现本地工具及隔离构建；Skeleton/生成模板的后端版本变量和 Makefile 链接/trimpath 规则已同步，模板转换规则同步更新。业务 HTTP 路由、前端页面和市场功能源码未修改。
+以下是实现任务的目标区域。当前 CLI 已实现本地工具、构建准入、系统凭据、市场连接、异步字节上传与恢复；Framework Admin Layer 页面及外层私有代理已接通同一引擎。F06 模板同步，F07 采用真实 tarball/模块代理快照独立消费。业务 HTTP 路由与市场功能源码未修改；详见[市场适配契约](../contracts/plugin-publisher-market-v1.md)。
 
 | 仓库 | 目标区域 | 职责与限制 |
 | --- | --- | --- |
@@ -132,9 +140,9 @@ Core、其他业务插件和用户日常服务不在本轮变更范围。后续�
 
 | 阶段 | Framework 任务 | 市场任务 | 依赖与退出证据 |
 | --- | --- | --- | --- |
-| M0 文档与契约 | F01 现状及迁移清单；F02 本地工具契约 | P01 正式 OpenAPI、错误、预算和 fixture | F02 本地计划/会话契约与基础已受控验证；F03/F05 后续消费；P01 未冻结前不宣称 M0 整体结束 |
-| M1 单平台上传 | F02 执行器；F03 构建/冻结；F04 凭据/上传/恢复；F05 页面；F06 模板；F07 独立生成消费 | P02 凭据；P03 机器路由；P04 字节接收；P05 幂等恢复；P06 查询；P08 本阶段审计 | 冻结 M0 后，受控实现可并行；真实上传等待市场接口及实际 ZIP。联合 A01—A14 |
-| M2 送审 | F08 资料选项、完整集合及状态回显 | P07 快照贯通浏览器、送审、审核、查看和上架；P08 审计 | 建立在 M1 上；A15—A18，至少覆盖第二个平台包损坏不能放行 |
+| M0 文档与契约 | F01 现状及迁移清单；F02 本地工具契约 | P01 正式 OpenAPI、错误、预算和 fixture | P01 rc.2 已交付，Framework 同版消费、共享 Go/Node 验证和隔离对接通过；正式能力开放和运行验收另列 |
+| M1 单平台上传 | F02 执行器；F03 构建/冻结；F04 凭据/上传/恢复；F05 页面；F06 模板；F07 独立生成消费 | P02 凭据；P03 机器路由；P04 字节接收；P05 幂等恢复；P06 查询；P08 本阶段审计 | 冻结 M0 后，受控实现可并行；隔离市场源码 + MinIO 字节上传/恢复通过；原始 discovery 拦截通过。正式开放与原生 Linux/Nuxt 的联合 A01—A14 仍保留 |
+| M2 送审 | F08 资料选项、完整集合及状态回显 | P07 快照贯通浏览器、送审、审核、查看和上架；P08 审计 | F08 源码、页面和受控契约验证已增加；P07 已交付且默认关闭。本轮已验证真实页面主链路；A15/A16 剩余失败分支、原生完整包和公开下载等仍待联合验收 |
 | M3 多平台与渠道 | 批量目标、同源码来源、补传和渠道选择 | beta、排序、发现、promotion 契约及逐包规则 | 单独冻结渠道规则；A16/A19/A20，不覆盖既有包 |
 | M4 CI | 非交互命令、secret、同引擎回执和独立包消费 | 同版机器接口及操作审计 | A21，记录 CI/CLI/Framework/生成插件版本和 SHA256；不自动触发用户 workflow |
 
@@ -144,13 +152,21 @@ F07 使用新的独立插件和隔离市场资源，登记维护人、源码状�
 
 | 项目 | 当前状态及剩余工作 | 负责方 |
 | --- | --- | --- |
-| 本地工具 | 本地契约及计划/会话服务已交付；构建任务/进程取消的首个配置已由 F03 受控验证；代理消费为 F05，真实 Linux/Nuxt 运行待验 | F02/F03/F05 |
-| 发布凭据 | 创建/列表/撤销 DTO，默认及最长有效期、scope 组合和安全存储校验 | P01/P02 |
-| 机器 schema | 成功/错误 envelope、UUID 字段、分页、operation 查询及 Retry-After、可信控制台 origin | P01 |
+| 本地工具 | 本地契约及计划/会话服务已交付；构建任务/进程取消的首个配置已由 F03 受控验证；F04/F05 市场链路及页面已交付，F06 模板与 F07 独立快照消费通过；真实 Linux/Nuxt 运行待验 | F02/F03/F05 |
+| 发布凭据 | rc.2 DTO/TTL/scope 已消费；F04 系统存储和同身份更新已实现；P02 网页已交付；本机 macOS 已完成真实 M2 绑定与同身份只读换发恢复；Linux Secret Service 及正式环境另验 | P01/P02 |
+| 机器 schema | rc.2 原包 24 文件与摘要保持，Go/Node 共享验证通过，客户端执行严格 schema 与可信控制台校验 | P01 |
 | 指纹及集合 | 上传和送审规范化算法、字段上限、集合排序、Artifact UUID 和冲突 fixture | P01/P07 |
 | 预算 | 幂等保留期、整包及 multipart 上限、解压预算、请求/空闲超时、轮询和重试上限 | P01/F02 |
 | 联调资源 | 独立插件 ID、维护人、隔离账号/数据库/存储、证据位置及清理归属 | F07 与市场维护人 |
 
-当前建议的七天保留期和分页 20/最大 100 是文档建议值；只有正式契约冻结且服务实现后才能对外宣称保证。M0 完成不要求先部署市场或执行真实写入。
+七天终态保留期、分页 20/最大 100 和预算已由 P01 rc.2 定义并同版消费。验证与清理见[本轮证据](../contracts/evidence/plugin-publisher-m1-validation-20261110.json)。源码交付、隔离联合验证、正式包发布和生产联合验收分别报告；不因本地快照或测试包装器宣布市场已开放。
 
 两仓库主方案和本设计保持相同版本及正文，允许相对链接因仓库位置不同而变化。市场侧是机器 API 正式 OpenAPI 的维护方，Framework 消费同版契约和 fixture；本地工具契约由 Framework 维护。协议语义发生变更时同步两份方案、指南及测试输入，不只改一端。
+
+F08 细节见[送审适配契约](../contracts/plugin-publisher-submission-v1.md)与[受控证据](../contracts/evidence/plugin-publisher-f08-validation-20261111.json)。原始 rc.2 工件未修改；本端不绕过 publication-submit/idempotent-writes 或 publications scopes，不用旧浏览器路由兼容。P07 已明确驳回重提生成新的 Publication UUID，旧回执及其资料／集合保持不变。
+
+市场 P08/M1 审计、P02 网页及默认关闭的 M1 能力公告门禁已交付（市场文档保持各阶段历史基线）；M1 新门禁仍待 Framework 客户端联合重放、目标运行时和真实系统凭据验收，M2/P07 默认关闭；本轮受控包的真实开发页面主链路已验证。配对方案 v0.9 不改写既有历史证据。
+
+2026-11-11／v0.8 对齐：[市场 P07 交付](../../../../PowerXPluginMarket/docs/marketplace/plugin-publisher-p07-delivery.md)及[M2 联调清单](../../../../PowerXPluginMarket/docs/marketplace/plugin-publisher-m2-joint-acceptance.md)已核对。协议继续 rc.2，24 文件与 bundle 摘要未变。本端增加按任务持久化、分页读取的脱敏 HTTP 请求记录及 Publication UUID 技术详情；见[本轮验证](../contracts/evidence/plugin-publisher-p07-alignment-20261111.json)。本轮已通过同机实验脚本交接并完成受控包页面主链路；环境现已清理，下一轮读取新 handoff。默认关闭不代表未实现；此前 M1/F08 证据保留为历史记录。
+
+2026-11-11／v0.9 联合进展：Framework 独立生成插件及实际 SDK tarball 的开发页面，已连接本轮真实 PostgreSQL/MinIO/Gin/Market 网页环境，完成送审、丢响应与执行器重启恢复、驳回重提、批准仍私有、显式上架、旧链接与只读换发恢复。输入为市场已上传的受控 ZIP，非 Framework 原生完整包。详见[联合记录](plugin-publisher-framework-m2-joint-record.md)和[新证据](../contracts/evidence/plugin-publisher-m2-page-joint-validation-20261111.json)。此前 v0.8 的待交接描述为历史时点，环境现已关闭；完整构建上传、A15/A16 剩余场景、公开下载及宿主安装继续保留。

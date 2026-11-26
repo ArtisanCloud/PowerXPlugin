@@ -1,0 +1,1169 @@
+{
+  "recorded_at": "2026-11-17T07:09:22.773957+00:00",
+  "scope": "Framework page-side real original Base package upload and submission; external review actions not yet performed",
+  "result": "upload_submission_recovery_passed_review_continuation_required",
+  "contract_version": "1.0.0-rc.2",
+  "branch": "025-framework-business-regression",
+  "head": "5683e4293d89b276ee3669448ceefd9de06a75a7",
+  "package": {
+    "plugin_id": "com.powerx.plugins.base",
+    "source_version": "0.1.4",
+    "version": "0.1.5",
+    "os": "linux",
+    "arch": "amd64",
+    "zip_size": 60868645,
+    "zip_entries": 544,
+    "sha256": "e7a9f5ef7d883633d2826011946c5f4201a2ef7ba77cc6ba1be5d08190c342f3",
+    "build_id": "7352fbba-b6ca-481d-9699-8650f5e4a52b",
+    "reused_original_without_rebuild": true
+  },
+  "market": {
+    "provided_script_used_unchanged": true,
+    "base_package": true,
+    "skip_seed_upload": true,
+    "api_root": "http://127.0.0.1:59542/api/v1",
+    "console_base": "http://127.0.0.1:59542",
+    "closed_at_expiry": true,
+    "historical_urls_in_receipts": true,
+    "boundary": "actual Gin Publisher/identity/catalog + PostgreSQL/MinIO + production Market Nuxt; Market does not run the package; isolation scanner and compatibility snapshot controlled"
+  },
+  "scopes_explicitly_selected_in_market_gui": [
+    "packages:write",
+    "plugins:read",
+    "publications:read",
+    "publications:submit"
+  ],
+  "token_id": "65487fbc-5086-4f06-8163-42db1aa96d6f",
+  "connection_id": "b46e353e-5916-41b9-aa0c-8046668bac9b",
+  "upload": {
+    "contract_version": "1.0.0-rc.2",
+    "bundle_sha256": "89141c00e0b99b6a803312119e4cbcb3e64224bf458e234e35fc5ffbdeacd8fa",
+    "schema": "powerx.plugin-publisher-upload/v1",
+    "upload_id": "4b2e0626-f22b-4a95-a683-34534e6b9758",
+    "operation_id": "0f30e788-bef7-4980-b533-909b230eeece",
+    "connection_id": "b46e353e-5916-41b9-aa0c-8046668bac9b",
+    "build_id": "7352fbba-b6ca-481d-9699-8650f5e4a52b",
+    "user_id": "d3489ac4-4c95-424c-b919-f307b8c09f7b",
+    "developer_id": "0523e3e8-9479-40c3-92de-065d4517c88d",
+    "plugin_id": "com.powerx.plugins.base",
+    "release_plan_id": "d50567be-0371-4b55-a57f-becf9e4f1957",
+    "version": "0.1.5",
+    "artifact": {
+      "path": "work/7352fbba-b6ca-481d-9699-8650f5e4a52b/artifact.zip",
+      "sha256": "e7a9f5ef7d883633d2826011946c5f4201a2ef7ba77cc6ba1be5d08190c342f3",
+      "size": 60868645,
+      "file_count": 544
+    },
+    "request_sha256": "01db1f07ee929f10de19e768bbed2b182b247c5ce1baa77aba204a1b2fd8f72c",
+    "stage": "succeeded",
+    "attempts": 1,
+    "bytes_sent": 60868645,
+    "created_at": "2026-11-17T06:53:41.953805Z",
+    "updated_at": "2026-11-17T06:53:44.47208Z",
+    "receipt": {
+      "operation_id": "0f30e788-bef7-4980-b533-909b230eeece",
+      "plugin_id": "com.powerx.plugins.base",
+      "version_id": "e5262283-9b65-475b-aee8-060205e29f18",
+      "version": "0.1.5",
+      "artifact": {
+        "artifact_id": "7cec7fa0-08fa-4f9f-9c9d-d77d6458b8dd",
+        "os": "linux",
+        "arch": "amd64",
+        "sha256": "e7a9f5ef7d883633d2826011946c5f4201a2ef7ba77cc6ba1be5d08190c342f3",
+        "size": 60868645
+      },
+      "market_version_url": "http://127.0.0.1:59542/developer/plugins/com.powerx.plugins.base?version_id=e5262283-9b65-475b-aee8-060205e29f18&view=versions"
+    },
+    "current_version": {
+      "version_id": "e5262283-9b65-475b-aee8-060205e29f18",
+      "plugin_id": "com.powerx.plugins.base",
+      "version": "0.1.5",
+      "channel": "stable",
+      "availability_status": "draft",
+      "release_notes": "Base 图形化发布流程验收候选包",
+      "min_core": "1.0.0",
+      "created_at": "2026-11-17T06:53:44.412Z",
+      "published_at": null,
+      "artifacts": [
+        {
+          "artifact_id": "7cec7fa0-08fa-4f9f-9c9d-d77d6458b8dd",
+          "os": "linux",
+          "arch": "amd64",
+          "sha256": "e7a9f5ef7d883633d2826011946c5f4201a2ef7ba77cc6ba1be5d08190c342f3",
+          "size": 60868645
+        }
+      ],
+      "market_version_url": "http://127.0.0.1:59542/developer/plugins/com.powerx.plugins.base?version_id=e5262283-9b65-475b-aee8-060205e29f18&view=versions"
+    }
+  },
+  "submission": {
+    "schema": "powerx.plugin-publisher-submission/v1",
+    "contract_version": "1.0.0-rc.2",
+    "bundle_sha256": "89141c00e0b99b6a803312119e4cbcb3e64224bf458e234e35fc5ffbdeacd8fa",
+    "submission_id": "764ea8be-b029-403f-8352-0b8f2988f12b",
+    "operation_id": "d82f8f33-9330-4f11-82fc-d09cffac2334",
+    "plugin_id": "com.powerx.plugins.base",
+    "user_id": "d3489ac4-4c95-424c-b919-f307b8c09f7b",
+    "developer_id": "0523e3e8-9479-40c3-92de-065d4517c88d",
+    "connection_id": "b46e353e-5916-41b9-aa0c-8046668bac9b",
+    "version_id": "e5262283-9b65-475b-aee8-060205e29f18",
+    "version": "0.1.5",
+    "metadata": {
+      "description": "Base GUI original acceptance description; isolated test candidate, 2026-11-17.",
+      "license": "MIT",
+      "min_core": "1.0.2",
+      "support_url": "https://example.invalid/base-gui-acceptance",
+      "icon_url": "",
+      "security_statement": "Owned isolated package acceptance, not a production security attestation.",
+      "privacy_statement": "Owned isolated acceptance fixture, no production customer data is processed."
+    },
+    "expected_artifacts": [
+      {
+        "artifact_id": "7cec7fa0-08fa-4f9f-9c9d-d77d6458b8dd",
+        "os": "linux",
+        "arch": "amd64",
+        "sha256": "e7a9f5ef7d883633d2826011946c5f4201a2ef7ba77cc6ba1be5d08190c342f3",
+        "size": 60868645
+      }
+    ],
+    "request_sha256": "1d466eff3d9bfa52bc7cfbeaf9c3e6daaf3b06aa9f75dd82615014ae3527f18f",
+    "stage": "succeeded",
+    "attempts": 1,
+    "created_at": "2026-11-17T07:00:37.966772Z",
+    "updated_at": "2026-11-17T07:02:56.747839Z",
+    "receipt": {
+      "operation_id": "d82f8f33-9330-4f11-82fc-d09cffac2334",
+      "publication_id": "44af66a4-c388-4b07-9502-e3865f421d1b",
+      "version_id": "e5262283-9b65-475b-aee8-060205e29f18",
+      "status": "submitted",
+      "submitted_at": "2026-11-17T07:00:39.24Z",
+      "market_publication_url": "http://127.0.0.1:59542/developer/plugins/com.powerx.plugins.base?publication_id=44af66a4-c388-4b07-9502-e3865f421d1b&view=history"
+    },
+    "current_publication": {
+      "publication_id": "44af66a4-c388-4b07-9502-e3865f421d1b",
+      "plugin_id": "com.powerx.plugins.base",
+      "version_id": "e5262283-9b65-475b-aee8-060205e29f18",
+      "version": "0.1.5",
+      "status": "submitted",
+      "metadata": {
+        "description": "Base GUI original acceptance description; isolated test candidate, 2026-11-17.",
+        "license": "MIT",
+        "min_core": "1.0.2",
+        "support_url": "https://example.invalid/base-gui-acceptance",
+        "icon_url": "",
+        "security_statement": "Owned isolated package acceptance, not a production security attestation.",
+        "privacy_statement": "Owned isolated acceptance fixture, no production customer data is processed."
+      },
+      "artifacts": [
+        {
+          "artifact_id": "7cec7fa0-08fa-4f9f-9c9d-d77d6458b8dd",
+          "os": "linux",
+          "arch": "amd64",
+          "sha256": "e7a9f5ef7d883633d2826011946c5f4201a2ef7ba77cc6ba1be5d08190c342f3",
+          "size": 60868645
+        }
+      ],
+      "submitted_at": "2026-11-17T07:00:39.24Z",
+      "reviewed_at": null,
+      "review_reason": "",
+      "published_at": null,
+      "publish_reason": "",
+      "market_publication_url": "http://127.0.0.1:59542/developer/plugins/com.powerx.plugins.base?publication_id=44af66a4-c388-4b07-9502-e3865f421d1b&view=history"
+    }
+  },
+  "checks": [
+    "real_market_token_issued_in_gui_with_four_explicit_scopes",
+    "page_auto_connected_and_same_original_base_zip_reverified_without_rebuild",
+    "publisher_gui_binding_saved_real_system_keyring_and_cleared_input",
+    "actual_original_base_zip_uploaded_in_gui_with_real_version_and_artifact_receipt",
+    "browser_submission_response_lost_after_acceptance_recovered_same_task_and_operation_without_duplicate",
+    "real_executor_restart_and_page_reload_preserved_task_operation_system_credential_and_receipt"
+  ],
+  "lost_response": {
+    "boundary": "Browser aborted response from local Framework submission POST after route.fetch received real accepted task; Market submission was not mocked",
+    "persisted_before_market_write": true,
+    "same_submission_and_operation_recovered": true,
+    "owned_submission_count": 1,
+    "market_post_attempts": 1
+  },
+  "restart": {
+    "before": {
+      "pid": 73668,
+      "ppid": 73666,
+      "argv": [
+        "node",
+        "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/skeleton/web-admin/nuxt/node_modules/nuxi/bin/nuxi.mjs",
+        "dev",
+        "--cwd",
+        "/private/var/folders/zh/215y91n14h36h244d2c9tbv40000gn/T/powerx-base-gui-m2-d9ou7ctm/app",
+        "--dotenv",
+        "/private/var/folders/zh/215y91n14h36h244d2c9tbv40000gn/T/powerx-base-gui-m2-d9ou7ctm/app/empty.env",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "60969",
+        "--no-fork"
+      ],
+      "port": 60969,
+      "origin": "http://127.0.0.1:60969",
+      "backend_port": 60970,
+      "exited": true
+    },
+    "after": {
+      "pid": 20328,
+      "ppid": 20327,
+      "argv": [
+        "node",
+        "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/skeleton/web-admin/nuxt/node_modules/nuxi/bin/nuxi.mjs",
+        "dev",
+        "--cwd",
+        "/private/var/folders/zh/215y91n14h36h244d2c9tbv40000gn/T/powerx-base-gui-m2-d9ou7ctm/app",
+        "--dotenv",
+        "/private/var/folders/zh/215y91n14h36h244d2c9tbv40000gn/T/powerx-base-gui-m2-d9ou7ctm/app/empty.env",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "62958",
+        "--no-fork"
+      ],
+      "port": 62958,
+      "origin": "http://127.0.0.1:62958",
+      "backend_port": 62959,
+      "exited": true
+    },
+    "same_operation": "d82f8f33-9330-4f11-82fc-d09cffac2334",
+    "same_receipt": {
+      "operation_id": "d82f8f33-9330-4f11-82fc-d09cffac2334",
+      "publication_id": "44af66a4-c388-4b07-9502-e3865f421d1b",
+      "version_id": "e5262283-9b65-475b-aee8-060205e29f18",
+      "status": "submitted",
+      "submitted_at": "2026-11-17T07:00:39.24Z",
+      "market_publication_url": "http://127.0.0.1:59542/developer/plugins/com.powerx.plugins.base?publication_id=44af66a4-c388-4b07-9502-e3865f421d1b&view=history"
+    },
+    "system_keyring_reused": true
+  },
+  "page_requests": [
+    {
+      "path": "/connect",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/plans/d50567be-0371-4b55-a57f-becf9e4f1957",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/markets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/uploads",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/submissions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/builds/7352fbba-b6ca-481d-9699-8650f5e4a52b",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/plans/d50567be-0371-4b55-a57f-becf9e4f1957",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/plans",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/builds",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/plans/d50567be-0371-4b55-a57f-becf9e4f1957",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/builds/7352fbba-b6ca-481d-9699-8650f5e4a52b",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/builds/7352fbba-b6ca-481d-9699-8650f5e4a52b/verify",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/markets",
+      "method": "POST",
+      "status": 201
+    },
+    {
+      "path": "/markets/b46e353e-5916-41b9-aa0c-8046668bac9b/bind",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/uploads",
+      "method": "POST",
+      "status": 202
+    },
+    {
+      "path": "/uploads/4b2e0626-f22b-4a95-a683-34534e6b9758",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/uploads/4b2e0626-f22b-4a95-a683-34534e6b9758",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/submissions/prepare",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/connect",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/plans/d50567be-0371-4b55-a57f-becf9e4f1957",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/markets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/submissions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/uploads",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/builds/7352fbba-b6ca-481d-9699-8650f5e4a52b",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/plans/d50567be-0371-4b55-a57f-becf9e4f1957",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/plans",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/builds",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/plans/d50567be-0371-4b55-a57f-becf9e4f1957",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/builds/7352fbba-b6ca-481d-9699-8650f5e4a52b",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/connect",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/plans/d50567be-0371-4b55-a57f-becf9e4f1957",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/markets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/submissions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/uploads",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/builds/7352fbba-b6ca-481d-9699-8650f5e4a52b",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/plans/d50567be-0371-4b55-a57f-becf9e4f1957",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/plans",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/builds",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/plans/d50567be-0371-4b55-a57f-becf9e4f1957",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/builds/7352fbba-b6ca-481d-9699-8650f5e4a52b",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/submissions/prepare",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/connect",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/plans/d50567be-0371-4b55-a57f-becf9e4f1957",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/markets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/uploads",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/submissions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/builds/7352fbba-b6ca-481d-9699-8650f5e4a52b",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/plans/d50567be-0371-4b55-a57f-becf9e4f1957",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/plans",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/builds",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/plans/d50567be-0371-4b55-a57f-becf9e4f1957",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/builds/7352fbba-b6ca-481d-9699-8650f5e4a52b",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/submissions/prepare",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/submissions/preview",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/submissions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/submissions/764ea8be-b029-403f-8352-0b8f2988f12b",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/connect",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/plans/d50567be-0371-4b55-a57f-becf9e4f1957",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/markets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/uploads",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/submissions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/builds/7352fbba-b6ca-481d-9699-8650f5e4a52b",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/plans/d50567be-0371-4b55-a57f-becf9e4f1957",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/plans",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/builds",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/plans/d50567be-0371-4b55-a57f-becf9e4f1957",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/builds/7352fbba-b6ca-481d-9699-8650f5e4a52b",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/submissions/prepare",
+      "method": "POST",
+      "status": 409
+    },
+    {
+      "path": "/connect",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/plans/d50567be-0371-4b55-a57f-becf9e4f1957",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/markets",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/uploads",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/submissions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/builds/7352fbba-b6ca-481d-9699-8650f5e4a52b",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/plans/d50567be-0371-4b55-a57f-becf9e4f1957",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/plans",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/builds",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/plans/d50567be-0371-4b55-a57f-becf9e4f1957",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/builds/7352fbba-b6ca-481d-9699-8650f5e4a52b",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/submissions/prepare",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/submissions/764ea8be-b029-403f-8352-0b8f2988f12b/resume",
+      "method": "POST",
+      "status": 202
+    },
+    {
+      "path": "/submissions/764ea8be-b029-403f-8352-0b8f2988f12b",
+      "method": "GET",
+      "status": 200
+    }
+  ],
+  "http_trace": [
+    {
+      "kind": "uploads",
+      "schema": "powerx.plugin-publisher-request/v1",
+      "task_kind": "uploads",
+      "task_id": "4b2e0626-f22b-4a95-a683-34534e6b9758",
+      "operation_id": "0f30e788-bef7-4980-b533-909b230eeece",
+      "client_request_id": "0e38ccba-0060-4981-b93b-8cd985b0098c",
+      "server_request_id": "90642b2e-7ae3-41f6-83dc-48146fd0e571",
+      "method": "GET",
+      "response_type": "MarketVersionResponse",
+      "http_status": 200,
+      "started_at": "2026-11-17T06:53:44.447213Z",
+      "finished_at": "2026-11-17T06:53:44.463045Z"
+    },
+    {
+      "kind": "uploads",
+      "schema": "powerx.plugin-publisher-request/v1",
+      "task_kind": "uploads",
+      "task_id": "4b2e0626-f22b-4a95-a683-34534e6b9758",
+      "operation_id": "0f30e788-bef7-4980-b533-909b230eeece",
+      "client_request_id": "2853ea87-9e1e-4356-b0d7-d503f32ad447",
+      "server_request_id": "995a8d1f-dd32-492b-9b92-4f353f6417d7",
+      "method": "GET",
+      "response_type": "MeResponse",
+      "http_status": 200,
+      "started_at": "2026-11-17T06:53:42.032311Z",
+      "finished_at": "2026-11-17T06:53:42.049423Z"
+    },
+    {
+      "kind": "uploads",
+      "schema": "powerx.plugin-publisher-request/v1",
+      "task_kind": "uploads",
+      "task_id": "4b2e0626-f22b-4a95-a683-34534e6b9758",
+      "operation_id": "0f30e788-bef7-4980-b533-909b230eeece",
+      "client_request_id": "72259efd-8de3-48a1-bb48-e9316967e72f",
+      "server_request_id": "2b2f3d3e-892e-46ba-a3fc-090ae85734ec",
+      "method": "GET",
+      "response_type": "PluginResponse",
+      "http_status": 200,
+      "started_at": "2026-11-17T06:53:42.059447Z",
+      "finished_at": "2026-11-17T06:53:42.075348Z"
+    },
+    {
+      "kind": "uploads",
+      "schema": "powerx.plugin-publisher-request/v1",
+      "task_kind": "uploads",
+      "task_id": "4b2e0626-f22b-4a95-a683-34534e6b9758",
+      "operation_id": "0f30e788-bef7-4980-b533-909b230eeece",
+      "client_request_id": "967af0a2-f086-41bd-9bed-6e30707bd91c",
+      "server_request_id": "c3d7ac45-b4af-4e2b-899c-8f3124ac3592",
+      "method": "POST",
+      "response_type": "UploadReceiptResponse",
+      "http_status": 201,
+      "started_at": "2026-11-17T06:53:42.897228Z",
+      "finished_at": "2026-11-17T06:53:44.42168Z"
+    },
+    {
+      "kind": "uploads",
+      "schema": "powerx.plugin-publisher-request/v1",
+      "task_kind": "uploads",
+      "task_id": "4b2e0626-f22b-4a95-a683-34534e6b9758",
+      "operation_id": "0f30e788-bef7-4980-b533-909b230eeece",
+      "client_request_id": "a71bc1f6-b2db-462d-94c3-f6895d805d7c",
+      "server_request_id": "53c3dfb0-cec0-4e36-8c02-4e0be286a6be",
+      "method": "GET",
+      "response_type": "DiscoveryResponse",
+      "http_status": 200,
+      "started_at": "2026-11-17T06:53:42.001752Z",
+      "finished_at": "2026-11-17T06:53:42.022232Z"
+    },
+    {
+      "kind": "submissions",
+      "schema": "powerx.plugin-publisher-request/v1",
+      "task_kind": "submissions",
+      "task_id": "764ea8be-b029-403f-8352-0b8f2988f12b",
+      "operation_id": "d82f8f33-9330-4f11-82fc-d09cffac2334",
+      "client_request_id": "06f7d34d-6f2c-4b41-a249-3afba33ab842",
+      "server_request_id": "506108fb-8258-4af9-9290-a8ab4f5b69b9",
+      "method": "GET",
+      "response_type": "DiscoveryResponse",
+      "http_status": 200,
+      "started_at": "2026-11-17T07:00:38.185146Z",
+      "finished_at": "2026-11-17T07:00:38.207173Z"
+    },
+    {
+      "kind": "submissions",
+      "schema": "powerx.plugin-publisher-request/v1",
+      "task_kind": "submissions",
+      "task_id": "764ea8be-b029-403f-8352-0b8f2988f12b",
+      "operation_id": "d82f8f33-9330-4f11-82fc-d09cffac2334",
+      "client_request_id": "186d24f4-663f-4859-a903-54cb9287e61c",
+      "server_request_id": "a7dfb2fe-2cc3-4544-8fe3-316660b9a2e8",
+      "method": "GET",
+      "response_type": "PluginResponse",
+      "http_status": 200,
+      "started_at": "2026-11-17T07:00:38.24942Z",
+      "finished_at": "2026-11-17T07:00:38.265406Z"
+    },
+    {
+      "kind": "submissions",
+      "schema": "powerx.plugin-publisher-request/v1",
+      "task_kind": "submissions",
+      "task_id": "764ea8be-b029-403f-8352-0b8f2988f12b",
+      "operation_id": "d82f8f33-9330-4f11-82fc-d09cffac2334",
+      "client_request_id": "2813ae64-6c5b-454e-904a-d4e4a27294c1",
+      "server_request_id": "2bc788b7-4f01-4651-922f-0102a789e055",
+      "method": "GET",
+      "response_type": "PluginResponse",
+      "http_status": 200,
+      "started_at": "2026-11-17T07:00:38.095393Z",
+      "finished_at": "2026-11-17T07:00:38.11202Z"
+    },
+    {
+      "kind": "submissions",
+      "schema": "powerx.plugin-publisher-request/v1",
+      "task_kind": "submissions",
+      "task_id": "764ea8be-b029-403f-8352-0b8f2988f12b",
+      "operation_id": "d82f8f33-9330-4f11-82fc-d09cffac2334",
+      "client_request_id": "4e1ed18e-66d8-4176-9ad1-871a488a0e71",
+      "server_request_id": "dd490f5a-a3a7-400e-8920-f7255445bbf1",
+      "method": "GET",
+      "response_type": "MeResponse",
+      "http_status": 200,
+      "started_at": "2026-11-17T07:00:38.217764Z",
+      "finished_at": "2026-11-17T07:00:38.236026Z"
+    },
+    {
+      "kind": "submissions",
+      "schema": "powerx.plugin-publisher-request/v1",
+      "task_kind": "submissions",
+      "task_id": "764ea8be-b029-403f-8352-0b8f2988f12b",
+      "operation_id": "d82f8f33-9330-4f11-82fc-d09cffac2334",
+      "client_request_id": "785bb617-d774-4731-8fa7-0a5f1dffb7d2",
+      "server_request_id": "7706ee6c-6bdb-44bc-8f47-3713f71dc494",
+      "method": "GET",
+      "response_type": "PublicationOptionsResponse",
+      "http_status": 200,
+      "started_at": "2026-11-17T07:00:38.337901Z",
+      "finished_at": "2026-11-17T07:00:38.354473Z"
+    },
+    {
+      "kind": "submissions",
+      "schema": "powerx.plugin-publisher-request/v1",
+      "task_kind": "submissions",
+      "task_id": "764ea8be-b029-403f-8352-0b8f2988f12b",
+      "operation_id": "d82f8f33-9330-4f11-82fc-d09cffac2334",
+      "client_request_id": "9c52be0b-2564-4b5b-a416-87e39758fa60",
+      "server_request_id": "bf9850c6-6907-438c-a37e-848e6cbec1e6",
+      "method": "GET",
+      "response_type": "PluginResponse",
+      "http_status": 200,
+      "started_at": "2026-11-17T07:02:56.645546Z",
+      "finished_at": "2026-11-17T07:02:56.661433Z"
+    },
+    {
+      "kind": "submissions",
+      "schema": "powerx.plugin-publisher-request/v1",
+      "task_kind": "submissions",
+      "task_id": "764ea8be-b029-403f-8352-0b8f2988f12b",
+      "operation_id": "d82f8f33-9330-4f11-82fc-d09cffac2334",
+      "client_request_id": "a2127280-69c9-4136-872c-3168d6fae886",
+      "server_request_id": "b81592bb-6c53-4d11-b4cc-2c41bf11e101",
+      "method": "POST",
+      "response_type": "SubmissionReceiptResponse",
+      "http_status": 201,
+      "started_at": "2026-11-17T07:00:38.400342Z",
+      "finished_at": "2026-11-17T07:00:39.250917Z"
+    },
+    {
+      "kind": "submissions",
+      "schema": "powerx.plugin-publisher-request/v1",
+      "task_kind": "submissions",
+      "task_id": "764ea8be-b029-403f-8352-0b8f2988f12b",
+      "operation_id": "d82f8f33-9330-4f11-82fc-d09cffac2334",
+      "client_request_id": "a4329539-e075-4e0c-8eb7-b9c139442af2",
+      "server_request_id": "9514dd37-d570-4587-97fe-8bdf7b737d50",
+      "method": "GET",
+      "response_type": "PublicationsPageResponse",
+      "http_status": 200,
+      "started_at": "2026-11-17T07:00:39.323123Z",
+      "finished_at": "2026-11-17T07:00:39.352225Z"
+    },
+    {
+      "kind": "submissions",
+      "schema": "powerx.plugin-publisher-request/v1",
+      "task_kind": "submissions",
+      "task_id": "764ea8be-b029-403f-8352-0b8f2988f12b",
+      "operation_id": "d82f8f33-9330-4f11-82fc-d09cffac2334",
+      "client_request_id": "cbfe6435-4f6d-4422-9d1e-ffb3beb5224c",
+      "server_request_id": "348d9408-bde2-458d-987d-0b7370c124c7",
+      "method": "GET",
+      "response_type": "DiscoveryResponse",
+      "http_status": 200,
+      "started_at": "2026-11-17T07:00:38.033993Z",
+      "finished_at": "2026-11-17T07:00:38.058576Z"
+    },
+    {
+      "kind": "submissions",
+      "schema": "powerx.plugin-publisher-request/v1",
+      "task_kind": "submissions",
+      "task_id": "764ea8be-b029-403f-8352-0b8f2988f12b",
+      "operation_id": "d82f8f33-9330-4f11-82fc-d09cffac2334",
+      "client_request_id": "cd16d2c9-3d95-4b98-8e85-8bfebc3b94c4",
+      "server_request_id": "77168030-2677-4b7d-85f5-43625ec0674a",
+      "method": "GET",
+      "response_type": "MeResponse",
+      "http_status": 200,
+      "started_at": "2026-11-17T07:00:38.069355Z",
+      "finished_at": "2026-11-17T07:00:38.085752Z"
+    },
+    {
+      "kind": "submissions",
+      "schema": "powerx.plugin-publisher-request/v1",
+      "task_kind": "submissions",
+      "task_id": "764ea8be-b029-403f-8352-0b8f2988f12b",
+      "operation_id": "d82f8f33-9330-4f11-82fc-d09cffac2334",
+      "client_request_id": "dc8698de-9b50-4fec-9e09-4ce160019cdd",
+      "server_request_id": "f4dda0ed-e4a8-4b31-bb31-312541d49009",
+      "method": "GET",
+      "response_type": "DiscoveryResponse",
+      "http_status": 200,
+      "started_at": "2026-11-17T07:02:56.588273Z",
+      "finished_at": "2026-11-17T07:02:56.607491Z"
+    },
+    {
+      "kind": "submissions",
+      "schema": "powerx.plugin-publisher-request/v1",
+      "task_kind": "submissions",
+      "task_id": "764ea8be-b029-403f-8352-0b8f2988f12b",
+      "operation_id": "d82f8f33-9330-4f11-82fc-d09cffac2334",
+      "client_request_id": "e991164c-d38f-40a9-948d-a7b2bf153621",
+      "server_request_id": "47c5c252-fef5-48ba-ae9f-b1bbd3300cf4",
+      "method": "GET",
+      "response_type": "MarketVersionResponse",
+      "http_status": 200,
+      "started_at": "2026-11-17T07:00:38.310644Z",
+      "finished_at": "2026-11-17T07:00:38.328419Z"
+    },
+    {
+      "kind": "submissions",
+      "schema": "powerx.plugin-publisher-request/v1",
+      "task_kind": "submissions",
+      "task_id": "764ea8be-b029-403f-8352-0b8f2988f12b",
+      "operation_id": "d82f8f33-9330-4f11-82fc-d09cffac2334",
+      "client_request_id": "f03912c9-baa6-45bd-8590-a843addfecea",
+      "server_request_id": "91af443d-bd3a-41e0-a339-65a536653b41",
+      "method": "GET",
+      "response_type": "PublicationsPageResponse",
+      "http_status": 200,
+      "started_at": "2026-11-17T07:02:56.715592Z",
+      "finished_at": "2026-11-17T07:02:56.737617Z"
+    },
+    {
+      "kind": "submissions",
+      "schema": "powerx.plugin-publisher-request/v1",
+      "task_kind": "submissions",
+      "task_id": "764ea8be-b029-403f-8352-0b8f2988f12b",
+      "operation_id": "d82f8f33-9330-4f11-82fc-d09cffac2334",
+      "client_request_id": "f80ca248-d5c0-43d5-a869-902f0982a79d",
+      "server_request_id": "5940ee4a-c253-4931-9f29-f91b9d459c13",
+      "method": "GET",
+      "response_type": "MeResponse",
+      "http_status": 200,
+      "started_at": "2026-11-17T07:02:56.617571Z",
+      "finished_at": "2026-11-17T07:02:56.633586Z"
+    }
+  ],
+  "page_errors": [],
+  "screenshots": [
+    {
+      "file": "plugin-publisher-base-page-20261117/review-submitted-desktop-dark.png",
+      "sha256": "7d3f71c13c2740f46ef010bb61597d0b5485125ce413013201f5701b20f20d81"
+    },
+    {
+      "file": "plugin-publisher-base-page-20261117/review-submitted-desktop-light.png",
+      "sha256": "b2ab4b4df7f527f9b0e55cd86e5e83fbc7a42b29de535d78b5a89a272492ca8b"
+    },
+    {
+      "file": "plugin-publisher-base-page-20261117/review-submitted-narrow-dark.png",
+      "sha256": "698be30ecf6a73c74ef77f60af48adef30ff77356ea8236b36c12e6ee884c041"
+    },
+    {
+      "file": "plugin-publisher-base-page-20261117/review-submitted-narrow-light.png",
+      "sha256": "f5bcfa2fb7eaeec6c9913ddff5a6a6220ac17437f1c1a8be858780ae919b782c"
+    },
+    {
+      "file": "plugin-publisher-base-page-20261117/review-submitted.png",
+      "sha256": "a497f225eee5d556fe2a808facc09682f44878333a701e42fd21d8213f4d0dcc"
+    },
+    {
+      "file": "plugin-publisher-base-page-20261117/upload-succeeded.png",
+      "sha256": "2538f3c069a935beafd17f9fd84224a6f8a6e06798c26b4b5dcf0c6f01fc4c6e"
+    }
+  ],
+  "rendering": [
+    {
+      "theme": "light",
+      "narrow": false,
+      "system": "dark",
+      "file": "review-submitted-desktop-light.png",
+      "color": "oklch(0.372 0.044 257.287)",
+      "background": "oklch(0.968 0.007 247.896)",
+      "overflow": false,
+      "status_text_contrast_ratio": 9.44
+    },
+    {
+      "theme": "dark",
+      "narrow": false,
+      "system": "light",
+      "file": "review-submitted-desktop-dark.png",
+      "color": "oklch(0.929 0.013 255.508)",
+      "background": "oklch(0.279 0.041 260.031)",
+      "overflow": false,
+      "status_text_contrast_ratio": 11.9
+    },
+    {
+      "theme": "light",
+      "narrow": true,
+      "system": "dark",
+      "file": "review-submitted-narrow-light.png",
+      "color": "oklch(0.372 0.044 257.287)",
+      "background": "oklch(0.968 0.007 247.896)",
+      "overflow": false,
+      "status_text_contrast_ratio": 9.44
+    },
+    {
+      "theme": "dark",
+      "narrow": true,
+      "system": "light",
+      "file": "review-submitted-narrow-dark.png",
+      "color": "oklch(0.929 0.013 255.508)",
+      "background": "oklch(0.279 0.041 260.031)",
+      "overflow": false,
+      "status_text_contrast_ratio": 11.9
+    }
+  ],
+  "tests": {
+    "targeted_go_race": "passed (9.425s; final explicit write-state assertions included)",
+    "go_vet_publisher": "passed",
+    "publisher_review_and_page_vitest": {
+      "files": 2,
+      "tests": 19,
+      "result": "passed"
+    },
+    "full_go_race_publisher": "passed (44.914s)"
+  },
+  "not_verified": [
+    "original Base package rejected/resubmitted/approved/published sequence",
+    "original application preservation after a revised publication in this run",
+    "same-identity credential renewal in this run",
+    "public download",
+    "PowerX install and activation",
+    "Linux Secret Service",
+    "independent released SDK/CLI consumption"
+  ],
+  "cleanup": {
+    "market": {
+      "backend_schema_bucket_cleanup_confirmed": true,
+      "ports_checked": [
+        59539,
+        59540,
+        59541,
+        59542,
+        59543,
+        59588
+      ],
+      "failures": [],
+      "complete": true,
+      "temporary_root_removed": true
+    },
+    "local_credential_removed_using_gui": true,
+    "os_keyring_item_absent": true,
+    "security_check_exit": 44,
+    "framework_cleanup": "complete",
+    "owned_ports": [
+      {
+        "port": 59539,
+        "released": true
+      },
+      {
+        "port": 59540,
+        "released": true
+      },
+      {
+        "port": 59541,
+        "released": true
+      },
+      {
+        "port": 59542,
+        "released": true
+      },
+      {
+        "port": 59543,
+        "released": true
+      },
+      {
+        "port": 59588,
+        "released": true
+      },
+      {
+        "port": 60969,
+        "released": true
+      },
+      {
+        "port": 60970,
+        "released": true
+      },
+      {
+        "port": 62958,
+        "released": true
+      },
+      {
+        "port": 62959,
+        "released": true
+      },
+      {
+        "port": 63196,
+        "released": true
+      }
+    ],
+    "tool_session_absent": true,
+    "protected_file_hashes_unchanged": [
+      "skeleton/web-admin/nuxt/.env",
+      "skeleton/backend/.env",
+      "skeleton/plugin.yaml",
+      "../../PowerXPluginMarket/backend/internal/publisher/admission/runtime.go",
+      "../../PowerXPluginMarket/scripts/publisher-joint-lab.py",
+      "../../PowerXPluginMarket/docs/marketplace/plugin-publisher-base-admission-delivery-20261116.md"
+    ],
+    "owned_process_ids": [
+      {
+        "pid": 71330,
+        "absent": true
+      },
+      {
+        "pid": 73666,
+        "absent": true
+      },
+      {
+        "pid": 73668,
+        "absent": true
+      },
+      {
+        "pid": 20327,
+        "absent": true
+      },
+      {
+        "pid": 20328,
+        "absent": true
+      },
+      {
+        "pid": 22177,
+        "absent": true
+      }
+    ],
+    "test_connection_upload_submission_and_traces_removed_after_evidence_capture": true,
+    "original_plan_build_and_zip_preserved": true,
+    "owned_temporary_config_scripts_and_logs_removed": true
+  },
+  "ownership": {
+    "market_source_modified": false,
+    "market_docs_modified": false,
+    "core_modified": false,
+    "daily_services_restarted": false,
+    "branch_changed": false,
+    "committed_or_pushed": false,
+    "sdk_cli_published": false
+  },
+  "launch_commands": {
+    "market": {
+      "cwd": "PowerXPluginMarket",
+      "command": "python3 scripts/publisher-joint-lab.py --base-package ../Plugins/PowerXPlugin/skeleton/.px-plugin/publisher/work/7352fbba-b6ca-481d-9699-8650f5e4a52b/artifact.zip --skip-seed-upload --seconds 1200",
+      "pid": 71330
+    },
+    "framework": {
+      "temporary_nuxt_config_uses_current_skeleton_source": true,
+      "root_command": "python3 <owned-private-workdir>/framework-lab.py",
+      "first_nuxt_pid": 73668,
+      "restarted_nuxt_pid": 20328,
+      "restarted_executor_pid": 22177,
+      "non_publisher_shell_get_responses_controlled": true,
+      "publisher_requests_use_real_managed_go_executor_and_real_market": true
+    }
+  },
+  "documentation_checks": {
+    "local_links": 8,
+    "missing": [],
+    "evidence_json": "valid",
+    "no_raw_publisher_token": true
+  },
+  "source_changes": [
+    {
+      "path": "tools/cli/internal/publisher/submission.go",
+      "change": "Separate read-only preparation from per-write eligibility checks; original operation/receipt semantics unchanged"
+    },
+    {
+      "path": "tools/cli/internal/publisher/submission_test.go",
+      "change": "Read all five states; submitted/approved/published writes retain local state rejection and send zero market POST requests"
+    }
+  ],
+  "documentation_changes": [
+    "docs/marketplace/plugin-developer-publishing-center-plan.md",
+    "docs/marketplace/plugin-publisher-implementation.md",
+    "docs/marketplace/plugin-publisher-framework-m2-joint-record.md",
+    "docs/marketplace/plugin-publisher-market-admission-handoff-20261116.md",
+    "docs/marketplace/plugin-publisher-base-review-coordination-20261117.md",
+    "docs/contracts/plugin-publisher-submission-v1.md",
+    "docs/contracts/plugin-publisher-build-v1.md",
+    "docs/guides/features/plugin-developer-publisher/guide.md"
+  ],
+  "source_worktree_is_uncommitted": true
+}

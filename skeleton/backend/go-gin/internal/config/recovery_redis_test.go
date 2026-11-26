@@ -43,3 +43,29 @@ func TestRecoveryRedisRequiresExplicitHostContract(t *testing.T) {
 		t.Fatal("missing frozen source binding accepted")
 	}
 }
+
+func TestRecoveryEventRedisFollowsProviderInsteadOfProxy(t *testing.T) {
+	for _, mode := range []string{"local", "delegated"} {
+		for _, proxy := range []string{"0", "1"} {
+			t.Run(mode+proxy, func(t *testing.T) {
+				t.Setenv("POWERX_RECOVERY_READ_ONLY", "true")
+				t.Setenv("POWERX_RECOVERY_REDIS_SOURCE_ADDR", "localhost:6379")
+				t.Setenv("POWERX_REDIS_ADDR", "127.0.0.1:16222")
+				t.Setenv("POWERX_REDIS_PASSWORD", "")
+				t.Setenv("POWERX_PROVIDER_MODE", mode)
+				t.Setenv("POWERX_PROXY", proxy)
+				c := &Config{Context: &ContextConfig{ProviderMode: mode}, EventBridge: &EventBridgeConfig{Enabled: true, RedisURL: "redis://localhost:6379/7"}}
+				if err := applyRecoveryRedisBindings(c); err != nil {
+					t.Fatal(err)
+				}
+				want := "redis://localhost:6379/7"
+				if mode == "local" {
+					want = "redis://127.0.0.1:16222/7"
+				}
+				if c.EventBridge.RedisURL != want {
+					t.Fatal("RECOVERY_EVENT_REDIS_MODE_MISMATCH")
+				}
+			})
+		}
+	}
+}

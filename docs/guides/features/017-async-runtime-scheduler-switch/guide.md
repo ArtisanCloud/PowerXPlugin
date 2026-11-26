@@ -197,7 +197,7 @@ GOCACHE=$PWD/tmp/gocache go test ./framework/backend/go/runtime/scheduler \
 | 模式服务 | `skeleton/backend/go-gin/internal/services/admin/runtime_ops/scheduler_mode_service.go` | `POWERX_PROXY` 与 provider 配对规则 |
 | 重试状态机 | `skeleton/backend/go-gin/internal/services/admin/runtime_ops/scheduler_retry_service.go` | 尝试次数、超限、暂停、恢复 |
 | 工单与审计 | `skeleton/backend/go-gin/internal/services/admin/runtime_ops/scheduler_ticket_service.go` | `ticket` 生命周期与 resume audit |
-| 启动期冲突校验 | `skeleton/backend/go-gin/cmd/plugin/taskbus_provider.go` | `validateTaskBusProviderConflict` |
+| 启动模式解析 | `skeleton/backend/go-gin/internal/bootstrap/provider_resolver.go` | `ProviderResolver.RuntimeMode()` |
 | 调度统一分发 | `skeleton/backend/go-gin/internal/jobs/integration/scheduler_event_dispatcher.go` | 统一 topic `powerx.runtime.scheduler.triggered.v1` |
 | 配置默认值/边界 | `skeleton/backend/go-gin/internal/config/config.go` | retry 默认值与范围校验 |
 | 验证测试 | `specs/017-async-runtime-scheduler-switch/quickstart.md` + `*_test.go` | 回归命令与单测/集成测试 |
@@ -205,8 +205,8 @@ GOCACHE=$PWD/tmp/gocache go test ./framework/backend/go/runtime/scheduler \
 ## 10. 常见问题与排障
 
 1. 现象：`mode/validate` 返回 `409 mode_conflict`。  
-排查：检查 `POWERX_PROXY` 与 `taskbus_provider` 是否按矩阵配对。  
-修复：`proxy=1 -> host`；`proxy=0 -> redis`。
+排查：检查 `POWERX_PROVIDER_MODE` 与 `POWERX_PROXY`；事件装配消费统一模式快照。旧 `event_bridge.mode/taskbus_provider/fallback_to_local` 需删除，不能继续作为选路输入。
+修复事件装配时，以统一 provider 为准：`local -> Redis`、`delegated -> Host`，proxy 只控制代理联调。旧 Scheduler `mode/validate` 诊断接口的 proxy 配对规则不作为当前事件装配依据。
 
 2. 现象：`retry` 一直 `409` 无法恢复。  
 排查：是否已经执行 `pause`，是否拿到有效 `ticket_id`。  
@@ -235,7 +235,7 @@ GOCACHE=$PWD/tmp/gocache go test ./framework/backend/go/runtime/scheduler \
 ## 11. 回滚与风险控制
 
 - 回滚方式：
-  - 配置回滚到稳定组合（`POWERX_PROXY` 与 `taskbus_provider` 对齐）。
+  - 将 `POWERX_PROVIDER_MODE` 与 `POWERX_PROXY` 设置为目标组合；不要恢复已移除的事件选路字段。
   - 暂停自动调度，仅保留手动触发做受控验证。
 - 风险控制：
   - 禁止业务层自行分支 host/redis。

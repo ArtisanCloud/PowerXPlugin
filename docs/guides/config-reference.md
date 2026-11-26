@@ -92,12 +92,11 @@ admin_console:
 
 ## 3.2 `runtime.event_bridge`
 - `enabled`
-- `mode`：`local | taskbus | dual`
-- `fallback_to_local`
 - `local_queue_size`
-- `taskbus_provider`：`redis | host`
 - `redis_url/redis_stream/redis_group/redis_consumer/redis_max_len`
 - `source_plugin/payload_version`
+
+事件选路只消费 `POWERX_PROVIDER_MODE`／`POWERX_PROXY` 的统一解析结果；原 mode/provider/fallback 字段已移除，旧字段明确失败。详见[模式判定](develop/standalone/mode-resolution.md)。
 
 ## 3.3 `runtime.ws_bus`
 - `provider`：`memory | redis`
@@ -168,22 +167,22 @@ admin_console:
 
 ### 5.1 standalone（本地）
 
+设置 `POWERX_PROVIDER_MODE=local`、`POWERX_PROXY=0`。
+
 ```yaml
 runtime:
   event_bridge:
     enabled: true
-    mode: taskbus
-    taskbus_provider: redis
 ```
 
 ### 5.2 standalone + proxy / host 联调
 
+设置 `POWERX_PROVIDER_MODE=local`、`POWERX_PROXY=1`；事件仍使用本地 Redis TaskBus。代理联调凭据不作为本地事件总线的 Core owner／主题启动前提。`delegated` 才选择 Host Event Fabric。
+
 ```yaml
 runtime:
   event_bridge:
     enabled: true
-    mode: taskbus
-    taskbus_provider: host
 gateway:
   auth_scheme: apikey
   api_key: <your-api-key>

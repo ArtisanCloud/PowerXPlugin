@@ -1,0 +1,674 @@
+{
+  "schema": "powerx.plugin-publisher-m2-page-validation/v1",
+  "date": "2026-11-11",
+  "timezone": "Asia/Shanghai",
+  "stage": "Framework developer page and real isolated Market M2",
+  "result": "passed_real_page_main_flow_with_controlled_preuploaded_package",
+  "documentation_version": "0.9",
+  "protocol": {
+    "version": "1.0.0-rc.2",
+    "bundle_sha256": "89141c00e0b99b6a803312119e4cbcb3e64224bf458e234e35fc5ffbdeacd8fa",
+    "portable_files": 24,
+    "modified": false
+  },
+  "branch": "025-framework-business-regression",
+  "source_commit": "5683e4293d89b276ee3669448ceefd9de06a75a7",
+  "source": {
+    "publisher_sources_unchanged_from_p07_alignment": true,
+    "functional_source_changes_this_round": false,
+    "shared_market_documents_changed": [
+      "docs/marketplace/plugin-developer-publishing-center-plan.md",
+      "docs/marketplace/plugin-publisher-implementation.md"
+    ],
+    "unrelated_worktree_changes_preserved": true
+  },
+  "environment": {
+    "market_command": [
+      "python3",
+      "scripts/publisher-joint-lab.py"
+    ],
+    "market_runtime": "actual isolated PostgreSQL/MinIO/Identity/Publisher/Catalog Gin and production Nuxt",
+    "market_actor": "owned isolated root user through actual Market UI; not production review or ordinary-publisher approval permission",
+    "lifetime_seconds": 1200,
+    "current_state": "closed_and_cleaned",
+    "input_package": {
+      "origin": "Market lab seed uploaded through actual package HTTP endpoint; seed credential revoked by lab",
+      "type": "controlled Linux Go ELF/pure JS ZIP; not a complete native generated plugin",
+      "sha256": "743cdbae1308c23f78136030769a0a41570651b27bd6f7d5cb59b68c87ba742c",
+      "size": 4415873,
+      "framework_native_build_and_upload": false
+    },
+    "framework": {
+      "cli_version": "px-plugin version dev (commit 5683e42-dirty)",
+      "cli_sha256": "9ee49dae84203cb0ebccd06b2e40b64f9a1da50787f889953b7c1eb7e529af51",
+      "sdk_tarballs": [
+        {
+          "name": "@artisan-cloud/plugin-framework-client",
+          "version": "0.0.15",
+          "sha256": "423d02223ec0b6a41b725e3c88ca96d4f0892c0502968cfac7a0ff6c1e208e6f",
+          "filename": "423d02223ec0b6a4-artisan-cloud-plugin-framework-client-0.0.15.tgz"
+        },
+        {
+          "name": "@artisan-cloud/plugin-framework-admin",
+          "version": "0.0.14",
+          "sha256": "9af0d9ee3428b473858f521c8dd9a90d97fed16852099473b922f54bf4bf8900",
+          "filename": "9af0d9ee3428b473-artisan-cloud-plugin-framework-admin-0.0.14.tgz"
+        }
+      ],
+      "generated_manifest_sha256": "31b89a9658a5ed925ccb04f0af66d28077252205ec198ac04f89c901e638cecf",
+      "independent_npm_install": true,
+      "source_workspace_link": false,
+      "registry_release": false,
+      "native_package_build": false,
+      "installed_publisher_files": 14,
+      "installed_exact_source_bytes": true
+    },
+    "faults": {
+      "market_proxy": "discard one real committed 201 submission response",
+      "framework_proxy": "pause original-operation GET until owned executor interruption; forward all other Publisher requests and response bodies unchanged",
+      "features_or_dtos_forged": false,
+      "result": {
+        "held": 2,
+        "forwarded": 94,
+        "stopped": true
+      }
+    }
+  },
+  "checks": [
+    "independent generated developer page created explicit trusted connection; real lab login succeeded",
+    "real M1-only credential cannot enable review submission",
+    "real m2 credential issued through Market UI and bound through private stdin/system keyring",
+    "real developer-page prepare response and available full collection/options verified",
+    "real committed response lost; page refreshed while original operation unresolved and receipt absent",
+    "after actual executor/Nuxt restart, developer page resumed original operation and recovered one original application without retransmission",
+    "actual Market administrative UI reject completed",
+    "page rejection revision created new task/operation/Publication UUID while old metadata/full set/receipt stayed immutable",
+    "actual Market administrative UI approve completed",
+    "real catalogue still private after approval",
+    "actual Market administrative UI publish completed",
+    "explicit publication became visible in real catalogue; no public package download performed",
+    "old trusted console link still shows exact original rejected application and original metadata",
+    "revoked real credential shows canonical market request UUID, clears stale current status and preserves original receipt",
+    "real reader credential issued through Market UI and bound through private stdin/system keyring",
+    "same stable identity rotated to real read-only credential and developer page recovered original rejected receipt with no new write",
+    "real persisted server/client request UUID records read through developer-page task history",
+    "all page-issued credentials revoked and owned real system-keyring connection disconnected"
+  ],
+  "objects": {
+    "version_id": "6eb94ef9-1f20-4a9a-93bf-b70a721381e7",
+    "artifact_ids": [
+      "016cd120-91dc-470e-ad55-31e9e88ab453"
+    ],
+    "first": {
+      "submission_id": "59ec87ea-bb95-4bdf-9a04-667f4f421c95",
+      "operation_id": "524c50c3-b0d2-4b70-adff-4577d434cc46",
+      "publication_id": "7b8a61da-841a-4816-b393-dcaf0bc476f0",
+      "request_sha256": "9fc3fe9d84103e6d61edcb67a46ad40588720120d7eb2e651ae28ab6cf215638",
+      "write_attempts": 1
+    },
+    "resubmission": {
+      "submission_id": "be7836ac-256c-4497-8d31-2dc12bb0e7ec",
+      "operation_id": "95085481-6a6c-4938-84cb-45525dc3af56",
+      "publication_id": "6efcf61c-1232-4c08-aff7-a88b398abe3e",
+      "request_sha256": "da1b10594bcd27b547f28a1370a26cc5bd6eeb1ce6237d116e69723b195ede01",
+      "write_attempts": 1
+    },
+    "real_publications_count": 2,
+    "revocation_diagnostic_request_id": "d6bf1da4-8a13-49f9-808f-d82c0a444e9f"
+  },
+  "request_records": [
+    {
+      "submission_id": "be7836ac-256c-4497-8d31-2dc12bb0e7ec",
+      "total": 24,
+      "retained": 24,
+      "post_count": 1,
+      "no_response_count": 0,
+      "confirmed_server_request_ids": 24
+    },
+    {
+      "submission_id": "59ec87ea-bb95-4bdf-9a04-667f4f421c95",
+      "total": 27,
+      "retained": 27,
+      "post_count": 1,
+      "no_response_count": 3,
+      "confirmed_server_request_ids": 24
+    }
+  ],
+  "browser": {
+    "framework_page_real_requests": true,
+    "market_credential_and_admin_actions_real_ui": true,
+    "business_route_fixtures_or_request_interception": false,
+    "desktop_width": 1440,
+    "narrow_width": 390,
+    "narrow_manual_theme": "dark",
+    "narrow_system_theme": "light",
+    "page_errors": [],
+    "focus_warnings": [],
+    "screenshots": [
+      "approved-awaiting-publication.png",
+      "first-submitted.png",
+      "narrow-dark-published-with-real-requests.png",
+      "narrow-dark-real-receipt.png",
+      "published.png",
+      "revoked-current-status-cleared.png",
+      "second-submitted.png"
+    ],
+    "closed": true
+  },
+  "privacy": {
+    "publisher_tokens_absent_from_mutable_workspace_and_saved_logs": true,
+    "files_checked": 1154,
+    "publisher_plaintext_exported_to_evidence": false,
+    "credential_browser_dialogs_cleared": true,
+    "all_issued_credentials_revoked": true,
+    "stable_identity_across_all_bindings": true,
+    "owned_real_keychain_item_removed": true,
+    "keychain_lookup_after_disconnect": 44,
+    "private_bootstrap_deleted_with_market_root": true,
+    "browser_memory_reset": true
+  },
+  "acceptance_boundaries": {
+    "passed": [
+      "real page trust connection and explicit M1/M2 scopes",
+      "real options, complete singleton artifact set, normalized preview and explicit submission",
+      "committed-response loss, browser reload, actual executor/Nuxt restart and original-operation recovery",
+      "real UI rejection and revised new task/operation/Publication UUID",
+      "immutable old metadata, set, receipt and exact old link",
+      "real UI approval with catalogue 404, explicit UI publication with catalogue 200",
+      "credential revoke 401 with canonical request UUID, stale current status cleared, same-identity read-only recovery",
+      "real task HTTP request history from developer page"
+    ],
+    "pending": [
+      "native Linux/amd64 full generated plugin build/start and Framework actual build/upload",
+      "remaining A15 options/validation outages and A16 full-set mutations/corruption joint replay",
+      "public package download, License/purchase and PowerX install/enable",
+      "Linux Secret Service, formal SDK/CLI release, remote CI, deployed proxy and production acceptance"
+    ],
+    "catalogue_visibility_is_not_public_download": true
+  },
+  "cleanup": {
+    "framework_processes": [
+      {
+        "kind": "fault-proxy",
+        "pid": 9366,
+        "pgid": 9366,
+        "cwd": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin",
+        "command": [
+          "/Users/michaelhu/.nvm/versions/node/v22.23.2/bin/node",
+          "/tmp/framework-m2-fault.mjs"
+        ],
+        "ports": [
+          55710
+        ]
+      },
+      {
+        "kind": "executor",
+        "pid": 9427,
+        "pgid": 9427,
+        "cwd": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin",
+        "command": [
+          "<framework-temp>/px-plugin",
+          "publisher",
+          "serve",
+          "--entry",
+          "<framework-temp>/generated-plugin",
+          "--origin",
+          "http://localhost:50662"
+        ],
+        "ports": [
+          55712
+        ]
+      },
+      {
+        "kind": "framework-dev",
+        "pid": 9451,
+        "pgid": 9451,
+        "cwd": "<framework-temp>/generated-plugin/web-admin",
+        "command": [
+          "/Users/michaelhu/.nvm/versions/node/v22.23.2/bin/node",
+          "node_modules/nuxi/bin/nuxi.mjs",
+          "dev",
+          "--host",
+          "localhost",
+          "--port",
+          "50662"
+        ],
+        "ports": [
+          50662
+        ]
+      },
+      {
+        "kind": "executor",
+        "pid": 26668,
+        "pgid": 26668,
+        "cwd": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin",
+        "command": [
+          "<framework-temp>/px-plugin",
+          "publisher",
+          "serve",
+          "--entry",
+          "<framework-temp>/generated-plugin",
+          "--origin",
+          "http://localhost:50662"
+        ],
+        "ports": [
+          55712
+        ]
+      },
+      {
+        "kind": "framework-dev",
+        "pid": 26670,
+        "pgid": 26670,
+        "cwd": "<framework-temp>/generated-plugin/web-admin",
+        "command": [
+          "/Users/michaelhu/.nvm/versions/node/v22.23.2/bin/node",
+          "node_modules/nuxi/bin/nuxi.mjs",
+          "dev",
+          "--host",
+          "localhost",
+          "--port",
+          "50662"
+        ],
+        "ports": [
+          50662
+        ]
+      },
+      {
+        "kind": "executor",
+        "pid": 31962,
+        "pgid": 31962,
+        "cwd": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin",
+        "command": [
+          "<framework-temp>/px-plugin",
+          "publisher",
+          "serve",
+          "--entry",
+          "<framework-temp>/generated-plugin",
+          "--origin",
+          "http://localhost:50662"
+        ],
+        "ports": [
+          60091
+        ]
+      },
+      {
+        "kind": "framework-dev",
+        "pid": 31973,
+        "pgid": 31973,
+        "cwd": "<framework-temp>/generated-plugin/web-admin",
+        "command": [
+          "/Users/michaelhu/.nvm/versions/node/v22.23.2/bin/node",
+          "node_modules/nuxi/bin/nuxi.mjs",
+          "dev",
+          "--host",
+          "localhost",
+          "--port",
+          "50662"
+        ],
+        "ports": [
+          50662
+        ]
+      }
+    ],
+    "framework_children": [
+      {
+        "pid": 9366,
+        "ppid": 1,
+        "pgid": 9366,
+        "stat": "Ss",
+        "command": "/Users/michaelhu/.nvm/versions/node/v22.23.2/bin/node /tmp/framework-m2-fault.mjs"
+      },
+      {
+        "pid": 31962,
+        "ppid": 1,
+        "pgid": 31962,
+        "stat": "Ss",
+        "command": "<framework-temp>/px-plugin publisher serve --entry <framework-temp>/generated-plugin --origin http://localhost:50662"
+      },
+      {
+        "pid": 31973,
+        "ppid": 1,
+        "pgid": 31973,
+        "stat": "Ss",
+        "command": "/Users/michaelhu/.nvm/versions/node/v22.23.2/bin/node node_modules/nuxi/bin/nuxi.mjs dev --host localhost --port 50662"
+      },
+      {
+        "pid": 32081,
+        "ppid": 31973,
+        "pgid": 31973,
+        "stat": "S",
+        "command": "/Users/michaelhu/.nvm/versions/node/v22.23.2/bin/node --enable-source-maps <framework-temp>/generated-plugin/web-admin/node_modules/nuxi/dist/dev/index.mjs --host localhost --port 50662"
+      },
+      {
+        "pid": 32082,
+        "ppid": 31973,
+        "pgid": 31973,
+        "stat": "S",
+        "command": "/Users/michaelhu/.nvm/versions/node/v22.23.2/bin/node --enable-source-maps <framework-temp>/generated-plugin/web-admin/node_modules/nuxi/dist/dev/index.mjs --host localhost --port 50662"
+      },
+      {
+        "pid": 32667,
+        "ppid": 31973,
+        "pgid": 31973,
+        "stat": "S",
+        "command": "<framework-temp>/generated-plugin/web-admin/node_modules/@esbuild/darwin-arm64/bin/esbuild --service=0.27.2 --ping"
+      }
+    ],
+    "market_processes": [
+      {
+        "pid": 5048,
+        "ppid": 1,
+        "pgid": 5048,
+        "stat": "Ss",
+        "command": "python3 scripts/publisher-joint-lab.py"
+      },
+      {
+        "pid": 5138,
+        "ppid": 1,
+        "pgid": 5138,
+        "stat": "Ss",
+        "command": "/opt/homebrew/Cellar/postgresql@14/14.15/bin/postgres -D <market-lab-temp>/pgdata -h 127.0.0.1 -p 54800 -k <market-lab-temp>"
+      },
+      {
+        "pid": 5140,
+        "ppid": 5138,
+        "pgid": 5140,
+        "stat": "Ss",
+        "command": "postgres: checkpointer"
+      },
+      {
+        "pid": 5141,
+        "ppid": 5138,
+        "pgid": 5141,
+        "stat": "Ss",
+        "command": "postgres: background writer"
+      },
+      {
+        "pid": 5142,
+        "ppid": 5138,
+        "pgid": 5142,
+        "stat": "Ss",
+        "command": "postgres: walwriter"
+      },
+      {
+        "pid": 5143,
+        "ppid": 5138,
+        "pgid": 5143,
+        "stat": "Ss",
+        "command": "postgres: autovacuum launcher"
+      },
+      {
+        "pid": 5144,
+        "ppid": 5138,
+        "pgid": 5144,
+        "stat": "Ss",
+        "command": "postgres: stats collector"
+      },
+      {
+        "pid": 5145,
+        "ppid": 5138,
+        "pgid": 5145,
+        "stat": "Ss",
+        "command": "postgres: logical replication launcher"
+      },
+      {
+        "pid": 5146,
+        "ppid": 5048,
+        "pgid": 5146,
+        "stat": "Ss",
+        "command": "/opt/homebrew/bin/minio --config-dir <market-lab-temp>/minio-config server <market-lab-temp>/objects --address 127.0.0.1:54801 --console-address 127.0.0.1:54802"
+      },
+      {
+        "pid": 5173,
+        "ppid": 5048,
+        "pgid": 5173,
+        "stat": "Ss",
+        "command": "go test ./internal/http/identity -run ^TestPublisherJointLab$ -count=1 -timeout=31m -json"
+      },
+      {
+        "pid": 5303,
+        "ppid": 5173,
+        "pgid": 5173,
+        "stat": "S",
+        "command": "<market-lab-temp>/go-build3548377579/b001/identity.test -test.paniconexit0 -test.v=test2json -test.run=^TestPublisherJointLab$ -test.count=1 -test.timeout=31m0s"
+      },
+      {
+        "pid": 5387,
+        "ppid": 5138,
+        "pgid": 5387,
+        "stat": "Ss",
+        "command": "postgres: publisher_lab postgres 127.0.0.1(54896) idle"
+      },
+      {
+        "pid": 5388,
+        "ppid": 5138,
+        "pgid": 5388,
+        "stat": "Ss",
+        "command": "postgres: publisher_lab postgres 127.0.0.1(54897) idle"
+      },
+      {
+        "pid": 5447,
+        "ppid": 5048,
+        "pgid": 5447,
+        "stat": "Ss",
+        "command": "node scripts/publisher-joint-proxy.mjs"
+      },
+      {
+        "pid": 7047,
+        "ppid": 5447,
+        "pgid": 7047,
+        "stat": "Ss",
+        "command": "node <market-lab-temp>/web-build/.output/server/index.mjs"
+      },
+      {
+        "pid": 44022,
+        "ppid": 5138,
+        "pgid": 44022,
+        "stat": "Ss",
+        "command": "postgres: publisher_lab postgres 127.0.0.1(62439) idle"
+      }
+    ],
+    "market_driver": {
+      "pid": 5048,
+      "pgid": 5048,
+      "command": [
+        "python3",
+        "scripts/publisher-joint-lab.py"
+      ],
+      "cwd": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/PowerXPluginMarket",
+      "log": "<framework-temp>/market-lab.log",
+      "handoff_file": "<market-lab-temp>/handoff.json",
+      "owner": {
+        "nonce": "febf614a-8a45-4b73-9b7a-c5ec3eeceaa4",
+        "pid": 5048,
+        "cwd": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/PowerXPluginMarket",
+        "ports": {
+          "postgres": 54800,
+          "minio": 54801,
+          "minio_console": 54802,
+          "console": 54803,
+          "preview": 54804
+        }
+      },
+      "processes_observed": [
+        {
+          "pid": 5048,
+          "ppid": 1,
+          "pgid": 5048,
+          "stat": "Ss",
+          "command": "python3 scripts/publisher-joint-lab.py"
+        },
+        {
+          "pid": 5138,
+          "ppid": 1,
+          "pgid": 5138,
+          "stat": "Ss",
+          "command": "/opt/homebrew/Cellar/postgresql@14/14.15/bin/postgres -D <market-lab-temp>/pgdata -h 127.0.0.1 -p 54800 -k <market-lab-temp>"
+        },
+        {
+          "pid": 5140,
+          "ppid": 5138,
+          "pgid": 5140,
+          "stat": "Ss",
+          "command": "postgres: checkpointer"
+        },
+        {
+          "pid": 5141,
+          "ppid": 5138,
+          "pgid": 5141,
+          "stat": "Ss",
+          "command": "postgres: background writer"
+        },
+        {
+          "pid": 5142,
+          "ppid": 5138,
+          "pgid": 5142,
+          "stat": "Ss",
+          "command": "postgres: walwriter"
+        },
+        {
+          "pid": 5143,
+          "ppid": 5138,
+          "pgid": 5143,
+          "stat": "Ss",
+          "command": "postgres: autovacuum launcher"
+        },
+        {
+          "pid": 5144,
+          "ppid": 5138,
+          "pgid": 5144,
+          "stat": "Ss",
+          "command": "postgres: stats collector"
+        },
+        {
+          "pid": 5145,
+          "ppid": 5138,
+          "pgid": 5145,
+          "stat": "Ss",
+          "command": "postgres: logical replication launcher"
+        },
+        {
+          "pid": 5146,
+          "ppid": 5048,
+          "pgid": 5146,
+          "stat": "Ss",
+          "command": "/opt/homebrew/bin/minio --config-dir <market-lab-temp>/minio-config server <market-lab-temp>/objects --address 127.0.0.1:54801 --console-address 127.0.0.1:54802"
+        },
+        {
+          "pid": 5173,
+          "ppid": 5048,
+          "pgid": 5173,
+          "stat": "Ss",
+          "command": "go test ./internal/http/identity -run ^TestPublisherJointLab$ -count=1 -timeout=31m -json"
+        },
+        {
+          "pid": 5303,
+          "ppid": 5173,
+          "pgid": 5173,
+          "stat": "S",
+          "command": "<market-lab-temp>/go-build3548377579/b001/identity.test -test.paniconexit0 -test.v=test2json -test.run=^TestPublisherJointLab$ -test.count=1 -test.timeout=31m0s"
+        },
+        {
+          "pid": 5387,
+          "ppid": 5138,
+          "pgid": 5387,
+          "stat": "Ss",
+          "command": "postgres: publisher_lab postgres 127.0.0.1(54896) idle"
+        },
+        {
+          "pid": 5388,
+          "ppid": 5138,
+          "pgid": 5388,
+          "stat": "Ss",
+          "command": "postgres: publisher_lab postgres 127.0.0.1(54897) idle"
+        },
+        {
+          "pid": 5447,
+          "ppid": 5048,
+          "pgid": 5447,
+          "stat": "Ss",
+          "command": "node scripts/publisher-joint-proxy.mjs"
+        },
+        {
+          "pid": 7047,
+          "ppid": 5447,
+          "pgid": 7047,
+          "stat": "Ss",
+          "command": "node <market-lab-temp>/web-build/.output/server/index.mjs"
+        },
+        {
+          "pid": 44022,
+          "ppid": 5138,
+          "pgid": 44022,
+          "stat": "Ss",
+          "command": "postgres: publisher_lab postgres 127.0.0.1(62439) idle"
+        }
+      ]
+    },
+    "market_cleanup": {
+      "backend_schema_bucket_cleanup_confirmed": true,
+      "ports_checked": [
+        54800,
+        54801,
+        54802,
+        54803,
+        54804,
+        54907
+      ],
+      "failures": [],
+      "complete": true,
+      "temporary_root_removed": true
+    },
+    "terminated_framework_groups": [
+      9366,
+      31962,
+      31973
+    ],
+    "forced_groups": [],
+    "all_ports_checked": [
+      50662,
+      54800,
+      54801,
+      54802,
+      54803,
+      54804,
+      54907,
+      55710,
+      55712,
+      60091
+    ],
+    "all_ports_released": true,
+    "remaining_owned_processes": 0,
+    "market_temporary_root_removed": true,
+    "tool_bootstrap_removed": true,
+    "owned_keychain_lookup_exit": 44,
+    "owned_keychain_item_removed": true,
+    "all_page_issued_tokens_revoked": true,
+    "framework_temporary_root_removed": true
+  },
+  "history_preserved": [
+    "plugin-publisher-f08-validation-20261111.json",
+    "plugin-publisher-p07-alignment-20261111.json",
+    "plugin-publisher-m1-validation-20261110.json"
+  ],
+  "artifacts": "plugin-publisher-m2-real-page-20261111/",
+  "committed_evidence_manifest": "plugin-publisher-m2-real-page-20261111/SHA256SUMS",
+  "joint_record": "../../marketplace/plugin-publisher-framework-m2-joint-record.md",
+  "harness_adjustments": [
+    "cross-realm JSON comparator normalized serialized protocol values",
+    "cached page preparation reused after first successful server response",
+    "restart driver waited for owned executor lock release",
+    "CLI observation of an active task can report pending in a separate process; final server-backed state awaited explicitly"
+  ],
+  "generated_at": "2026-11-11T14:41:43.759009+00:00",
+  "document_checks": {
+    "paired_canonical_equal": 2,
+    "version": "0.9",
+    "relative_links_checked": 141,
+    "broken_links": 0
+  },
+  "artifact_integrity": {
+    "verified_files": 20,
+    "archived_manifest_path": "artifacts/plugin-publisher-m2-real-page-20261111/sha256.json"
+  }
+}

@@ -1,6 +1,7 @@
 import test, { after } from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
+import { createHash } from 'node:crypto'
 import path from 'node:path'
 import os from 'node:os'
 import { fileURLToPath } from 'node:url'
@@ -60,6 +61,10 @@ function fixture(name, sourceTarget = '') {
   fs.mkdirSync(path.join(directory, 'backend/cmd/database'), { recursive: true })
   fs.mkdirSync(path.join(directory, 'backend/etc/ai/providers.d'), { recursive: true })
   fs.writeFileSync(path.join(directory, 'backend/etc/ai/providers.d/fixture.yaml'), 'provider: fixture\n')
+  fs.mkdirSync(path.join(directory, 'config'), { recursive: true })
+  fs.writeFileSync(path.join(directory, 'config/event_fabric_service.yaml'), 'version: v1\ntopics: []\n')
+  fs.writeFileSync(path.join(directory, 'config/values.example.yaml'), 'runtime:\n  event_bridge:\n    topic_manifest: config/event_fabric_service.yaml\n')
+  fs.writeFileSync(path.join(directory, 'config/private.yaml'), 'secret: fixture-private\n')
   fs.writeFileSync(
     path.join(directory, 'backend/go.mod'),
     'module example.com/distfixture\n\ngo 1.24\n'
@@ -178,6 +183,9 @@ for (const target of [
     assert.deepEqual(manifest.target, { os: target.os, arch: target.arch })
     assert.equal(manifest.version, '2.0.0')
     assert.equal(fs.readFileSync(path.join(artifact, 'backend/etc/ai/providers.d/fixture.yaml'), 'utf8'), 'provider: fixture\n')
+    for (const file of ['event_fabric_service.yaml', 'values.example.yaml'])
+      assert.equal(fs.readFileSync(path.join(artifact, 'config', file), 'utf8'), fs.readFileSync(path.join(directory, 'config', file), 'utf8'))
+    assert.equal(fs.existsSync(path.join(artifact, 'config/private.yaml')), false)
     assert.equal(fs.readFileSync(path.join(directory, 'plugin.yaml'), 'utf8'), original)
     for (const binary of ['plugin', 'migrate'])
       assert.deepEqual(readGoTarget(path.join(artifact, 'backend/bin', binary)), manifest.target)
@@ -270,4 +278,46 @@ test('root make dist forwards exactly one artifact directory without dist/mac', 
     fs.readFileSync(path.join(directory, 'skeleton/dist/platform-artifact/plugin.yaml'), 'utf8')
   )
   assert.deepEqual(manifest.target, { os: native[0], arch: native[1] })
+})
+
+test('make package includes only indexed dataset bytes on repeated builds', async () => {
+  const directory = fixture('datasets')
+  const manifest = path.join(directory, 'plugin.yaml')
+  const initial = fs.readFileSync(manifest, 'utf8')
+  const declarations = path.join(directory, 'contracts/storage-datasets')
+  fs.mkdirSync(declarations, { recursive: true })
+  const raw = '{ "preserve": "literal bytes" }\n'
+  const digest = createHash('sha256').update(raw).digest('hex')
+  const setIndex = (key) =>
+    fs.writeFileSync(manifest, initial + `data_lifecycle:\n  ${key}:\n    sha256: "${digest}"\n`)
+  const packageBuild = () => execute(
+    'make',
+    ['package', 'DIST_VERIFY=0', 'PLUGIN_ID=fixture.plugin', 'DIST_ROOT=dist', 'DIST_DIR=dist/2.0.0'],
+    { cwd: directory, env: cleanEnvironment }
+  )
+  const archive = path.join(directory, 'fixture.plugin-2.0.0.zip')
+  const listDeclarations = async () => (await execute('unzip', ['-Z1', archive])).stdout
+    .trim().split(/\r?\n/).filter((entry) => entry.includes('/storage-datasets/') && entry.endsWith('.json'))
+
+  for (const key of ['original', 'current']) {
+    fs.writeFileSync(path.join(declarations, `${key}.json`), raw)
+    setIndex(key)
+    await packageBuild()
+    const entry = `2.0.0/contracts/storage-datasets/${key}.json`
+    assert.deepEqual(await listDeclarations(), [entry])
+    assert.equal((await execute('unzip', ['-p', archive, entry])).stdout, raw)
+  }
+
+  const before = fs.readFileSync(archive)
+  const active = path.join(declarations, 'current.json')
+  fs.unlinkSync(active)
+  await assert.rejects(packageBuild(), (error) => /\[DATASET_ASSET_INVALID\]/.test(error.stderr))
+  fs.writeFileSync(active, 'changed')
+  await assert.rejects(packageBuild(), (error) => /\[DATASET_ASSET_DIGEST_MISMATCH\]/.test(error.stderr))
+  fs.unlinkSync(active)
+  const outside = path.join(temporary, 'outside.json')
+  fs.writeFileSync(outside, raw)
+  fs.symlinkSync(outside, active)
+  await assert.rejects(packageBuild(), (error) => /\[DATASET_ASSET_INVALID\]/.test(error.stderr))
+  assert.deepEqual(fs.readFileSync(archive), before)
 })

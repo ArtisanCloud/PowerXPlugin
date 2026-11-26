@@ -1,0 +1,220 @@
+
+const packagedDatasetID = "com.powerx.plugins.storage-package-fixture"
+
+func configurePackagedDatasetFixture(t *testing.T, ctx context.Context, dsn string, engine *gin.Engine, group *gin.RouterGroup,
+	server *httptest.Server, deps *shared.Deps, queue *taskqueue.StreamDriver, credentials *setting.PluginInstanceConfigService,
+	credentialOptions *setting.ClientCredential, tenant, stsAddress string, secret []byte,
+) (pm.Manager, *config.Config, *pluginSupervisor.Supervisor) {
+	t.Helper()
+	parsed, err := pgx.ParseConfig(dsn)
+	require.NoError(t, err)
+	workerPort := server.Listener.Addr().(*net.TCPAddr).Port
+	cfg := &config.Config{EnvironmentID: "owned", Deployment: config.DeploymentConfig{Env: config.DeploymentEnvDev},
+		Database: corexdb.DatabaseConfig{Driver: "postgres", DSN: dsn, Host: parsed.Host, Port: int(parsed.Port), Database: parsed.Database, UserName: parsed.User},
+		Server: config.ServerConfig{Port: workerPort, SecretKey: string(secret), APIPrefix: "/custom/v2"},
+		Auth: config.AuthConfig{JWTSecret: string(secret), Issuer: "powerx-auth", AudienceUser: "user"},
+		Plugin: config.PluginAggregateConfig{PluginConfig: config.PluginConfig{Enabled: true, BasePrefix: "/_p", InstalledDir: filepath.Join(t.TempDir(), "installed")}}}
+	require.NoError(t, os.MkdirAll(cfg.Plugin.InstalledDir, 0700))
+	reg := packageManager.NewJSONRegistry(filepath.Join(filepath.Dir(cfg.Plugin.InstalledDir), "registry.json"))
+	require.NoError(t, reg.Load(ctx))
+	sup := pluginSupervisor.New()
+	clientID, clientSecret, err := credentials.EnsureCredentials(ctx, tenant, packagedDatasetID, credentialOptions)
+	require.NoError(t, err)
+	mgr := packageManager.New(packageManager.Options{Enabled: true, BasePrefix: "/_p",
+		InstalledRoot: cfg.Plugin.InstalledDir, Registry: reg, Loader: packageManager.NewFSLoader(), Supervisor: sup,
+		HTTP: pluginRouter.NewDynamicRouter("/_p", engine), CoreConfig: cfg,
+		RuntimeCredential: func(_ context.Context, pluginID string) (*packageManager.PluginRuntimeCredential, error) {
+			if pluginID != packagedDatasetID {
+				return nil, errors.New("DATASET_PACKAGE_ID_MISMATCH")
+			}
+			return &packageManager.PluginRuntimeCredential{TenantUUID: tenant, ClientID: clientID, ClientSecret: clientSecret,
+				GRPCAddress: stsAddress, GatewayBaseURL: "http://" + server.Listener.Addr().String()}, nil
+		},
+	})
+	t.Cleanup(func() {
+		procs := sup.List()
+		require.NoError(t, mgr.Shutdown(context.Background()))
+		for _, proc := range procs {
+			verifyDatasetFixturePortClosed(t, fmt.Sprintf("127.0.0.1:%d", proc.Port))
+		}
+	})
+	require.NoError(t, deps.DB.AutoMigrate(&installModel.Installation{}, &sm.PluginCapabilityApproval{}))
+	redisClient := redis.NewClient(&redis.Options{Network: "unix", Addr: filepath.Join(parsed.Host, "redis.sock")})
+	t.Cleanup(func() { require.NoError(t, redisClient.Close()) })
+	deps.EventFabric = &shared.EventFabricDeps{RedisClient: redisClient, StreamTasks: queue}
+	service, err := pluginInstall.NewService(deps.DB, pluginInstall.Options{
+		Root: filepath.Join(t.TempDir(), "install-tasks"), InstanceID: "owned", Secret: secret, Manager: mgr, Queue: queue,
+		Authorize: func(ctx context.Context, requestedTenant string, actor uint64) error {
+			if requestedTenant != tenant || actor != 1 || !reqctx.IsRoot(ctx) {
+				return errors.New("DATASET_FIXTURE_ROOT_REQUIRED")
+			}
+			return nil
+		},
+		Finalize: func(ctx context.Context, requestedTenant string, plugin pm.Plugin) error {
+			_, _, _, err := pluginService.NewTenantPluginInstanceService(deps.DB).Enable(ctx, requestedTenant, plugin, nil)
+			if err != nil {
+				t.Logf("installed package tenant activation failed: %v", err)
+			}
+			return err
+		},
+		Notify: func(ctx context.Context, channel string) { _ = redisClient.Publish(ctx, channel, "changed").Err() },
+	})
+	require.NoError(t, err)
+	deps.PluginInstallations = service
+	run, stop := context.WithCancel(ctx)
+	done := make(chan struct{})
+	go func() { defer close(done); _ = service.Run(run) }()
+	t.Cleanup(func() { stop(); <-done })
+	previous := config.GlobalConfig
+	config.GlobalConfig = cfg
+	t.Cleanup(func() { config.GlobalConfig = previous })
+	pluginHTTP.RegisterAPIRoutes(engine.Group("/custom/v2"), group, deps)
+	return mgr, cfg, sup
+}
+
+func exercisePackagedDataset(t *testing.T, ctx context.Context, db *gorm.DB,
+	call func(string, string, string, any, int) []byte, server *httptest.Server, mgr pm.Manager,
+	cfg *config.Config, sup *pluginSupervisor.Supervisor, archiveFile, tenant, foreignTenant, root, target string,
+) {
+	t.Helper()
+	require.NotEmpty(t, target)
+	installPath := "/admin/plugins/installations"
+	var status struct{ Data pluginInstall.View }
+	require.NoError(t, json.Unmarshal(call("POST", installPath, root, pluginInstall.Input{
+		RequestID: uuid.NewString(), SourceKind: "local", PluginID: packagedDatasetID, Version: "1.0.0", Enable: true,
+	}, 200), &status))
+	require.Equal(t, "awaiting_upload", status.Data.Status)
+	taskPath := installPath + "/" + status.Data.TaskID
+	streamCtx, stop := context.WithTimeout(ctx, 25*time.Second)
+	defer stop()
+	request, err := http.NewRequestWithContext(streamCtx, http.MethodGet, server.URL+"/custom/v2"+taskPath+"/events", nil)
+	require.NoError(t, err)
+	request.Header.Set("Authorization", "Bearer "+root)
+	events, err := server.Client().Do(request)
+	require.NoError(t, err)
+	defer events.Body.Close()
+	require.Equal(t, http.StatusOK, events.StatusCode)
+	scan := bufio.NewScanner(events.Body)
+	readStatus := func() pluginInstall.View {
+		for scan.Scan() {
+			line := scan.Text()
+			if payload, ok := strings.CutPrefix(line, "data: "); ok {
+				var result pluginInstall.View
+				require.NoError(t, json.Unmarshal([]byte(payload), &result))
+				return result
+			}
+		}
+		require.FailNow(t, "installation SSE ended before terminal result", "%v", scan.Err())
+		return pluginInstall.View{}
+	}
+	require.Equal(t, "awaiting_upload", readStatus().Status)
+	data, err := os.ReadFile(archiveFile)
+	require.NoError(t, err)
+	var body bytes.Buffer
+	upload := multipart.NewWriter(&body)
+	file, err := upload.CreateFormFile("file", filepath.Base(archiveFile))
+	require.NoError(t, err)
+	_, err = file.Write(data)
+	require.NoError(t, err)
+	require.NoError(t, upload.Close())
+	request, err = http.NewRequestWithContext(ctx, http.MethodPut, server.URL+"/custom/v2"+taskPath+"/package", &body)
+	require.NoError(t, err)
+	request.Header.Set("Authorization", "Bearer "+root)
+	request.Header.Set("Content-Type", upload.FormDataContentType())
+	response, err := server.Client().Do(request)
+	require.NoError(t, err)
+	responseJSON, err := io.ReadAll(response.Body)
+	response.Body.Close()
+	require.NoError(t, err)
+	require.Equal(t, 200, response.StatusCode, "%s", responseJSON)
+	for {
+		result := readStatus()
+		if result.Status == "queued" || result.Status == "running" || result.Status == "awaiting_upload" {
+			continue
+		}
+		require.Equal(t, "succeeded", result.Status, "%s %s", result.ErrorCode, result.FailureDetails)
+		require.NotEmpty(t, result.InstalledRevision)
+		break
+	}
+	p, err := mgr.Get(ctx, packagedDatasetID)
+	require.NoError(t, err)
+	require.Equal(t, pm.StateEnabled, p.State)
+	require.Equal(t, status.Data.TaskID, p.Revision)
+	require.NotNil(t, p.Migration)
+	require.Equal(t, pm.MigrationStatusSuccess, p.Migration.LastStatus)
+	require.FileExists(t, filepath.Join(p.Paths.Root, "contracts", "storage-datasets", "reports.json"))
+	_, schema, role, err := packageManager.ManagedDatasetBinding(p, string(cfg.Deployment.Env), cfg.Database)
+	require.NoError(t, err)
+	var restricted bool
+	require.NoError(t, db.Raw("SELECT NOT (rolsuper OR rolcreaterole OR rolcreatedb OR rolreplication OR rolbypassrls) FROM pg_roles WHERE rolname = ?", role).Row().Scan(&restricted))
+	require.True(t, restricted)
+	ledger := pgx.Identifier{schema, "powerx_dataset_source_batches"}.Sanitize()
+	reports := pgx.Identifier{schema, "reports"}.Sanitize()
+	var triggers int
+	require.NoError(t, db.Raw("SELECT count(*) FROM pg_trigger WHERE tgrelid = ?::regclass AND NOT tgisinternal", ledger).Row().Scan(&triggers))
+	require.Equal(t, 2, triggers)
+	var indexes int
+	require.NoError(t, db.Raw("SELECT count(*) FROM pg_indexes WHERE schemaname = ? AND indexname = 'powerx_dataset_source_pending_delivery'", schema).Row().Scan(&indexes))
+	require.Equal(t, 1, indexes)
+	proc, ok := sup.Status(packagedDatasetID)
+	require.True(t, ok)
+	t.Logf("owned installed worker pid=%d cwd=%s command=%s port=%d", proc.PID, p.Paths.Root, p.Paths.Entry, proc.Port)
+	token, ok := packageManager.TryInternalToken(mgr, p.ID)
+	require.True(t, ok)
+	worker := func(action string, want int) []byte {
+		t.Helper()
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("http://127.0.0.1:%d/fixture/%s", proc.Port, action), nil)
+		require.NoError(t, err)
+		req.Header.Set("X-Fixture-Token", token)
+		req.Header.Set("X-Fixture-Request", uuid.NewString())
+		out, err := server.Client().Do(req)
+		require.NoError(t, err)
+		defer out.Body.Close()
+		raw, err := io.ReadAll(out.Body)
+		require.NoError(t, err)
+		require.Equal(t, want, out.StatusCode, "%s", raw)
+		return raw
+	}
+	var registration datasetfw.Registration
+	require.NoError(t, json.Unmarshal(worker("register", 200), &registration))
+	require.Equal(t, "accepted", registration.State)
+	require.Positive(t, registration.AcceptanceRevision)
+	original := uuid.NewString()
+	require.NoError(t, db.Exec("INSERT INTO "+reports+" VALUES (?, ?, NOW()-INTERVAL '45 days', 'archivable'),"+
+		"(?, ?, NOW(), 'recent'), (?, ?, NOW()-INTERVAL '45 days', 'foreign')",
+		original, tenant, uuid.NewString(), tenant, uuid.NewString(), foreignTenant).Error)
+	dataset := "/admin/ops/storage/datasets/" + registration.DatasetUUID
+	preview := uuid.NewString()
+	call("POST", dataset+"/previews", root, gov.DatasetPreviewInput{RequestUUID: preview, TenantUUID: tenant, RetentionDays: 30,
+		AcceptanceRevision: registration.AcceptanceRevision}, 202)
+	worker("preview", 200)
+	require.Contains(t, string(call("GET", dataset+"/previews/"+preview, root, nil, 200)), `"candidate_count":1`)
+	call("PUT", dataset+"/policies/"+tenant, root, map[string]any{
+		"expected_revision": 0, "acceptance_revision": registration.AcceptanceRevision, "enabled": true,
+		"action": "archive", "retention_days": 30, "archive_target_uuid": target,
+	}, 200)
+	batch := uuid.NewString()
+	call("POST", dataset+"/runs", root, gov.DatasetRunInput{RequestUUID: batch, TenantUUID: tenant, PreviewUUID: preview, PolicyRevision: 1}, 202)
+	require.Contains(t, string(worker("archive", 409)), "DATASET_FIXTURE_ARCHIVE_RESPONSE_LOST")
+	var originalArchive []byte
+	var checksum, receipt string
+	require.NoError(t, db.Raw("SELECT archive_bytes, archive_sha256, source_receipt_uuid FROM "+ledger+
+		" WHERE request_uuid = ? AND installation_revision = ? AND outcome = 'committed' AND NOT delivered", batch, p.Revision).
+		Row().Scan(&originalArchive, &checksum, &receipt))
+	sum := sha256.Sum256(originalArchive)
+	require.Equal(t, checksum, hex.EncodeToString(sum[:]))
+	require.Contains(t, string(originalArchive), original)
+	require.NotContains(t, string(originalArchive), "foreign")
+	require.Equal(t, "1", strings.TrimSpace(string(worker("recover", 200))))
+	batchURL := dataset + "/runs/" + batch
+	require.Contains(t, string(call("GET", batchURL, root, nil, 200)), receipt)
+	require.Equal(t, originalArchive, call("GET", batchURL+"/archive", root, nil, 200))
+	var kept int64
+	require.NoError(t, db.Table(reports).Count(&kept).Error)
+	require.EqualValues(t, 3, kept)
+	var delivered int
+	require.NoError(t, db.Raw("SELECT count(*) FROM "+ledger+
+		" WHERE request_uuid = ? AND source_receipt_uuid = ? AND delivered AND archive_bytes IS NULL AND archive_sha256 = ?", batch, receipt, checksum).Row().Scan(&delivered))
+	require.Equal(t, 1, delivered)
+	t.Logf("T179 installed package replay verified migration=%s role=%s rows_retained=%d object_sha256=%s", p.Migration.LastStatus, role, kept, checksum)
+}

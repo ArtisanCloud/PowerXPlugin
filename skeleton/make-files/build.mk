@@ -146,7 +146,8 @@ dist-backend: dist-target-check
 .PHONY: frontend-build
 frontend-build: ## 构建 Host 包（POWERX_PROXY=1, baseURL=$(POWERX_ADMIN_BASE)）
 	@echo "==> 构建 web-admin（Host 包） POWERX_PROXY=1 baseURL=$(POWERX_ADMIN_BASE)"
-	cd $(FRONTEND_DIR) && \
+	cd "$(FRONTEND_DIR)" && \
+	  NODE_PATH="$$PWD/node_modules$${NODE_PATH:+:$$NODE_PATH}" \
 	  POWERX_PROXY=1 \
 	  NUXT_PUBLIC_INSIDE_POWERX=1 \
 	  POWERX_PLUGIN_ID="$(PLUGIN_ID)" \
@@ -246,10 +247,13 @@ dist: dist-target-check plugin-yaml-check plugin-permission-declaration-check di
 	  mkdir -p $(DIST_DIR)/plugin.d; \
 	  cp -R plugin.d/. $(DIST_DIR)/plugin.d/; \
 	fi
-	@if [ -f "config/event_fabric.yaml" ]; then \
-	  mkdir -p $(DIST_DIR)/config; \
-	  cp config/event_fabric.yaml $(DIST_DIR)/config/event_fabric.yaml; \
-	fi
+	@for file in event_fabric.yaml event_fabric_service.yaml values.example.yaml; do \
+	  if [ -f "config/$$file" ]; then \
+	    mkdir -p $(DIST_DIR)/config; \
+	    cp "config/$$file" "$(DIST_DIR)/config/$$file"; \
+	  fi; \
+	done
+	@node "$(DIST_TARGET_SCRIPT)" stage-datasets --source "$(PLUGIN_MANIFEST)" --dist-dir "$(DIST_DIR)" --frontend-dir "$(FRONTEND_DIR)"
 	@if [ -d "skills" ]; then \
 	  mkdir -p $(DIST_DIR)/skills; \
 	  cp -R skills/. $(DIST_DIR)/skills/; \
@@ -330,10 +334,13 @@ release: build frontend-build
 	  mkdir -p $(RELEASE_DIR)/plugin.d; \
 	  cp -R plugin.d/. $(RELEASE_DIR)/plugin.d/; \
 	fi
-	@if [ -f "config/event_fabric.yaml" ]; then \
-	  mkdir -p $(RELEASE_DIR)/config; \
-	  cp config/event_fabric.yaml $(RELEASE_DIR)/config/event_fabric.yaml; \
-	fi
+	@for file in event_fabric.yaml event_fabric_service.yaml values.example.yaml; do \
+	  if [ -f "config/$$file" ]; then \
+	    mkdir -p $(RELEASE_DIR)/config; \
+	    cp "config/$$file" "$(RELEASE_DIR)/config/$$file"; \
+	  fi; \
+	done
+	@node "$(DIST_TARGET_SCRIPT)" stage-datasets --source "$(PLUGIN_MANIFEST)" --dist-dir "$(RELEASE_DIR)" --frontend-dir "$(FRONTEND_DIR)"
 	@if [ -d "skills" ]; then \
 	  mkdir -p $(RELEASE_DIR)/skills; \
 	  cp -R skills/. $(RELEASE_DIR)/skills/; \

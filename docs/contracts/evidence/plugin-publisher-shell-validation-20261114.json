@@ -1,0 +1,619 @@
+{
+  "schema": "powerx.plugin-publisher-shell-validation/v1",
+  "recorded_at": "2026-11-14T00:42:00.543994+08:00",
+  "result": "passed_in_isolated_current_source_environment",
+  "branch": "025-framework-business-regression",
+  "base_commit": "5683e4293d89b276ee3669448ceefd9de06a75a7",
+  "scope": {
+    "framework": "publisher development route, shared admin shell, setup guidance, locales and generated templates",
+    "marketplace": "two paired documents only",
+    "page_route": "/powerx/publisher",
+    "private_api_route": "/__powerx/publisher-api",
+    "contract_version": "1.0.0-rc.2",
+    "no_old_page_alias": true
+  },
+  "changes": [
+    "Restore default admin layout and shared navigation for the development publisher page.",
+    "Keep the private API and independent executor authentication unchanged.",
+    "Use a setup action instead of reporting an unconfigured proxy as an uncertain write failure.",
+    "Keep shared theme/language controls and retain section context.",
+    "Do not request business IAM context or connect notifications when the public developer page has no business login."
+  ],
+  "checks": [
+    "unpaired page retains main navigation and shows setup guidance without a false write-failure banner",
+    "desktop main menu and mobile drawer remain visible, selected and navigable across light/dark with opposite system preference",
+    "actual CLI executor connects through the same private API, without market credentials in the browser",
+    "real plan creation succeeds; selected version and unsaved draft survive section changes",
+    "shared navbar language updates the workspace and persists after refresh"
+  ],
+  "unit_tests": {
+    "command": "npm --prefix skeleton/web-admin/nuxt run test:unit -- tests/unit/publisher-page.spec.ts tests/unit/publisher-workspace.spec.ts tests/unit/publisher-proxy.spec.ts tests/unit/publisher-market.spec.ts tests/unit/publisher-review.spec.ts tests/unit/publisher-request-trace.spec.ts tests/unit/layout-routing.spec.ts",
+    "files_passed": 7,
+    "tests_passed": 62,
+    "tests_failed": 0,
+    "coverage": [
+      "actual module dev registration and production exclusion",
+      "local and embedded layout routing",
+      "workspace, market, review, request trace and private proxy contracts"
+    ]
+  },
+  "typecheck": {
+    "result": "passed",
+    "tool": "vue-tsc 3.3.14, TypeScript 6.0.3 from existing offline npm cache",
+    "scope": "PublisherPage.vue and its imported panels/workspaces, strict targeted configuration with Nuxt/UI/i18n aliases from the Skeleton consumer",
+    "full_project_typecheck": false,
+    "repository_dependencies_changed": false
+  },
+  "templates": {
+    "sync_command": "npm run sync:templates",
+    "check_command": "npm run sync:templates -- --check",
+    "result": "passed",
+    "targets": [
+      "scaffold/templates/web-admin/nuxt",
+      "tools/cli/internal/templates/data/web-admin/nuxt"
+    ]
+  },
+  "real_local_execution": {
+    "source": "CLI built from current repository sources",
+    "cli_binary_sha256": "e4109167447965d7e3c47b59e26125e409cb360bccda3db9100f570c9ee70c3e",
+    "fixture_plugin": "com.example.publisher-shell-check",
+    "manifest_version": "0.1.0",
+    "plan_version_created_in_browser": "1.2.3",
+    "unsaved_plan_version_retained": "1.2.4",
+    "manifest_unchanged": true,
+    "market_credentials_used": false
+  },
+  "visual_validation": {
+    "browser": "isolated headless Google Chrome via Playwright",
+    "desktop_widths": [
+      1440,
+      1024
+    ],
+    "narrow_width": 390,
+    "themes": [
+      "light",
+      "dark",
+      "system"
+    ],
+    "manual_theme_opposite_system": true,
+    "states": [
+      "default",
+      "hover",
+      "focus",
+      "selected",
+      "disabled",
+      "setup dialog",
+      "mobile navigation drawer"
+    ],
+    "method": "Computed text and composited ancestor background colors; normal text >=4.5:1, large text >=3:1. Visible shell/workspace/modal text sampled for each recorded state.",
+    "checks": [
+      {
+        "label": "setup-modal",
+        "viewport": 1440,
+        "scrollWidth": 1440,
+        "theme": "light",
+        "tabs": 5,
+        "tabOrientation": "vertical",
+        "text_samples": 11,
+        "minimum_text_contrast": 7.58,
+        "contrast_failures": 0
+      },
+      {
+        "label": "unpaired-1440-light",
+        "viewport": 1440,
+        "scrollWidth": 1440,
+        "theme": "light",
+        "tabs": 5,
+        "tabOrientation": "vertical",
+        "text_samples": 32,
+        "minimum_text_contrast": 6.92,
+        "contrast_failures": 0
+      },
+      {
+        "label": "unpaired-1440-dark",
+        "viewport": 1440,
+        "scrollWidth": 1440,
+        "theme": "dark",
+        "tabs": 5,
+        "tabOrientation": "vertical",
+        "text_samples": 32,
+        "minimum_text_contrast": 9.83,
+        "contrast_failures": 0
+      },
+      {
+        "label": "unpaired-390-light",
+        "viewport": 390,
+        "scrollWidth": 390,
+        "theme": "light",
+        "tabs": 5,
+        "tabOrientation": "horizontal",
+        "text_samples": 6,
+        "minimum_text_contrast": 4.76,
+        "contrast_failures": 0
+      },
+      {
+        "label": "mobile-menu-light",
+        "viewport": 390,
+        "scrollWidth": 390,
+        "theme": "light",
+        "tabs": 5,
+        "tabOrientation": "horizontal",
+        "text_samples": 6,
+        "minimum_text_contrast": 4.76,
+        "contrast_failures": 0
+      },
+      {
+        "label": "unpaired-390-dark",
+        "viewport": 390,
+        "scrollWidth": 390,
+        "theme": "dark",
+        "tabs": 5,
+        "tabOrientation": "horizontal",
+        "text_samples": 6,
+        "minimum_text_contrast": 6.78,
+        "contrast_failures": 0
+      },
+      {
+        "label": "mobile-menu-dark",
+        "viewport": 390,
+        "scrollWidth": 390,
+        "theme": "dark",
+        "tabs": 5,
+        "tabOrientation": "horizontal",
+        "text_samples": 6,
+        "minimum_text_contrast": 6.78,
+        "contrast_failures": 0
+      },
+      {
+        "label": "paired-1440-light",
+        "viewport": 1440,
+        "scrollWidth": 1440,
+        "theme": "light",
+        "tabs": 5,
+        "tabOrientation": "vertical",
+        "text_samples": 34,
+        "minimum_text_contrast": 6.92,
+        "contrast_failures": 0
+      },
+      {
+        "label": "hover-1440-light",
+        "viewport": 1440,
+        "scrollWidth": 1440,
+        "theme": "light",
+        "tabs": 5,
+        "tabOrientation": "vertical",
+        "text_samples": 34,
+        "minimum_text_contrast": 6.92,
+        "contrast_failures": 0
+      },
+      {
+        "label": "focus-1440-light",
+        "viewport": 1440,
+        "scrollWidth": 1440,
+        "theme": "light",
+        "tabs": 5,
+        "tabOrientation": "vertical",
+        "text_samples": 34,
+        "minimum_text_contrast": 6.92,
+        "contrast_failures": 0
+      },
+      {
+        "label": "paired-1440-dark",
+        "viewport": 1440,
+        "scrollWidth": 1440,
+        "theme": "dark",
+        "tabs": 5,
+        "tabOrientation": "vertical",
+        "text_samples": 34,
+        "minimum_text_contrast": 9.83,
+        "contrast_failures": 0
+      },
+      {
+        "label": "hover-1440-dark",
+        "viewport": 1440,
+        "scrollWidth": 1440,
+        "theme": "dark",
+        "tabs": 5,
+        "tabOrientation": "vertical",
+        "text_samples": 34,
+        "minimum_text_contrast": 9.83,
+        "contrast_failures": 0
+      },
+      {
+        "label": "focus-1440-dark",
+        "viewport": 1440,
+        "scrollWidth": 1440,
+        "theme": "dark",
+        "tabs": 5,
+        "tabOrientation": "vertical",
+        "text_samples": 34,
+        "minimum_text_contrast": 9.83,
+        "contrast_failures": 0
+      },
+      {
+        "label": "paired-1024-light",
+        "viewport": 1024,
+        "scrollWidth": 1024,
+        "theme": "light",
+        "tabs": 5,
+        "tabOrientation": "horizontal",
+        "text_samples": 34,
+        "minimum_text_contrast": 6.92,
+        "contrast_failures": 0
+      },
+      {
+        "label": "hover-1024-light",
+        "viewport": 1024,
+        "scrollWidth": 1024,
+        "theme": "light",
+        "tabs": 5,
+        "tabOrientation": "horizontal",
+        "text_samples": 34,
+        "minimum_text_contrast": 6.92,
+        "contrast_failures": 0
+      },
+      {
+        "label": "focus-1024-light",
+        "viewport": 1024,
+        "scrollWidth": 1024,
+        "theme": "light",
+        "tabs": 5,
+        "tabOrientation": "horizontal",
+        "text_samples": 34,
+        "minimum_text_contrast": 6.92,
+        "contrast_failures": 0
+      },
+      {
+        "label": "paired-1024-dark",
+        "viewport": 1024,
+        "scrollWidth": 1024,
+        "theme": "dark",
+        "tabs": 5,
+        "tabOrientation": "horizontal",
+        "text_samples": 34,
+        "minimum_text_contrast": 9.83,
+        "contrast_failures": 0
+      },
+      {
+        "label": "hover-1024-dark",
+        "viewport": 1024,
+        "scrollWidth": 1024,
+        "theme": "dark",
+        "tabs": 5,
+        "tabOrientation": "horizontal",
+        "text_samples": 34,
+        "minimum_text_contrast": 9.83,
+        "contrast_failures": 0
+      },
+      {
+        "label": "focus-1024-dark",
+        "viewport": 1024,
+        "scrollWidth": 1024,
+        "theme": "dark",
+        "tabs": 5,
+        "tabOrientation": "horizontal",
+        "text_samples": 34,
+        "minimum_text_contrast": 9.83,
+        "contrast_failures": 0
+      },
+      {
+        "label": "paired-390-light",
+        "viewport": 390,
+        "scrollWidth": 390,
+        "theme": "light",
+        "tabs": 5,
+        "tabOrientation": "horizontal",
+        "text_samples": 6,
+        "minimum_text_contrast": 4.76,
+        "contrast_failures": 0
+      },
+      {
+        "label": "paired-390-light",
+        "viewport": 390,
+        "scrollWidth": 390,
+        "theme": "light",
+        "tabs": 5,
+        "tabOrientation": "horizontal",
+        "text_samples": 26,
+        "minimum_text_contrast": 6.92,
+        "contrast_failures": 0
+      },
+      {
+        "label": "hover-390-light",
+        "viewport": 390,
+        "scrollWidth": 390,
+        "theme": "light",
+        "tabs": 5,
+        "tabOrientation": "horizontal",
+        "text_samples": 26,
+        "minimum_text_contrast": 6.92,
+        "contrast_failures": 0
+      },
+      {
+        "label": "focus-390-light",
+        "viewport": 390,
+        "scrollWidth": 390,
+        "theme": "light",
+        "tabs": 5,
+        "tabOrientation": "horizontal",
+        "text_samples": 26,
+        "minimum_text_contrast": 6.92,
+        "contrast_failures": 0
+      },
+      {
+        "label": "paired-390-dark",
+        "viewport": 390,
+        "scrollWidth": 390,
+        "theme": "dark",
+        "tabs": 5,
+        "tabOrientation": "horizontal",
+        "text_samples": 26,
+        "minimum_text_contrast": 9.83,
+        "contrast_failures": 0
+      },
+      {
+        "label": "hover-390-dark",
+        "viewport": 390,
+        "scrollWidth": 390,
+        "theme": "dark",
+        "tabs": 5,
+        "tabOrientation": "horizontal",
+        "text_samples": 26,
+        "minimum_text_contrast": 9.83,
+        "contrast_failures": 0
+      },
+      {
+        "label": "focus-390-dark",
+        "viewport": 390,
+        "scrollWidth": 390,
+        "theme": "dark",
+        "tabs": 5,
+        "tabOrientation": "horizontal",
+        "text_samples": 26,
+        "minimum_text_contrast": 9.83,
+        "contrast_failures": 0
+      }
+    ],
+    "page_errors": [],
+    "screenshots": [
+      {
+        "path": "artifacts/plugin-publisher-shell-20261114/setup-desktop-light.png",
+        "sha256": "3a5cd0c1b6ebc4edcabddec468ac0330eb55ade7e9b636ac6f0f6c88626d1ffe",
+        "bytes": 245679
+      },
+      {
+        "path": "artifacts/plugin-publisher-shell-20261114/unpaired-1440-light.png",
+        "sha256": "d00aeda297b695e465d610c7d9960da2e57a93487dbd4f1bafd8f86811d52981",
+        "bytes": 119792
+      },
+      {
+        "path": "artifacts/plugin-publisher-shell-20261114/unpaired-1440-dark.png",
+        "sha256": "9ab927403122fd6dae10bdb55b452908bb3adacb9ed5df8a8948969cfee5826f",
+        "bytes": 119659
+      },
+      {
+        "path": "artifacts/plugin-publisher-shell-20261114/unpaired-390-light.png",
+        "sha256": "0ecadc774fd3014274259b44b5e218ba2d5f379cfadc7de6b041d938bfcba017",
+        "bytes": 24449
+      },
+      {
+        "path": "artifacts/plugin-publisher-shell-20261114/navigation-narrow-light.png",
+        "sha256": "0ecadc774fd3014274259b44b5e218ba2d5f379cfadc7de6b041d938bfcba017",
+        "bytes": 24449
+      },
+      {
+        "path": "artifacts/plugin-publisher-shell-20261114/unpaired-390-dark.png",
+        "sha256": "f48b9f0fe5bc7e0b5bffe8b9eb9d0f7ecd3cef3e5afb49dddc36a9480c41c280",
+        "bytes": 24559
+      },
+      {
+        "path": "artifacts/plugin-publisher-shell-20261114/navigation-narrow-dark.png",
+        "sha256": "f48b9f0fe5bc7e0b5bffe8b9eb9d0f7ecd3cef3e5afb49dddc36a9480c41c280",
+        "bytes": 24559
+      },
+      {
+        "path": "artifacts/plugin-publisher-shell-20261114/system-theme-desktop.png",
+        "sha256": "10da76e5a978dd709f7bf10f270a68fc348b206dd68f56773bd34920bb8434c0",
+        "bytes": 119725
+      },
+      {
+        "path": "artifacts/plugin-publisher-shell-20261114/connected-1440-light.png",
+        "sha256": "f0240670bbe4d910a665caa229ef4e50e5aff368aa32c418b1009f8c3d77276e",
+        "bytes": 102557
+      },
+      {
+        "path": "artifacts/plugin-publisher-shell-20261114/connected-1440-dark.png",
+        "sha256": "20fc40693c48d8493eaf8ff31b467765c305e5cf70afb22db8050131888060a4",
+        "bytes": 102504
+      },
+      {
+        "path": "artifacts/plugin-publisher-shell-20261114/connected-1024-light.png",
+        "sha256": "afd4a78ffb780a76ab0eb154a806a7fb6452eb445b2230b9a41d5372f15ae4dc",
+        "bytes": 93488
+      },
+      {
+        "path": "artifacts/plugin-publisher-shell-20261114/connected-1024-dark.png",
+        "sha256": "41ee3733f93b83c19e2d221df4f62c4a00a2ea90d521d85a8aca4833aa22e3e1",
+        "bytes": 93424
+      },
+      {
+        "path": "artifacts/plugin-publisher-shell-20261114/connected-390-light.png",
+        "sha256": "77c62bdfd220d1a1986d9c15497ad8866f0d21f7419b0b3c3c06976eb1d3f038",
+        "bytes": 71391
+      },
+      {
+        "path": "artifacts/plugin-publisher-shell-20261114/connected-390-dark.png",
+        "sha256": "e44840c990d49b7abfc3b8f30d4c8b2f3a8b0692aa29ba6e9757de84734d23fc",
+        "bytes": 71571
+      }
+    ]
+  },
+  "daily_service_read_only_check": {
+    "origin": "http://127.0.0.1:3131",
+    "path": "/powerx/publisher",
+    "read_only": true,
+    "services_restarted": false,
+    "status": 200,
+    "final_path": "/users/login",
+    "workspace_visible": false,
+    "publisher_navigation_visible": false,
+    "page_errors": [],
+    "error_page": [
+      " PowerX "
+    ]
+  },
+  "daily_service_follow_up": "The existing :3131 process redirected the new route to /users/login; restart the user-owned Nuxt process to reload module route registration, then open /powerx/publisher. No daily service was restarted.",
+  "marketplace_docs": {
+    "branch": "010-install-plugin-pxp",
+    "files": {
+      "docs/marketplace/plugin-developer-publishing-center-plan.md": {
+        "sha256_before": "d78abd76f2e0ebc06a753a2698239bf903319f604c6712a67b0eef17d48b1cde",
+        "sha256_after": "d393459094c63ee150c36b9680887b1bf56e28f24852b3f818bcde59a4867f82"
+      },
+      "docs/marketplace/plugin-publisher-implementation.md": {
+        "sha256_before": "e63bceb01827d0f3442da540b995acf3f421d74c85ae5649eeede6bd2f69d6c9",
+        "sha256_after": "e81de233e94e1b11a17df6006fd6b2d3f17f1acadea302e5c192eb7051b034a6"
+      }
+    }
+  },
+  "source_sha256": {
+    "framework/frontend/nuxt/framework-admin/publisher/types.ts": "4024bf1f6f3475797a9c8ee30f33530a50fa2ba46c3571c89342abc0c2962b68",
+    "framework/frontend/nuxt/framework-admin/publisher/module.ts": "b9e2ca83103c7c62ed5aacf61b0c4f087d2a5b44fd89efe57fca9eaee8c425c5",
+    "framework/frontend/nuxt/framework-admin/publisher/runtime/PublisherPage.vue": "e991dc1233fa951d760b48dad6ec108bf4618b8d3e3724bf98c5ba2e5e4e30e6",
+    "framework/frontend/nuxt/framework-admin/publisher/locales/en.json": "9176333802a82cc147921b530d1d2123652d5bdc5c5175fe42b9829a7bd72760",
+    "framework/frontend/nuxt/framework-admin/publisher/locales/zh.json": "dc23fb8280394433e0f51b46a97e28b7aed106e2f12d1b95e6ed11a17decb449",
+    "skeleton/web-admin/nuxt/app/middleware/layout.global.ts": "96dae9b55626382fa696d0a09c63471a41fdc59d28ca280bcdb72d2ce761ac99",
+    "skeleton/web-admin/nuxt/app/components/AppNavbar.vue": "cdcaeec0ba9127774cca5a3b336eb80e4cc365236ec82ac4c27a9f8c2e59b46b",
+    "skeleton/web-admin/nuxt/app/components/AppSidebar.vue": "12c73654db47771f0bfe6ba99717c5d8b8379481e4bac407c19023f3a545f836",
+    "skeleton/web-admin/nuxt/app/components/ThemeSelector.vue": "0c50352a089aa79a3dc2d6851c7e1b63e2d909fee5cb68b4c6da8e1fa9fffd85",
+    "skeleton/web-admin/nuxt/app/components/LanguageSelector.vue": "ee2beb083df29b5c08681ec89bbb9c973014f283d9301843b5d08bebdfd4089f",
+    "skeleton/web-admin/nuxt/i18n/locales/en.json": "58713e9ac5e4a866d6b7ea5eda287f9f27a231028f61b2ca0049e087246a300f",
+    "skeleton/web-admin/nuxt/i18n/locales/zh.json": "0ffff75a12670e7b6f29911fdd62394313ed9d1973646cbf48873226b7e54008",
+    "skeleton/web-admin/nuxt/tests/unit/publisher-page.spec.ts": "c3051a6b70a42a284cd9e821f3b84531b9a8e591f90af283d8048a67ac1f944f",
+    "skeleton/web-admin/nuxt/tests/unit/layout-routing.spec.ts": "af52b4037b9a8b0c4ab0ee20e3652748bc1baec1aef3b43ccdddd5fbeb6ae100"
+  },
+  "preservation": {
+    "branch_unchanged": true,
+    "head_unchanged": true,
+    "private_files_unchanged": {
+      "skeleton/web-admin/nuxt/.env": true,
+      "skeleton/backend/.env": true
+    },
+    "preexisting_changed_files_modified_this_task": [
+      "docs/contracts/plugin-publisher-market-v1.md",
+      "docs/guides/features/plugin-developer-publisher/guide.md",
+      "framework/frontend/nuxt/framework-admin/publisher/locales/en.json",
+      "framework/frontend/nuxt/framework-admin/publisher/locales/zh.json",
+      "framework/frontend/nuxt/framework-admin/publisher/module.ts",
+      "framework/frontend/nuxt/framework-admin/publisher/runtime/PublisherPage.vue",
+      "framework/frontend/nuxt/framework-admin/publisher/types.ts",
+      "skeleton/web-admin/nuxt/tests/unit/publisher-page.spec.ts",
+      "docs/marketplace/plugin-developer-publishing-center-plan.md",
+      "docs/marketplace/plugin-publisher-implementation.md",
+      "scaffold/templates/web-admin/nuxt/app/components/AppSidebar.vue.tmpl",
+      "scaffold/templates/web-admin/nuxt/app/middleware/layout.global.ts.tmpl",
+      "scaffold/templates/web-admin/nuxt/i18n/locales/en.json.tmpl",
+      "scaffold/templates/web-admin/nuxt/i18n/locales/zh.json.tmpl",
+      "skeleton/web-admin/nuxt/app/components/AppSidebar.vue",
+      "skeleton/web-admin/nuxt/app/middleware/layout.global.ts",
+      "skeleton/web-admin/nuxt/i18n/locales/en.json",
+      "skeleton/web-admin/nuxt/i18n/locales/zh.json",
+      "tools/cli/internal/templates/data/web-admin/nuxt/app/components/AppSidebar.vue.tmpl",
+      "tools/cli/internal/templates/data/web-admin/nuxt/app/middleware/layout.global.ts.tmpl",
+      "tools/cli/internal/templates/data/web-admin/nuxt/i18n/locales/en.json.tmpl",
+      "tools/cli/internal/templates/data/web-admin/nuxt/i18n/locales/zh.json.tmpl"
+    ],
+    "no_core_changes": true,
+    "no_database_migrations": true,
+    "no_marketplace_code_changes": true,
+    "no_daily_service_restarts": true
+  },
+  "temporary_services": {
+    "parent_pid": 66843,
+    "services": [
+      {
+        "name": "executor",
+        "pid": 66845,
+        "ppid": 66843,
+        "argv": [
+          "${TEMP_ROOT}/px-plugin",
+          "publisher",
+          "serve",
+          "--entry",
+          "${TEMP_ROOT}/plugin",
+          "--origin",
+          "http://127.0.0.1:52344"
+        ]
+      },
+      {
+        "name": "nuxt-unpaired",
+        "pid": 66846,
+        "ppid": 66843,
+        "argv": [
+          "node",
+          "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/skeleton/web-admin/nuxt/node_modules/nuxi/bin/nuxi.mjs",
+          "dev",
+          "--cwd",
+          "${TEMP_ROOT}/app",
+          "--dotenv",
+          "${TEMP_ROOT}/app/empty.env",
+          "--host",
+          "127.0.0.1",
+          "--port",
+          "52344",
+          "--no-fork"
+        ]
+      },
+      {
+        "name": "executor-refreshed",
+        "pid": 68069,
+        "ppid": 66843,
+        "argv": [
+          "${TEMP_ROOT}/px-plugin",
+          "publisher",
+          "serve",
+          "--entry",
+          "${TEMP_ROOT}/plugin",
+          "--origin",
+          "http://127.0.0.1:52344"
+        ]
+      },
+      {
+        "name": "nuxt-paired",
+        "pid": 68072,
+        "ppid": 66843,
+        "argv": [
+          "node",
+          "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/skeleton/web-admin/nuxt/node_modules/nuxi/bin/nuxi.mjs",
+          "dev",
+          "--cwd",
+          "${TEMP_ROOT}/app",
+          "--dotenv",
+          "${TEMP_ROOT}/app/empty.env",
+          "--host",
+          "127.0.0.1",
+          "--port",
+          "52344",
+          "--no-fork"
+        ]
+      }
+    ],
+    "fixture_backend_port": 52345,
+    "all_owned_processes_exited": true,
+    "all_recorded_ports_released": [
+      52344,
+      52345,
+      52346,
+      52573
+    ],
+    "private_session_file_removed_by_executor": true,
+    "temporary_directory_cleanup": "removed",
+    "owned_process_check": "no remaining process commands reference the isolated temporary directory"
+  },
+  "acceptance_limits": [
+    "This task validates navigation and local executor/plan flow only.",
+    "No new real marketplace build/upload/review/download/PowerX-install acceptance was performed.",
+    "Native complete Linux package and formal SDK/CLI release are outside this task.",
+    "Production exclusion is verified by invoking the actual module with dev=false; no new production build was performed."
+  ]
+}

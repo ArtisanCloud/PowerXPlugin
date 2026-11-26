@@ -1,0 +1,10 @@
+{
+  "source_repository": "PowerXPlugin",
+  "source_head": "32aaf0bd33ec",
+  "source_worktree_uncommitted": true,
+  "source_directory": "docs/standards/powerx-plugin/_shared",
+  "files": {
+    "plugin-id.schema.json": "27f1a43ff8809a41bce9e936571a80129d74743b1a9861bfb677a08d3c7191b1",
+    "plugin-id.cases.json": "3e8bc2bb4c672768db05496d9689b2c1890a4b6d9ef6b8be7fd19cd96757eba8"
+  }
+}

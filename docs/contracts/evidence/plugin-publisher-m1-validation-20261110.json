@@ -1,0 +1,199 @@
+{
+  "date": "2026-11-10",
+  "verified_at": "2026-11-10T22:34:21.321380+08:00",
+  "scope": "Framework M1 source, page, templates, independent snapshots and isolated market integration; not production acceptance",
+  "branch": "025-framework-business-regression",
+  "framework_head": "5683e4293d89b276ee3669448ceefd9de06a75a7",
+  "market_head": "c863f284fc1ce30178aa2f78923f8bf82179c831",
+  "uncommitted_source": true,
+  "contract": {
+    "protocol": "powerx.plugin-publisher/v1",
+    "version": "1.0.0-rc.2",
+    "files": 24,
+    "bundle_sha256": "89141c00e0b99b6a803312119e4cbcb3e64224bf458e234e35fc5ffbdeacd8fa",
+    "portable_original_preserved": true,
+    "rc1_evidence_preserved": true
+  },
+  "implemented": [
+    "immutable market connection trust boundary",
+    "CLI stdin to system credential store; no browser token route or plaintext fallback",
+    "stable user/developer identity binding",
+    "async frozen ZIP multipart upload",
+    "persistent original operation UUID and request fingerprint",
+    "bounded same-operation recovery, cancellation and restart reconciliation",
+    "successful recovery without a local ZIP",
+    "receipt separated from fresh current version; stale snapshots cleared after read failure",
+    "market version pagination and empty state",
+    "Nuxt development page, private proxy, locale and template integration"
+  ],
+  "checks": {
+    "go_race": {
+      "pass": 174,
+      "skip": 1,
+      "fail": 0
+    },
+    "go_vet": "passed",
+    "portable_go_race_vet": "passed",
+    "portable_node_tests": 216,
+    "portable_openapi": "12 paths and 32 wire definitions passed",
+    "local_openapi": "3.1 structure and reference checks passed",
+    "frontend_tests": 35,
+    "publisher_targeted_typecheck": "passed with actual Nuxt/UI/i18n types",
+    "full_application_typecheck": "not claimed; initial application-generated type graph reported errors outside publisher",
+    "template_sync": "passed",
+    "generated_consumer": "GOWORK=off, packaged Framework SDK proxy, no replace; passed",
+    "linux_amd64_cross_compile": "passed; compilation only",
+    "remote_ci_executed": false,
+    "paired_documents": "v0.6 bodies identical after resolving relative links",
+    "documentation_links": "7 changed guides/contracts/plans checked",
+    "json_yaml_examples": 4,
+    "git_diff_check": "passed"
+  },
+  "independent_consumer": {
+    "publisher_source_matches_installed_tarball": true,
+    "files": 11,
+    "admin_artifact": {
+      "name": "@artisan-cloud/plugin-framework-admin",
+      "version": "0.0.14",
+      "sha256": "c7e9d9d8297a8e9fd82bc6129e399984e0182a58f99cf464ccccfedea6c945b1",
+      "filename": "c7e9d9d8297a8e9f-artisan-cloud-plugin-framework-admin-0.0.14.tgz"
+    },
+    "client_artifact": {
+      "name": "@artisan-cloud/plugin-framework-client",
+      "version": "0.0.15",
+      "sha256": "423d02223ec0b6a41b725e3c88ca96d4f0892c0502968cfac7a0ff6c1e208e6f",
+      "filename": "423d02223ec0b6a4-artisan-cloud-plugin-framework-client-0.0.15.tgz"
+    },
+    "go_sdk_snapshot": "v0.0.27-dev.g5117efac6220041a",
+    "formal_registry_release": false,
+    "global_cli_changed": false
+  },
+  "market_integration": {
+    "source": "disposable copy of Marketplace backend",
+    "database": "owned SQLite test databases only",
+    "object_store": "owned real MinIO buckets with isolated server config and credentials",
+    "credential_seed": "inherited pipe FD 3; no token argv or workspace file",
+    "original_discovery": "features=[] blocks writes",
+    "positive_activation": "explicit test HTTP wrapper changes discovery features only; not deployed",
+    "actual_routes": [
+      "package upload",
+      "operation query",
+      "version detail",
+      "versions page"
+    ],
+    "result": "private draft created; same operation/version recovered, one full upload; local ZIP removed before successful recovery",
+    "fixture_artifact_sha256": "0b50f5d710529b4f82ad3ae848f600e8d5df4cb47118180bb150590476200efa",
+    "fixture_artifact_size": 1116393,
+    "market_source_changed_after_joint_validation": false
+  },
+  "browser": {
+    "page": "/__powerx/publisher",
+    "scenarios": [
+      "real_go_connection_creation",
+      "real_keyring_missing_error_remains_visible_across_tabs",
+      "browser_dto_has_no_token",
+      "controlled_upload_confirmation_and_queue",
+      "controlled_cancel_preserves_attention_across_tabs",
+      "controlled_resume_keeps_operation_and_receipt",
+      "exact_version_link_and_duplicate_upload_disabled",
+      "controlled_versions_empty_state_and_pagination",
+      "market_form_draft_survives_tab_switch",
+      "eight_rendered_theme_viewport_combinations_and_modals",
+      "real_runtime_chinese_market_form_and_modal_focus"
+    ],
+    "render_combinations": 8,
+    "widths": [
+      1440,
+      390
+    ],
+    "manual_system_theme_mismatch": true,
+    "all_narrow_tabs_visible": true,
+    "states": [
+      "default",
+      "hover",
+      "focus",
+      "selected",
+      "disabled",
+      "modal",
+      "validation error"
+    ],
+    "minimum_text_contrast": 6.922767067725606,
+    "page_errors": [],
+    "focus_warnings": [],
+    "transfer_task_ui": "explicit controlled DTO fixtures; not a real Linux build",
+    "real_actions": [
+      "tool handshake",
+      "connection creation",
+      "keyring missing error",
+      "Chinese form and modal"
+    ]
+  },
+  "production": {
+    "build": "passed",
+    "node": "22.23.2",
+    "sdk_artifacts": [
+      {
+        "name": "@artisan-cloud/plugin-framework-client",
+        "version": "0.0.15",
+        "sha256": "423d02223ec0b6a41b725e3c88ca96d4f0892c0502968cfac7a0ff6c1e208e6f",
+        "filename": "423d02223ec0b6a4-artisan-cloud-plugin-framework-client-0.0.15.tgz"
+      },
+      {
+        "name": "@artisan-cloud/plugin-framework-admin",
+        "version": "0.0.14",
+        "sha256": "c7e9d9d8297a8e9fd82bc6129e399984e0182a58f99cf464ccccfedea6c945b1",
+        "filename": "c7e9d9d8297a8e9f-artisan-cloud-plugin-framework-admin-0.0.14.tgz"
+      }
+    ],
+    "output_runtime_markers": [],
+    "requests": [
+      {
+        "path": "/__powerx/publisher",
+        "status": 200,
+        "content_type": "text/html;charset=utf-8",
+        "publisher_json": false
+      },
+      {
+        "path": "/__powerx/publisher-api/status",
+        "status": 200,
+        "content_type": "text/html;charset=utf-8",
+        "publisher_json": false
+      },
+      {
+        "path": "/__powerx/publisher-api/markets",
+        "status": 200,
+        "content_type": "text/html;charset=utf-8",
+        "publisher_json": false
+      }
+    ],
+    "scope": "Actual independent generated Nuxt consumer. HTML SPA responses are not publisher API routes.",
+    "router": {
+      "matched": [],
+      "workspaces": 0
+    }
+  },
+  "cleanup": {
+    "groups_checked": 24,
+    "ports_released": 22,
+    "all_ports_released": true,
+    "bootstrap_removed": true,
+    "temporary_workspace_removed": true,
+    "user_services_touched": false
+  },
+  "market_original_repository_edits": [
+    "docs/marketplace/plugin-developer-publishing-center-plan.md",
+    "docs/marketplace/plugin-publisher-implementation.md"
+  ],
+  "not_performed": [
+    "native Linux/amd64 full Nuxt plugin build/runtime acceptance",
+    "real production Keychain/Secret Service token binding",
+    "market credential management UI and P08 acceptance",
+    "formal market capability activation",
+    "SDK/CLI publication",
+    "M2 submission, review or public publishing",
+    "public download or PowerX installation",
+    "daily database migration or mutation",
+    "user-owned service restart"
+  ],
+  "evidence_directory": "artifacts/plugin-publisher-m1-20261110"
+}

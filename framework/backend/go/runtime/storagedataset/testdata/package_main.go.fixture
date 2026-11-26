@@ -1,0 +1,247 @@
+package main
+
+import (
+	"bytes"
+	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"os"
+	"strings"
+	"sync/atomic"
+	"time"
+
+	stsv1 "github.com/ArtisanCloud/PowerX/api/grpc/gen/go/powerx/auth/sts/v1"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/gateway"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/storagedataset"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/taskqueue"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"gopkg.in/yaml.v3"
+)
+
+func main() {
+	cfg, err := pgx.ParseConfig(os.Getenv("POWERX_DB_DSN"))
+	if err != nil || !strings.HasPrefix(cfg.Host, "/tmp/powerx-control-owned-") || cfg.Database != "postgres" {
+		log.Fatal("DATASET_FIXTURE_DATABASE_INVALID")
+	}
+	db := stdlib.OpenDB(*cfg)
+	defer db.Close()
+	if len(os.Args) == 2 && os.Args[1] == "migrate" {
+		if err := migrate(db); err != nil {
+			log.Fatal("DATASET_FIXTURE_MIGRATION_FAILED: ", err)
+		}
+		return
+	}
+	if err := serve(db, cfg.User); err != nil {
+		log.Fatal("DATASET_FIXTURE_WORKER_FAILED: ", err)
+	}
+}
+
+func migrate(db *sql.DB) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	schema := os.Getenv("POWERX_PLUGIN_DB_SCHEMA")
+	if schema == "" || schema != os.Getenv("POWERX_DB_SCHEMA") || !strings.HasPrefix(schema, "px_") {
+		return errors.New("DATASET_FIXTURE_SCHEMA_INVALID")
+	}
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err = tx.ExecContext(ctx, "SET LOCAL search_path TO "+pgx.Identifier{schema}.Sanitize()+", pg_catalog"); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, `CREATE TABLE reports (uuid uuid PRIMARY KEY, tenant_uuid uuid NOT NULL, finished_at timestamptz NOT NULL, label text NOT NULL);
+CREATE INDEX reports_retention ON reports (tenant_uuid, finished_at, uuid);`); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, storagedataset.SourceLedgerMigration()); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func serve(db *sql.DB, role string) error {
+	root := os.Getenv("POWERX_PLUGIN_ROOT")
+	assets, err := storagedataset.LoadAssets(root)
+	if err != nil || len(assets) != 1 {
+		return errors.New("DATASET_FIXTURE_ASSETS_INVALID")
+	}
+	var host struct {
+		Database struct {
+			Binding string `yaml:"binding_uuid"`
+		} `yaml:"database"`
+	}
+	raw, err := os.ReadFile(os.Getenv("POWERX_PLUGIN_HOST_VALUES"))
+	if err != nil || yaml.Unmarshal(raw, &host) != nil {
+		return errors.New("DATASET_FIXTURE_HOST_BINDING_INVALID")
+	}
+	connection, err := grpc.NewClient(os.Getenv("POWERX_GRPC_UPSTREAM_ADDRESS"), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return err
+	}
+	defer connection.Close()
+	tenant := os.Getenv("POWERX_GRPC_UPSTREAM_TENANT_UUID")
+	client := stsv1.NewSTSServiceClient(connection)
+	token := func(ctx context.Context) (string, error) {
+		result, err := client.Exchange(ctx, &stsv1.ExchangeRequest{ClientId: os.Getenv("POWERX_STS_CLIENT_ID"),
+			ClientSecret: os.Getenv("POWERX_STS_CLIENT_SECRET"), Audience: "powerx:api", Scope: "access", TtlSeconds: 120})
+		if err != nil || result.GetData().GetAccessToken() == "" {
+			return "", errors.New("DATASET_FIXTURE_STS_FAILED")
+		}
+		return result.GetData().GetAccessToken(), nil
+	}
+	fault := &archiveResponseLoss{}
+	base, prefix := os.Getenv("PX_GATEWAY_BASE_URL"), os.Getenv("PX_GATEWAY_API_PREFIX")
+	hostClient, err := gateway.NewClient(gateway.Config{BaseURL: base, APIPrefix: prefix, AuthScheme: "bearer",
+		TenantUUID: tenant, TokenProvider: token, HTTPClient: &http.Client{Transport: fault, Timeout: 8 * time.Second}})
+	if err != nil {
+		return err
+	}
+	sdk, err := storagedataset.NewClient(hostClient, tenant)
+	if err != nil {
+		return err
+	}
+	queue, err := taskqueue.NewHostProvider(taskqueue.HostProviderConfig{BaseURL: base, APIPrefix: prefix, AuthScheme: "bearer",
+		TenantUUID: tenant, TokenProvider: tokenProvider(token)})
+	if err != nil {
+		return err
+	}
+	schema := os.Getenv("POWERX_PLUGIN_DB_SCHEMA")
+	worker, err := storagedataset.NewWorker(sdk, queue, storagedataset.Installation{
+		DeploymentID: os.Getenv("POWERX_ENVIRONMENT_ID"), PluginID: os.Getenv("POWERX_PLUGIN_ID"),
+		Revision: os.Getenv("POWERX_PLUGIN_INSTALLATION_REVISION"),
+	}, []storagedataset.Dataset{{Asset: assets[0], Binding: storagedataset.Binding{UUID: host.Database.Binding,
+		ClusterID: "owned", Schema: schema, WorkerRole: role, DB: db}, Adapter: reportAdapter{table: pgx.Identifier{schema, "reports"}.Sanitize()}}})
+	if err != nil {
+		return err
+	}
+	server := http.NewServeMux()
+	server.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
+	server.HandleFunc("POST /fixture/{action}", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Fixture-Token") == "" || r.Header.Get("X-Fixture-Token") != os.Getenv("POWERX_INTERNAL_TOKEN") {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		var err error
+		var result any
+		switch r.PathValue("action") {
+		case "register":
+			result, err = sdk.Register(r.Context(), r.Header.Get("X-Fixture-Request"), assets[0])
+		case "preview", "archive":
+			subscriber := storagedataset.PreviewSubscriber
+			if r.PathValue("action") == "archive" {
+				subscriber = storagedataset.ExecutionSubscriber
+				fault.armed.Store(true)
+			}
+			var found bool
+			found, err = worker.ReceiveAndHandle(r.Context(), subscriber, 2*time.Second)
+			if !found && err == nil {
+				err = errors.New("DATASET_FIXTURE_DELIVERY_MISSING")
+			}
+		case "recover":
+			result, err = worker.RecoverPending(r.Context(), 4)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if err != nil {
+			w.WriteHeader(http.StatusConflict)
+			result = map[string]string{"error": err.Error()}
+		}
+		_ = json.NewEncoder(w).Encode(result)
+	})
+	addr := os.Getenv("POWERX_HTTP_ADDR")
+	if !strings.HasPrefix(addr, "127.0.0.1:") {
+		return errors.New("DATASET_FIXTURE_LISTENER_INVALID")
+	}
+	return (&http.Server{Addr: addr, Handler: server, ReadHeaderTimeout: 2 * time.Second}).ListenAndServe()
+}
+
+type tokenProvider func(context.Context) (string, error)
+
+func (f tokenProvider) Token(ctx context.Context) (string, error) { return f(ctx) }
+
+type archiveResponseLoss struct{ armed atomic.Bool }
+
+func (f *archiveResponseLoss) RoundTrip(req *http.Request) (*http.Response, error) {
+	if !f.armed.Load() || req.Body == nil {
+		return http.DefaultTransport.RoundTrip(req)
+	}
+	body, err := io.ReadAll(req.Body)
+	req.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+	req.Body = io.NopCloser(bytes.NewReader(body))
+	if !bytes.Contains(body, []byte(`"operation":"archive_execution"`)) || !f.armed.CompareAndSwap(true, false) {
+		return http.DefaultTransport.RoundTrip(req)
+	}
+	res, err := http.DefaultTransport.RoundTrip(req)
+	if err != nil {
+		return nil, err
+	}
+	io.Copy(io.Discard, res.Body)
+	res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("DATASET_FIXTURE_ARCHIVE_REJECTED_%d", res.StatusCode)
+	}
+	return nil, errors.New("DATASET_FIXTURE_ARCHIVE_RESPONSE_LOST")
+}
+
+type reportAdapter struct{ table string }
+
+func (a reportAdapter) ValidateSchema(ctx context.Context, tx storagedataset.Tx, version int64) error {
+	if version != 1 {
+		return storagedataset.ErrSchema
+	}
+	var kind string
+	return tx.QueryRowContext(ctx, "SELECT pg_typeof((NULL::"+a.table+").finished_at)::text").Scan(&kind)
+}
+
+func (a reportAdapter) Scan(ctx context.Context, tx storagedataset.Tx, scope storagedataset.Scope, mode storagedataset.ScanMode) (storagedataset.Scan, error) {
+	if mode != storagedataset.PreviewScan && mode != storagedataset.ArchiveScan {
+		return storagedataset.Scan{}, storagedataset.ErrScope
+	}
+	rows, err := tx.QueryContext(ctx, "SELECT uuid::text FROM "+a.table+" WHERE tenant_uuid=$1 AND finished_at < $2 ORDER BY uuid LIMIT $3",
+		scope.TenantUUID, scope.Cutoff, scope.MaxExamined)
+	if err != nil {
+		return storagedataset.Scan{}, err
+	}
+	defer rows.Close()
+	var out storagedataset.Scan
+	for rows.Next() {
+		var item storagedataset.Root
+		if err := rows.Scan(&item.UUID); err != nil {
+			return out, err
+		}
+		out.Roots = append(out.Roots, item)
+	}
+	return out, rows.Err()
+}
+
+func (a reportAdapter) Archive(ctx context.Context, tx storagedataset.Tx, grant storagedataset.Grant, ids []string) ([]json.RawMessage, error) {
+	var out []json.RawMessage
+	for _, id := range ids {
+		var row json.RawMessage
+		if err := tx.QueryRowContext(ctx, "SELECT to_jsonb(r) FROM "+a.table+" r WHERE tenant_uuid=$1 AND uuid=$2 AND finished_at < $3",
+			grant.TenantUUID, id, grant.Cutoff).Scan(&row); err != nil {
+			return nil, err
+		}
+		out = append(out, row)
+	}
+	return out, nil
+}
+
+func (reportAdapter) Delete(context.Context, storagedataset.Tx, storagedataset.Grant, []string) ([]string, error) {
+	return nil, storagedataset.ErrScope
+}

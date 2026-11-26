@@ -1,0 +1,136 @@
+{
+  "cases": [
+    {
+      "name": "root base",
+      "base": "https://market.example",
+      "target": "https://market.example/developer/plugins/com.example.promo?view=versions",
+      "valid": true
+    },
+    {
+      "name": "default HTTPS port",
+      "base": "https://market.example:443/",
+      "target": "https://MARKET.EXAMPLE/developer",
+      "valid": true
+    },
+    {
+      "name": "console subpath",
+      "base": "https://market.example/console/",
+      "target": "https://market.example/console/developer",
+      "valid": true
+    },
+    {
+      "name": "prefix boundary",
+      "base": "https://market.example/console",
+      "target": "https://market.example/console-evil",
+      "valid": false
+    },
+    {
+      "name": "foreign origin",
+      "base": "https://market.example",
+      "target": "https://evil.example/developer",
+      "valid": false
+    },
+    {
+      "name": "different port",
+      "base": "https://market.example",
+      "target": "https://market.example:444/developer",
+      "valid": false
+    },
+    {
+      "name": "userinfo",
+      "base": "https://market.example",
+      "target": "https://user:password@market.example/developer",
+      "valid": false
+    },
+    {
+      "name": "dot segments",
+      "base": "https://market.example/console",
+      "target": "https://market.example/console/../outside",
+      "valid": false
+    },
+    {
+      "name": "encoded dot segments",
+      "base": "https://market.example/console",
+      "target": "https://market.example/console/%2e%2e/outside",
+      "valid": false
+    },
+    {
+      "name": "backslash",
+      "base": "https://market.example",
+      "target": "https://market.example\\@evil.example/",
+      "valid": false
+    },
+    {
+      "name": "local HTTP",
+      "base": "http://127.0.0.1:8088",
+      "target": "http://127.0.0.1:8088/developer",
+      "valid": true
+    },
+    {
+      "name": "remote HTTP not allowed",
+      "base": "http://market.example",
+      "target": "http://market.example/developer",
+      "valid": false
+    },
+    {
+      "name": "IPv6 loopback",
+      "base": "http://[::1]:8088",
+      "target": "http://[::1]:8088/developer",
+      "valid": true
+    },
+    {
+      "name": "base query rejected",
+      "base": "https://market.example?x=y",
+      "target": "https://market.example/developer",
+      "valid": false
+    },
+    {
+      "name": "duplicate separators",
+      "base": "https://market.example/console",
+      "target": "https://market.example/console//developer",
+      "valid": false
+    },
+    {
+      "name": "encoded slash",
+      "base": "https://market.example/console",
+      "target": "https://market.example/console%2fdeveloper",
+      "valid": false
+    },
+    {
+      "name": "literal Unicode console path",
+      "base": "https://market.example",
+      "target": "https://market.example/详情",
+      "valid": false
+    },
+    {
+      "name": "short numeric IP alias",
+      "base": "https://127.1",
+      "target": "https://127.0.0.1/developer",
+      "valid": false
+    },
+    {
+      "name": "hex IP alias",
+      "base": "https://0x7f000001",
+      "target": "https://127.0.0.1/developer",
+      "valid": false
+    },
+    {
+      "name": "noncanonical expanded IPv6",
+      "base": "http://[0:0:0:0:0:0:0:1]:8088",
+      "target": "http://[::1]:8088/developer",
+      "valid": false
+    },
+    {
+      "name": "numeric default port spelling",
+      "base": "https://market.example:0443",
+      "target": "https://market.example/developer",
+      "valid": true
+    },
+    {
+      "name": "case insensitive localhost origin",
+      "base": "http://LOCALHOST:8088",
+      "target": "http://localhost:8088/developer",
+      "valid": true
+    }
+  ]
+}

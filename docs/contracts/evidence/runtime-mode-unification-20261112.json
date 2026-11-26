@@ -1,0 +1,366 @@
+{
+  "date": "2026-11-12",
+  "task": "single runtime mode for EventBridge and TaskBus",
+  "result": "passed_source_and_isolated_validation",
+  "branch": "025-framework-business-regression",
+  "source_commit": "5683e4293d89b276ee3669448ceefd9de06a75a7",
+  "mode_rule": {
+    "business": "existing provider resolver",
+    "transport": "POWERX_PROXY 0/unset -> Redis; 1 -> Core Event Fabric",
+    "runtime_snapshot": "provider.RuntimeMode",
+    "yaml_routing_removed": [
+      "mode",
+      "taskbus_provider",
+      "fallback_to_local"
+    ],
+    "legacy_config_error": "EVENT_BRIDGE_ROUTING_FIELDS_REMOVED",
+    "disabled_bus": "explicit in-process queue; no Host/Redis initialization",
+    "provider_failure": "propagated; no fallback or dual write",
+    "transport_lifecycle": "Close unwraps metrics and closes selected Host or Redis transport"
+  },
+  "checks": {
+    "race_tests": {
+      "framework-tests.jsonl": {
+        "passed_test_events": 88,
+        "passed_packages": [
+          "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider",
+          "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge",
+          "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/taskbus",
+          "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/eventfabric"
+        ],
+        "failed_tests": []
+      },
+      "skeleton-tests.jsonl": {
+        "passed_test_events": 123,
+        "passed_packages": [
+          "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config",
+          "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/bootstrap",
+          "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/tests/unit",
+          "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/cmd/plugin",
+          "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/tests/integration"
+        ],
+        "failed_tests": []
+      }
+    },
+    "go_vet": "passed Framework provider/eventbridge/taskbus/eventfabric and Skeleton config/bootstrap/main",
+    "contract_provenance": "EVENT_FABRIC_CONTRACT_OK",
+    "template_sync": "passed",
+    "independent_generated_plugin_compile": {
+      "passed": true,
+      "module": "module github.com/example.com/event-mode/backend",
+      "scope": "main/config/bootstrap with explicit temporary Go workspace using current Framework source",
+      "no_registry_release": true
+    },
+    "runtime_matrix": [
+      "local/0",
+      "local/1",
+      "delegated/0",
+      "delegated/1"
+    ],
+    "edge_cases": [
+      "snapshot unaffected by later env changes",
+      "unknown proxy rejected",
+      "removed fields rejected including YAML merge keys",
+      "YAML rejection does not fall back to defaults",
+      "provider failure propagates",
+      "wrong transport rejected and closed",
+      "disabled bus does not initialize provider",
+      "missing Host credential rejected",
+      "missing Host topic reported explicitly"
+    ],
+    "dotenv_unchanged": true,
+    "vscode_entries_unchanged": true,
+    "private_config_migration": "only removed three obsolete routing lines; all other bytes verified unchanged",
+    "unrelated_preexisting_source_unchanged": true,
+    "validation_metadata_refreshed": [
+      "go.work.sum"
+    ]
+  },
+  "actual_developer_config_readonly": {
+    "consume_keys_count": 0,
+    "core_requested": false,
+    "database_connected": false,
+    "event_bus_enabled": true,
+    "host_initialization": "EVENT_FABRIC_HOST_TOPICS_REQUIRED",
+    "provider_mode": "local",
+    "proxy_enabled": true,
+    "publish_keys_count": 0,
+    "taskbus_provider": "host",
+    "topic_bindings_count": 0
+  },
+  "acceptance_boundary": {
+    "daily_services_started_or_restarted": false,
+    "real_core_requested_or_changed": false,
+    "sdk_cli_published": false,
+    "current_host_startup_dependency": "no topic bindings or publish/consume keys; EVENT_FABRIC_HOST_TOPICS_REQUIRED; real Host initialization remains blocked until actual resource configuration",
+    "user_database_connected_or_migrated": false
+  },
+  "source_files": [
+    {
+      "path": "docs/contracts/event-fabric-framework.md",
+      "sha256": "389ebfca2eb6a78a202f4b371ac0c7f783efa8ca36c8a81986bc1bc44195df8e",
+      "deleted": false
+    },
+    {
+      "path": "docs/guides/async_runtime/event_fabric/integration_playbook.md",
+      "sha256": "bb28d8741a8db486a21fa96f24f74d06aaae9bea99693fd163e7072c342dc0b0",
+      "deleted": false
+    },
+    {
+      "path": "docs/guides/async_runtime/scheduler/README.md",
+      "sha256": "f72bccef1ee3f281a9ee48180c08e791918a167e3f6477af0c674daa69411ea1",
+      "deleted": false
+    },
+    {
+      "path": "docs/guides/async_runtime/task/README.md",
+      "sha256": "6fb21e5e69d10215976b7fd3b50e9f045ab1b1016757375dc5399065651e3b79",
+      "deleted": false
+    },
+    {
+      "path": "docs/guides/async_runtime/task/mechanism.md",
+      "sha256": "608c385ab6fc0b710cc65fe37c8d27750def9334f9fe955e8480d51cf9fc5fa8",
+      "deleted": false
+    },
+    {
+      "path": "docs/guides/config-reference.md",
+      "sha256": "49862c452d4fe62eea690484ab9486b6db7b09694cbb8eaab9934b0482b9a3a2",
+      "deleted": false
+    },
+    {
+      "path": "docs/guides/develop/standalone/mode-resolution.md",
+      "sha256": "026e37bf2af680e084e78f28a42ff2dca214a246bb0296f13035b417b970a484",
+      "deleted": false
+    },
+    {
+      "path": "docs/guides/features/017-async-runtime-scheduler-switch/guide.md",
+      "sha256": "7ebedabb93ac8e597564a261f441022598b8f61010f35dbf446e7261aca29640",
+      "deleted": false
+    },
+    {
+      "path": "docs/guides/features/017-async-runtime-scheduler-switch/usecase-us1-mode-switch.md",
+      "sha256": "1b65ccc0d9ad5d9ae3c7e7004e63fdcd86c3bfc0e7ec403ac53cf0abb7c53306",
+      "deleted": false
+    },
+    {
+      "path": "framework/backend/go/eventbridge/config.go",
+      "sha256": "07024eec98883b4ab94a22a6fbe58df368b25aad04d9ffa88c69ccc769a4572a",
+      "deleted": false
+    },
+    {
+      "path": "framework/backend/go/eventbridge/emitter.go",
+      "sha256": "9ed9f77f49e1b380e3bb500f9a6c56a65e4f75de4ec78b97327545f76b703ede",
+      "deleted": false
+    },
+    {
+      "path": "framework/backend/go/eventbridge/emitter_test.go",
+      "sha256": "37bf4ef34ae9f2626998cab350d1d1a3cc2a0af33b69cfafd2b7fca7bc9e4f1f",
+      "deleted": false
+    },
+    {
+      "path": "framework/backend/go/eventbridge/errors.go",
+      "sha256": "f91e33a0e274364cbd1e5fd6dcec8023c6fcedf6a1e8159da2c9f9ea92dd244b",
+      "deleted": false
+    },
+    {
+      "path": "framework/backend/go/runtime/provider/errors.go",
+      "sha256": "c739a32f8493c03c1cd1d1166515d0bd1e568b7c6eead32ecae94c588de18f1d",
+      "deleted": false
+    },
+    {
+      "path": "framework/backend/go/runtime/taskbus/provider_log_fields_test.go",
+      "sha256": "22135684a446c9ceb1ee93a3894f1646a0db64668684d69bfd6aadad0f7b7e13",
+      "deleted": false
+    },
+    {
+      "path": "scaffold/templates/backend/go-gin/cmd/plugin/main.go.tmpl",
+      "sha256": "ef9d6722883196ef0e75e21001e2ba883a4f9161d9556086f7a0e32ae8a1b647",
+      "deleted": false
+    },
+    {
+      "path": "scaffold/templates/backend/go-gin/cmd/plugin/taskbus_provider.go.tmpl",
+      "sha256": "66b692b2767d3c1fdbdf9f251ebc84dfad6618cad98d6f7f34eb5bacfca636c0",
+      "deleted": false
+    },
+    {
+      "path": "scaffold/templates/backend/go-gin/etc/config.example.yaml.tmpl",
+      "sha256": "327a16be5555713289b31afaff6703f71759341c8b8b3afa0f2b748a2daa02bf",
+      "deleted": false
+    },
+    {
+      "path": "scaffold/templates/backend/go-gin/internal/bootstrap/provider_resolver.go.tmpl",
+      "sha256": "d9269606fef49c69a9d733847e5b12b2a2e902d53c09cfe507e820799e6cebb4",
+      "deleted": false
+    },
+    {
+      "path": "scaffold/templates/backend/go-gin/internal/config/config.go.tmpl",
+      "sha256": "549752efadcd25f4709bf634c99bb75f213830ff809bbd076115699399e20959",
+      "deleted": false
+    },
+    {
+      "path": "scaffold/templates/backend/go-gin/internal/config/recovery_redis.go.tmpl",
+      "sha256": "567502ed358764e2d2ab26c318bfe0c9ac9168cce162e71a999facc430d3f5eb",
+      "deleted": false
+    },
+    {
+      "path": "skeleton/backend/etc/config.example.yaml",
+      "sha256": "4d3d0f92a5f8821a6882e6dcb611b1acf23e7d437ef13d8803c01848fbc757e4",
+      "deleted": false
+    },
+    {
+      "path": "skeleton/backend/go-gin/cmd/plugin/main.go",
+      "sha256": "e7d9fce8618cb402aa12cb731409576ec0d08e195f7ebf75a2e0d94931cd2cfd",
+      "deleted": false
+    },
+    {
+      "path": "skeleton/backend/go-gin/cmd/plugin/taskbus_provider.go",
+      "sha256": "7975caed3b6f431129d33f5dee6d2cba30503160f923fb76861a3c665d707c5c",
+      "deleted": false
+    },
+    {
+      "path": "skeleton/backend/go-gin/cmd/plugin/taskbus_provider_test.go",
+      "sha256": "61eb1f4c8636ea78a988dbaaf131ab298f3ba148e664be1733f19f456d9eedc5",
+      "deleted": false
+    },
+    {
+      "path": "skeleton/backend/go-gin/cmd/plugin/taskbus_resolve_test.go",
+      "sha256": "dee5a2f85e0a31e37ddb9ef13c520d746bd18ecb7448cd0362f9661eca1745f1",
+      "deleted": false
+    },
+    {
+      "path": "skeleton/backend/go-gin/internal/bootstrap/provider_resolver.go",
+      "sha256": "616dddc2724249358ad045ce6cf02c04909662528ef9db50f002f764a01d9a18",
+      "deleted": false
+    },
+    {
+      "path": "skeleton/backend/go-gin/internal/config/config.go",
+      "sha256": "51550b58a9ce187144e88be667a2c539270e1c28b69c36184aeb42bfc65ac1f6",
+      "deleted": false
+    },
+    {
+      "path": "skeleton/backend/go-gin/internal/config/config_test.go",
+      "sha256": "ef0e1df405f646e9b79c5a1af569fa91fce6c458fcd8c1d097369d8512b0b26d",
+      "deleted": false
+    },
+    {
+      "path": "skeleton/backend/go-gin/internal/config/recovery_redis.go",
+      "sha256": "567502ed358764e2d2ab26c318bfe0c9ac9168cce162e71a999facc430d3f5eb",
+      "deleted": false
+    },
+    {
+      "path": "skeleton/backend/go-gin/tests/integration/event_bridge_fallback_test.go",
+      "sha256": null,
+      "deleted": true
+    },
+    {
+      "path": "skeleton/backend/go-gin/tests/integration/event_bridge_taskbus_e2e_test.go",
+      "sha256": "6243c34adfd47f2b17f2906d4461fd2a318c47874a6a0742d796907d0942e21c",
+      "deleted": false
+    },
+    {
+      "path": "skeleton/backend/go-gin/tests/integration/event_bridge_taskbus_provider_test.go",
+      "sha256": "8f68ede289d5516f5ce42206f988731ea57793840f7cbb29b54148b3fd6e993b",
+      "deleted": false
+    },
+    {
+      "path": "skeleton/backend/go-gin/tests/unit/event_bridge_metrics_instrumentation_test.go",
+      "sha256": "71f8246af11a057a528d3b8ead56c42a778b5b77c73cdd7f2e5080935b6815ee",
+      "deleted": false
+    },
+    {
+      "path": "skeleton/backend/go-gin/tests/unit/event_bridge_metrics_test.go",
+      "sha256": "34c267ec8e97937f94f0afa44f9c16740552e3b4530d7b31730df19c07590f0b",
+      "deleted": false
+    },
+    {
+      "path": "skeleton/backend/go-gin/tests/unit/event_local_queue_full_test.go",
+      "sha256": "064da6d2166dfed0b34063883993f320e104eeb4d86218c4fbd7b06ddace7aa1",
+      "deleted": false
+    },
+    {
+      "path": "specs/008-framework-task-bus/readiness.md",
+      "sha256": "0a6f1046fa41585789b5cc15d77b4108ab3dedd424395a52ea924d67ca03bf1c",
+      "deleted": false
+    },
+    {
+      "path": "specs/017-async-runtime-scheduler-switch/quickstart.md",
+      "sha256": "37c6ec272c8d3e6cfa1c738fb2f33c8efb1edae37930e39cf886701cbb4c5cb0",
+      "deleted": false
+    },
+    {
+      "path": "tools/cli/internal/contracts/data/media-contracts/event-fabric-framework.md",
+      "sha256": "389ebfca2eb6a78a202f4b371ac0c7f783efa8ca36c8a81986bc1bc44195df8e",
+      "deleted": false
+    },
+    {
+      "path": "tools/cli/internal/templates/data/backend/go-gin/cmd/plugin/main.go.tmpl",
+      "sha256": "ef9d6722883196ef0e75e21001e2ba883a4f9161d9556086f7a0e32ae8a1b647",
+      "deleted": false
+    },
+    {
+      "path": "tools/cli/internal/templates/data/backend/go-gin/cmd/plugin/taskbus_provider.go.tmpl",
+      "sha256": "66b692b2767d3c1fdbdf9f251ebc84dfad6618cad98d6f7f34eb5bacfca636c0",
+      "deleted": false
+    },
+    {
+      "path": "tools/cli/internal/templates/data/backend/go-gin/etc/config.example.yaml.tmpl",
+      "sha256": "327a16be5555713289b31afaff6703f71759341c8b8b3afa0f2b748a2daa02bf",
+      "deleted": false
+    },
+    {
+      "path": "tools/cli/internal/templates/data/backend/go-gin/internal/bootstrap/provider_resolver.go.tmpl",
+      "sha256": "d9269606fef49c69a9d733847e5b12b2a2e902d53c09cfe507e820799e6cebb4",
+      "deleted": false
+    },
+    {
+      "path": "tools/cli/internal/templates/data/backend/go-gin/internal/config/config.go.tmpl",
+      "sha256": "549752efadcd25f4709bf634c99bb75f213830ff809bbd076115699399e20959",
+      "deleted": false
+    },
+    {
+      "path": "tools/cli/internal/templates/data/backend/go-gin/internal/config/recovery_redis.go.tmpl",
+      "sha256": "567502ed358764e2d2ab26c318bfe0c9ac9168cce162e71a999facc430d3f5eb",
+      "deleted": false
+    },
+    {
+      "path": "framework/backend/go/runtime/provider/runtime_mode.go",
+      "sha256": "950621613ef84ff99c53765569f9d9f303a4d777bc86c1165983cd8f93e6c488",
+      "deleted": false
+    },
+    {
+      "path": "framework/backend/go/runtime/provider/runtime_mode_test.go",
+      "sha256": "e5ed68060128b301e3ce70edfac830680d83e1dbaa8ded6a2578a5eb40899202",
+      "deleted": false
+    },
+    {
+      "path": "scaffold/templates/backend/go-gin/internal/config/event_bridge.go.tmpl",
+      "sha256": "72d9fa1b57467a4ba343cde3befc24b1f13da34f52dabfeadc94148d2315ba39",
+      "deleted": false
+    },
+    {
+      "path": "skeleton/backend/go-gin/cmd/plugin/event_bridge_runtime_test.go",
+      "sha256": "f3c9521c93c7cefb595ac53a4fb66bbac17b708120b881f27a6a71c0ae5a1caf",
+      "deleted": false
+    },
+    {
+      "path": "skeleton/backend/go-gin/internal/config/event_bridge.go",
+      "sha256": "72d9fa1b57467a4ba343cde3befc24b1f13da34f52dabfeadc94148d2315ba39",
+      "deleted": false
+    },
+    {
+      "path": "skeleton/backend/go-gin/internal/config/event_bridge_test.go",
+      "sha256": "edf6b058d71581829e7a5bf91b7def9a3ccd0bb7d4e976e7c312134fcb98d0f9",
+      "deleted": false
+    },
+    {
+      "path": "skeleton/backend/go-gin/tests/integration/event_bridge_failure_test.go",
+      "sha256": "efb5f8b4bd64bcf83ac2346fd3e94530f7b37b716f60b4e59a2a27e7573707b0",
+      "deleted": false
+    },
+    {
+      "path": "tools/cli/internal/templates/data/backend/go-gin/internal/config/event_bridge.go.tmpl",
+      "sha256": "72d9fa1b57467a4ba343cde3befc24b1f13da34f52dabfeadc94148d2315ba39",
+      "deleted": false
+    }
+  ],
+  "temporary_validation_directory_removed": true
+}

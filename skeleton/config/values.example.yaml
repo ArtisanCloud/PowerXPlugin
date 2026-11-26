@@ -1,0 +1,5 @@
+runtime:
+  event_bridge:
+    enabled: true
+    source_plugin: com.powerx.plugins.base
+    topic_manifest: config/event_fabric_service.yaml

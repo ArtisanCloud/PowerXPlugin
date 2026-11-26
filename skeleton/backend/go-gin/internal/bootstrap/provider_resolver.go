@@ -15,10 +15,11 @@ import (
 // ProviderResolver determines whether business providers should use delegated
 // (PowerX Core) or local data sources.
 type ProviderResolver struct {
-	mode   fwprovider.Mode
-	source string
-	record fwprovider.ModeResolutionRecord
-	err    error
+	mode        fwprovider.Mode
+	source      string
+	record      fwprovider.ModeResolutionRecord
+	err         error
+	runtimeMode fwprovider.RuntimeMode
 }
 
 func NewProviderResolver(cfg *config.Config) *ProviderResolver {
@@ -33,13 +34,13 @@ func NewProviderResolver(cfg *config.Config) *ProviderResolver {
 		envName = strings.TrimSpace(cfg.Server.Mode)
 	}
 
-	resolver := fwprovider.ModeResolver{}
-	mode, record, err := resolver.Resolve(fwprovider.ResolveInput{
+	runtimeMode, record, err := fwprovider.ResolveRuntimeMode(fwprovider.ResolveInput{
 		ConfigMode:  configMode,
 		EnvMode:     envMode,
 		PowerXProxy: proxy,
 		Environment: envName,
 	})
+	mode := runtimeMode.ProviderMode
 	if mode == "" {
 		mode = fwprovider.ModeLocal
 	}
@@ -49,10 +50,11 @@ func NewProviderResolver(cfg *config.Config) *ProviderResolver {
 	}
 
 	result := &ProviderResolver{
-		mode:   mode,
-		source: source,
-		record: record,
-		err:    err,
+		mode:        mode,
+		source:      source,
+		record:      record,
+		err:         err,
+		runtimeMode: runtimeMode,
 	}
 
 	if cfg != nil && cfg.Logging != nil && cfg.Logging.DebugMode {
@@ -71,6 +73,13 @@ func NewProviderResolver(cfg *config.Config) *ProviderResolver {
 		}), "Provider mode resolved")
 	}
 	return result
+}
+
+func (r *ProviderResolver) RuntimeMode() fwprovider.RuntimeMode {
+	if r == nil {
+		return fwprovider.RuntimeMode{}
+	}
+	return r.runtimeMode
 }
 
 func (r *ProviderResolver) Mode() fwprovider.Mode {

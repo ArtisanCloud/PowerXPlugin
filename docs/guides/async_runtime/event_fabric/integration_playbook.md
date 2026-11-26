@@ -168,9 +168,7 @@ curl -sS -X PUT "$PLUGIN_BASE_URL/templates/{id}" \
 
 1. 新增/校验 `event_bridge`：
    - `enabled`
-   - `mode=local|taskbus|dual`
-   - `fallback_to_local`
-   - `taskbus_provider=host|redis`
+   - 连接与主题配置；模式只消费 `POWERX_PROVIDER_MODE`／`POWERX_PROXY` 的统一启动快照，删除旧 mode/provider/fallback 字段。
 2. 迁移旧配置到新语义：
    - 旧“直接写 ws/queue”配置 -> `event_bridge.*`
    - 旧“环境分支”逻辑 -> 启动期 provider 决策
@@ -179,7 +177,7 @@ curl -sS -X PUT "$PLUGIN_BASE_URL/templates/{id}" \
 
 1. 业务发事件统一改为 `EventEmitter.Emit(...)`，禁止业务层直接写 ws publish。
 2. 在启动期注入 `Factory.WithTaskBusProvider(...)`。
-3. 保留 fallback 语义：provider 不可用时自动回落 local（按配置）。
+3. provider 初始化失败明确失败，不降级、不双写；事件工厂不再读取环境变量或接受独立 mode。
 
 ### 10.4 权限与契约
 
@@ -189,8 +187,8 @@ curl -sS -X PUT "$PLUGIN_BASE_URL/templates/{id}" \
 
 ### 10.5 验收清单
 
-1. `mode=taskbus` + provider 可用：事件可投递。
-2. `mode=taskbus` + provider 异常 + `fallback_to_local=true`：可自动回落。
-3. `mode=dual`：主链路成功后本地副本写入成功。
+1. local/delegated × proxy 0/1 四种组合按统一快照选择事件链路：local 始终 Redis、delegated 始终 Host；proxy 不改变事件归属。
+2. provider 异常：保留原错误，无本地降级或双写。
+3. 旧 mode/provider/fallback 字段明确报错；Host 缺少主题声明明确失败。
 4. 指标可见：`emit_total` / `consume_total` / `latency_ms` / `drop_total`。
 5. 日志可检索：`topic`、`tenant_uuid`、`trace_id`、`status`。

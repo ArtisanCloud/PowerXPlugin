@@ -1,12 +1,11 @@
 package eventbridge
 
-import "strings"
+import "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 
 type Config struct {
-	Enabled         bool
-	Mode            string
-	FallbackToLocal bool
-	LocalQueueSize  int
+	Enabled        bool
+	RuntimeMode    provider.RuntimeMode
+	LocalQueueSize int
 }
 
 func (c Config) Normalized() (Config, error) {
@@ -15,26 +14,9 @@ func (c Config) Normalized() (Config, error) {
 		cfg.LocalQueueSize = 1024
 	}
 
-	mode := strings.ToLower(strings.TrimSpace(cfg.Mode))
-	if mode == "" {
-		if cfg.Enabled {
-			mode = "taskbus"
-		} else {
-			mode = "local"
-		}
-	}
-
-	switch mode {
-	case "local", "taskbus", "dual":
-		cfg.Mode = mode
-	default:
-		return Config{}, ErrInvalidMode
-	}
-
-	if !cfg.Enabled {
-		cfg.Mode = "local"
+	if err := cfg.RuntimeMode.Validate(); err != nil {
+		return Config{}, err
 	}
 
 	return cfg, nil
 }
-

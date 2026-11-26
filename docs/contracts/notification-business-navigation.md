@@ -40,3 +40,12 @@ Go 回执错误分为三类：本地成员／通知 UUID、重复或批量限制
 本次命令与结果见 [Framework review 对齐收据](evidence/notification-sdk-review-alignment-20261018.json)。路径矩阵验证的是通知 SDK 地址构建，不代替其他客户端的全局前缀迁移或安装环境验收。
 
 Core 对应的 session、分页、重连与配置注入修正，以及后续 Skeleton 根前缀补充验证，见 [Core review 回归收据](../../../../PowerX/docs/contracts/evidence/notification-core-review-alignment-20261018.json)。本轮没有代替插件修改自有启动装配、配置归一化或安装包。
+# 成员创建幂等补充（2026-11-12）
+
+.NET `CreateNotificationRequest.IdempotencyKey` 已接正式 `notification_create.v1`：提供键时仅调用 `{apiPrefix}/notifications/idempotent`，必须有规范成员 UUID；不提供键时仍使用原普通创建功能。带键请求不回退普通接口，不使用管理员 bearer，也不向请求中添加租户或请求者身份。Core 的固定 typed `create_idempotent` capability 共享同一服务授权。
+
+SDK 核对 receipt 契约、完整键、通知/成员 UUID、title/content/type/category/重要性、创建时间、metadata 和业务导航。409为 `FRAMEWORK_NOTIFICATION_IDEMPOTENCY_CONFLICT`；404/501为 `FRAMEWORK_NOTIFICATION_IDEMPOTENCY_UNSUPPORTED`。字段缺失、错成员、错键或普通创建响应为 `FRAMEWORK_NOTIFICATION_INVALID_RESPONSE`。不会在客户端内部自动重试；业务调用方必须重新核对业务后，用同一键与 payload 明确重试。
+
+去重范围为 tenant + 实际服务 owner + key。通知删除/已读不重置创建凭据，重放返回原创建结果，不再次创建或发布；持久化创建不等于浏览器收到。凭据 owner 轮换不能当作同一去重范围。Core 需启用空新表及正式 capability 元数据；旧 Host 明确不可用。详见 Core 的 `docs/contracts/notification-idempotent-creation.md`。
+
+隔离验证：.NET Framework 全量297项通过，实际Core fixture用例默认跳过并已在临时Core HTTP/PostgreSQL中单独运行通过；包括指定前缀、受控丢响应重试、冲突/授权/旧Host错误、完整receipt核对及禁止重定向/降级。另运行CRM实际业务→SDK→Core丢响应重试，返回同一持久通知。Core原生测试、显式API-key、capability-check/隔离seed/grant-status通过。持久创建不等于浏览器接收；未发布Framework包或变更日常运行环境。

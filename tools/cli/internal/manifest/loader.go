@@ -6,12 +6,14 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/powerx-plugin/cli/internal/datasetasset"
 	"gopkg.in/yaml.v3"
 )
 
 // PluginManifest represents the minimal fields needed from plugin.yaml.
 type PluginManifest struct {
 	NotificationPresentations []fwmanifest.NotificationPresentation `yaml:"notification_presentations"`
+	DataLifecycle             datasetasset.Index                    `yaml:"-"`
 	ID                        string                                `yaml:"id"`
 	Version                   string                                `yaml:"version"`
 	Backend                   struct {
@@ -54,6 +56,11 @@ func Load(path string) (*PluginManifest, error) {
 	if _, err := fwmanifest.DecodeNotificationPresentations(raw["notification_presentations"]); err != nil {
 		return nil, fmt.Errorf("manifest notification_presentations: %w", err)
 	}
+	index, err := datasetasset.DecodeIndex(raw["data_lifecycle"])
+	if err != nil {
+		return nil, err
+	}
+	manifest.DataLifecycle = index
 
 	return &manifest, nil
 }

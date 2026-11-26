@@ -4,6 +4,8 @@
       color="neutral"
       variant="ghost"
       :icon="currentThemeIcon"
+      :aria-label="t('theme.select')"
+      data-testid="admin-theme"
       size="sm"
       square
     />
@@ -11,13 +13,14 @@
 </template>
 
 <script setup lang="ts">
-const { theme, themes, setTheme } = useTheme();
+const { theme, setTheme } = useTheme();
 const { t } = useI18n();
 
 // 主题图标映射
 const themeIcons = {
   light: "i-heroicons-sun",
   dark: "i-heroicons-moon",
+  system: "i-heroicons-computer-desktop",
 };
 
 const currentThemeIcon = computed(() => {
@@ -27,12 +30,11 @@ const currentThemeIcon = computed(() => {
 });
 
 const dropdownItems = computed(() => [
-  themes.map((themeOption) => ({
-    label: t(`theme.${themeOption.value}`),
-    icon: themeIcons[themeOption.value as keyof typeof themeIcons],
+  (["light", "dark", "system"] as const).map((value) => ({
+    label: t(`theme.${value}`),
+    icon: themeIcons[value],
     onSelect: () => {
-      console.log("切换主题到:", themeOption.value);
-      setTheme(themeOption.value);
+      setTheme(value);
     },
   })),
 ]);

@@ -1,0 +1,444 @@
+{
+  "source_sha256": "3fb1d135efe6e90d6d3dea7599f8c08325ce48fac42df6331fd55cfd84ec47a7",
+  "date": "2026-11-11",
+  "boundary": "actual Framework developer page and Go executor with real Market routes/PostgreSQL/MinIO; controlled pre-uploaded ZIP; no native package or public download acceptance",
+  "checks": [
+    "independent generated developer page created explicit trusted connection; real lab login succeeded",
+    "real M1-only credential cannot enable review submission",
+    "real m2 credential issued through Market UI and bound through private stdin/system keyring",
+    "real developer-page prepare response and available full collection/options verified",
+    "real committed response lost; page refreshed while original operation unresolved and receipt absent",
+    "after actual executor/Nuxt restart, developer page resumed original operation and recovered one original application without retransmission",
+    "actual Market administrative UI reject completed",
+    "page rejection revision created new task/operation/Publication UUID while old metadata/full set/receipt stayed immutable",
+    "actual Market administrative UI approve completed",
+    "real catalogue still private after approval",
+    "actual Market administrative UI publish completed",
+    "explicit publication became visible in real catalogue; no public package download performed",
+    "old trusted console link still shows exact original rejected application and original metadata",
+    "revoked real credential shows canonical market request UUID, clears stale current status and preserves original receipt",
+    "real reader credential issued through Market UI and bound through private stdin/system keyring",
+    "same stable identity rotated to real read-only credential and developer page recovered original rejected receipt with no new write",
+    "real persisted server/client request UUID records read through developer-page task history",
+    "all page-issued credentials revoked and owned real system-keyring connection disconnected"
+  ],
+  "first_submission": {
+    "contract_version": "1.0.0-rc.2",
+    "bundle_sha256": "89141c00e0b99b6a803312119e4cbcb3e64224bf458e234e35fc5ffbdeacd8fa",
+    "submission_id": "59ec87ea-bb95-4bdf-9a04-667f4f421c95",
+    "operation_id": "524c50c3-b0d2-4b70-adff-4577d434cc46",
+    "version_id": "6eb94ef9-1f20-4a9a-93bf-b70a721381e7",
+    "version": "1.2.0",
+    "stage": "succeeded",
+    "attempts": 1,
+    "request_sha256": "9fc3fe9d84103e6d61edcb67a46ad40588720120d7eb2e651ae28ab6cf215638",
+    "expected_artifacts": [
+      {
+        "artifact_id": "016cd120-91dc-470e-ad55-31e9e88ab453",
+        "os": "linux",
+        "arch": "amd64",
+        "sha256": "743cdbae1308c23f78136030769a0a41570651b27bd6f7d5cb59b68c87ba742c",
+        "size": 4415873
+      }
+    ],
+    "receipt": {
+      "publication_id": "7b8a61da-841a-4816-b393-dcaf0bc476f0",
+      "status": "submitted"
+    },
+    "current_publication": {
+      "status": "submitted"
+    }
+  },
+  "first_after_rejection": {
+    "contract_version": "1.0.0-rc.2",
+    "bundle_sha256": "89141c00e0b99b6a803312119e4cbcb3e64224bf458e234e35fc5ffbdeacd8fa",
+    "submission_id": "59ec87ea-bb95-4bdf-9a04-667f4f421c95",
+    "operation_id": "524c50c3-b0d2-4b70-adff-4577d434cc46",
+    "version_id": "6eb94ef9-1f20-4a9a-93bf-b70a721381e7",
+    "version": "1.2.0",
+    "stage": "succeeded",
+    "attempts": 1,
+    "request_sha256": "9fc3fe9d84103e6d61edcb67a46ad40588720120d7eb2e651ae28ab6cf215638",
+    "expected_artifacts": [
+      {
+        "artifact_id": "016cd120-91dc-470e-ad55-31e9e88ab453",
+        "os": "linux",
+        "arch": "amd64",
+        "sha256": "743cdbae1308c23f78136030769a0a41570651b27bd6f7d5cb59b68c87ba742c",
+        "size": 4415873
+      }
+    ],
+    "receipt": {
+      "publication_id": "7b8a61da-841a-4816-b393-dcaf0bc476f0",
+      "status": "submitted"
+    },
+    "current_publication": {
+      "status": "rejected"
+    }
+  },
+  "second_submission": {
+    "contract_version": "1.0.0-rc.2",
+    "bundle_sha256": "89141c00e0b99b6a803312119e4cbcb3e64224bf458e234e35fc5ffbdeacd8fa",
+    "submission_id": "be7836ac-256c-4497-8d31-2dc12bb0e7ec",
+    "operation_id": "95085481-6a6c-4938-84cb-45525dc3af56",
+    "version_id": "6eb94ef9-1f20-4a9a-93bf-b70a721381e7",
+    "version": "1.2.0",
+    "stage": "succeeded",
+    "attempts": 1,
+    "request_sha256": "da1b10594bcd27b547f28a1370a26cc5bd6eeb1ce6237d116e69723b195ede01",
+    "expected_artifacts": [
+      {
+        "artifact_id": "016cd120-91dc-470e-ad55-31e9e88ab453",
+        "os": "linux",
+        "arch": "amd64",
+        "sha256": "743cdbae1308c23f78136030769a0a41570651b27bd6f7d5cb59b68c87ba742c",
+        "size": 4415873
+      }
+    ],
+    "receipt": {
+      "publication_id": "6efcf61c-1232-4c08-aff7-a88b398abe3e",
+      "status": "submitted"
+    },
+    "current_publication": {
+      "status": "submitted"
+    }
+  },
+  "second_approved": {
+    "contract_version": "1.0.0-rc.2",
+    "bundle_sha256": "89141c00e0b99b6a803312119e4cbcb3e64224bf458e234e35fc5ffbdeacd8fa",
+    "submission_id": "be7836ac-256c-4497-8d31-2dc12bb0e7ec",
+    "operation_id": "95085481-6a6c-4938-84cb-45525dc3af56",
+    "version_id": "6eb94ef9-1f20-4a9a-93bf-b70a721381e7",
+    "version": "1.2.0",
+    "stage": "succeeded",
+    "attempts": 1,
+    "request_sha256": "da1b10594bcd27b547f28a1370a26cc5bd6eeb1ce6237d116e69723b195ede01",
+    "expected_artifacts": [
+      {
+        "artifact_id": "016cd120-91dc-470e-ad55-31e9e88ab453",
+        "os": "linux",
+        "arch": "amd64",
+        "sha256": "743cdbae1308c23f78136030769a0a41570651b27bd6f7d5cb59b68c87ba742c",
+        "size": 4415873
+      }
+    ],
+    "receipt": {
+      "publication_id": "6efcf61c-1232-4c08-aff7-a88b398abe3e",
+      "status": "submitted"
+    },
+    "current_publication": {
+      "status": "approved"
+    }
+  },
+  "second_published": {
+    "contract_version": "1.0.0-rc.2",
+    "bundle_sha256": "89141c00e0b99b6a803312119e4cbcb3e64224bf458e234e35fc5ffbdeacd8fa",
+    "submission_id": "be7836ac-256c-4497-8d31-2dc12bb0e7ec",
+    "operation_id": "95085481-6a6c-4938-84cb-45525dc3af56",
+    "version_id": "6eb94ef9-1f20-4a9a-93bf-b70a721381e7",
+    "version": "1.2.0",
+    "stage": "succeeded",
+    "attempts": 1,
+    "request_sha256": "da1b10594bcd27b547f28a1370a26cc5bd6eeb1ce6237d116e69723b195ede01",
+    "expected_artifacts": [
+      {
+        "artifact_id": "016cd120-91dc-470e-ad55-31e9e88ab453",
+        "os": "linux",
+        "arch": "amd64",
+        "sha256": "743cdbae1308c23f78136030769a0a41570651b27bd6f7d5cb59b68c87ba742c",
+        "size": 4415873
+      }
+    ],
+    "receipt": {
+      "publication_id": "6efcf61c-1232-4c08-aff7-a88b398abe3e",
+      "status": "submitted"
+    },
+    "current_publication": {
+      "status": "published"
+    }
+  },
+  "readonly_recovered": {
+    "contract_version": "1.0.0-rc.2",
+    "bundle_sha256": "89141c00e0b99b6a803312119e4cbcb3e64224bf458e234e35fc5ffbdeacd8fa",
+    "submission_id": "59ec87ea-bb95-4bdf-9a04-667f4f421c95",
+    "operation_id": "524c50c3-b0d2-4b70-adff-4577d434cc46",
+    "version_id": "6eb94ef9-1f20-4a9a-93bf-b70a721381e7",
+    "version": "1.2.0",
+    "stage": "succeeded",
+    "attempts": 1,
+    "request_sha256": "9fc3fe9d84103e6d61edcb67a46ad40588720120d7eb2e651ae28ab6cf215638",
+    "expected_artifacts": [
+      {
+        "artifact_id": "016cd120-91dc-470e-ad55-31e9e88ab453",
+        "os": "linux",
+        "arch": "amd64",
+        "sha256": "743cdbae1308c23f78136030769a0a41570651b27bd6f7d5cb59b68c87ba742c",
+        "size": 4415873
+      }
+    ],
+    "receipt": {
+      "publication_id": "7b8a61da-841a-4816-b393-dcaf0bc476f0",
+      "status": "submitted"
+    },
+    "current_publication": {
+      "status": "rejected"
+    }
+  },
+  "market_requests": [
+    {
+      "method": "POST",
+      "status": 200,
+      "request_id": "0237245d-f63e-43f9-8908-7117c2f0a819"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": "fae0d897-5255-4b91-b3c8-eaadc71d5630"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": "1df46671-c321-4a4a-aac9-c5b8e0076d82"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": "d2beafc4-de93-4f97-a21c-a9f09b1d76de"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": "1eaa688d-a118-43ca-b383-8de50176fb79"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": "9c02462c-a523-4d27-b7cc-1a51ba87d8c2"
+    },
+    {
+      "method": "POST",
+      "status": 201,
+      "request_id": "086c1de3-ace0-4003-9d98-33142faa0a93"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": "2977d91b-84be-4283-8578-a99001c4f084"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": "e35d1c33-b58e-4e2f-96a6-9db8b6143de7"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": "3b457c30-cc00-4af8-b7c0-759c716f5c6a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": "1b56a7b4-d1be-4f56-996b-e0285c9b7b41"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": "e3992495-0da6-4344-9671-d7634294efc7"
+    },
+    {
+      "method": "POST",
+      "status": 201,
+      "request_id": "aa72eef7-f6a6-4755-a5fa-0723b9e10ec0"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": "3a29df6f-1701-4d95-bc55-216828e393a1"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": "d4b28e60-dfda-43fd-b1db-daf84817574c"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": ""
+    },
+    {
+      "method": "POST",
+      "status": 200,
+      "request_id": "ef07c993-7e25-46b7-9bac-8c10487e3089"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": ""
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": ""
+    },
+    {
+      "method": "POST",
+      "status": 200,
+      "request_id": "6da92feb-2502-4b7e-97be-2edfbde04dc6"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": ""
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": ""
+    },
+    {
+      "method": "POST",
+      "status": 200,
+      "request_id": "38835beb-4dd5-43cb-b11f-488aa653414f"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": ""
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": ""
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": ""
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": ""
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": ""
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": ""
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": ""
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": "b1572ba0-4e89-4a59-bd19-69f7ba401d36"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": "4a353da2-725e-401d-859f-07c6657d5432"
+    },
+    {
+      "method": "POST",
+      "status": 200,
+      "request_id": "f78ec8c0-710f-4613-838f-d7bc78fcac3c"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": "d120eb9a-306b-4880-9574-ba0d28371552"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": "c7d1eb58-3cc3-4c6f-88db-cdd9393efe8e"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": "0e820b9f-929a-4060-a49b-cbd52bd65d02"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": "10a1c75d-ce6e-4420-98e6-e4151467b6c1"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": "bcd3e731-951d-48b5-9fe7-b6c591f037e2"
+    },
+    {
+      "method": "POST",
+      "status": 201,
+      "request_id": "67bb0376-d7e0-4f58-85d5-11fbd61ec3f1"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": "cc80b942-2eed-4b8d-a1ce-e6abfdb2b80c"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": "34ae5245-49c4-43ff-ac85-45320e3c905f"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": "cf36a62c-38c9-42a0-b0d0-3f15457652cb"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": "848f60ec-b7d0-4ece-9303-e616a72af34a"
+    },
+    {
+      "method": "POST",
+      "status": 200,
+      "request_id": "e35bf727-3c58-4cf2-b4e8-420e4c2f32cb"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": "1f7f8a9a-da61-4fdf-b920-98015b872ba7"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": "9f1fb2bc-5c1f-4103-b604-ee8b6f230424"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": "e0e7663b-ce53-46cd-bbcc-bc9a0d7f12a0"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": "16913ca4-3a21-4ef3-9b4a-ed2e3844f5e0"
+    },
+    {
+      "method": "POST",
+      "status": 200,
+      "request_id": "fea525d8-d88e-4255-a0fa-cea0535e4fee"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": "5eb58796-32f8-4c57-886f-0f6ec796e8d3"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "request_id": "fccecc4c-1d37-41df-81e5-18c8864af08c"
+    }
+  ]
+}

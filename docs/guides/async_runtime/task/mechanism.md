@@ -4,7 +4,7 @@
 
 1. `topic`：事件语义（发生了什么）
 2. `subscriber`：消费逻辑（谁处理）
-3. `taskbus_provider`：执行承载（`redis` / `host`）
+3. 执行承载由统一 `RuntimeMode` 派生（`redis` / `host`），不再提供独立 YAML 选择
 
 ## 2. 生命周期（插件实现）
 
@@ -38,6 +38,6 @@ sequenceDiagram
 
 ## 4. 模式映射
 
-1. standalone：`taskbus_provider=redis`
-2. standalone + proxy：`taskbus_provider=host`
+1. 本地：`POWERX_PROVIDER_MODE=local`，proxy 为 `0` 或 `1` 均选择 Redis TaskBus
+2. 委派：`POWERX_PROVIDER_MODE=delegated`，proxy 为 `0` 或 `1` 均选择 Host Event Fabric
 3. Host：由 framework 统一封装，业务层无感知

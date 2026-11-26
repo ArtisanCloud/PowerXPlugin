@@ -8,7 +8,7 @@ var (
 )
 
 func IsInvalid(err error) bool {
-	return errors.Is(err, ErrModeInvalid)
+	return errors.Is(err, ErrModeInvalid) || errors.Is(err, ErrProxyInvalid)
 }
 
 func IsConflict(err error) bool {

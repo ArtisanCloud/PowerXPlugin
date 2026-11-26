@@ -30,6 +30,6 @@ cd skeleton/web-admin/nuxt
 npm run test:unit -- tests/unit/session-termination-v2.spec.ts tests/unit/session-termination-admin.spec.ts tests/unit/session-termination-adapter.spec.ts tests/unit/session-termination-router.spec.ts tests/unit/bridge-v2-interoperability.spec.ts
 ```
 
-`python3 scripts/contracts/package-session-termination.py` 生成内容寻址的本地 client/Admin 包和 CLI 示例，以实际安装字节复跑协议测试与严格类型检查；不发布 npm 或 Git tag。`node scripts/contracts/test-session-termination-browser.mjs <bundle>` 使用同包和真实 Core 注入消费器进行隔离浏览器验证，服务在 finally 中关闭。
+`python3 scripts/contracts/package-session-termination.py --browser` 生成内容寻址的本地 client/Admin 包和 CLI 示例，以实际安装字节复跑协议测试、严格类型检查及隔离浏览器验证；不发布 npm 或 Git tag。省略 `--browser` 只运行包、生成物及类型验证。浏览器使用同包和真实 Core 注入消费器，服务在 finally 中关闭；生成插件、编译器、安装依赖和测试副本放在忽略的 `tmp/` 私有临时目录，成功、失败或正常中断后自动删除。`artifacts/framework-session-termination-*` 仅保留 SDK 包、摘要及验证／清理报告，不进入 Git 提交候选；浏览器检查需通过完整命令重新生成工作目录，不直接复用已清理的历史目录。
 
 验收记录：[2026-11-07 Framework 验证](evidence/plugin-session-termination-framework-validation-20261107.json)。源码、受控测试与本地包验证不代表 npm 已发布、既有插件已安装或日常 Core/AI Craft 已联调。AI Craft 仍需消费相同版本、移除自行退出逻辑、绑定草稿身份，随后由各仓库所有者完成部署与真实登录验收。

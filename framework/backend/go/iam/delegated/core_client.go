@@ -15,6 +15,7 @@ import (
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
 	iamerrors "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/errors"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/hostcontract"
 	"github.com/google/uuid"
 )
 
@@ -27,11 +28,12 @@ type TokenProviderFunc func(context.Context) (string, error)
 func (f TokenProviderFunc) Token(ctx context.Context) (string, error) { return f(ctx) }
 
 type CoreClientConfig struct {
-	PluginID string
-	BaseURL  string
-	Tokens   TokenProvider
-	Timeout  time.Duration
-	Client   *http.Client
+	PluginID  string
+	BaseURL   string
+	APIPrefix string
+	Tokens    TokenProvider
+	Timeout   time.Duration
+	Client    *http.Client
 }
 
 // CoreClient is the official Framework STS transport for the IAM directory
@@ -61,7 +63,15 @@ func NewCoreClient(cfg CoreClientConfig) (*CoreClient, error) {
 	if client == nil {
 		client = &http.Client{Timeout: timeout + 500*time.Millisecond}
 	}
-	return &CoreClient{pluginID: strings.TrimSpace(cfg.PluginID), baseURL: apiBase(cfg.BaseURL), tokens: cfg.Tokens, timeout: timeout, client: client, authScheme: "Bearer"}, nil
+	baseURL := apiBase(cfg.BaseURL)
+	if cfg.APIPrefix != "" {
+		var err error
+		baseURL, err = hostcontract.InvocationEndpoint(cfg.BaseURL, cfg.APIPrefix, "")
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &CoreClient{pluginID: strings.TrimSpace(cfg.PluginID), baseURL: baseURL, tokens: cfg.Tokens, timeout: timeout, client: client, authScheme: "Bearer"}, nil
 }
 
 // NewCoreClientWithAPIKey uses a server-owned credential for Local + proxy.

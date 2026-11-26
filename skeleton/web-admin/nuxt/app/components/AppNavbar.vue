@@ -26,6 +26,7 @@
         <UBadge
           :color="providerModeBadge.color"
           variant="outline"
+          :ui="{ base: 'text-(--ui-text-highlighted)' }"
           class="text-xs font-semibold"
         >
           {{ providerModeBadge.label }}
@@ -46,6 +47,7 @@
             size="sm"
             square
             :aria-label="t('navigation.notifications')"
+            :disabled="!auth.isAuthenticated.value"
             @click="toggleNotifications"
           >
             <UIcon name="i-heroicons-bell" class="w-5 h-5" />
@@ -176,11 +178,11 @@ const handleLogout = async () => {
 const providerModeBadge = computed(() => {
   const standalone = auth.localIAMEnabled?.value ?? false;
   return {
-    label: standalone ? "本地 IAM" : "Delegated IAM",
+    label: standalone ? t("navigation.localIAM") : t("navigation.delegatedIAM"),
     description: standalone
-      ? "当前使用本地目录鉴权"
-      : "通过宿主 PowerX 鉴权",
-    color: standalone ? "green" : "yellow",
+      ? t("navigation.localIAMDescription")
+      : t("navigation.delegatedIAMDescription"),
+    color: standalone ? "success" as const : "warning" as const,
   };
 });
 
@@ -250,15 +252,26 @@ const subscribeNotificationTopics = () => {
   }
 };
 
+let notificationsDisposed = false;
 onMounted(() => {
-  userStore.fetchUserContext().finally(() => {
-    subscribeNotificationTopics();
-  });
-  connect();
-  subscribeNotificationTopics();
+  watch(() => auth.isAuthenticated.value, async (authenticated) => {
+    if (!authenticated) {
+      disconnect();
+      return;
+    }
+    try {
+      await userStore.fetchUserContext();
+      if (notificationsDisposed || !auth.isAuthenticated.value) return;
+      connect();
+      subscribeNotificationTopics();
+    } catch (error) {
+      console.warn("NAVBAR_USER_CONTEXT_UNAVAILABLE", error);
+    }
+  }, { immediate: true });
 });
 
 onUnmounted(() => {
+  notificationsDisposed = true;
   disconnect();
 });
 </script>
